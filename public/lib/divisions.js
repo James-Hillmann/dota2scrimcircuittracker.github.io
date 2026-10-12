@@ -18,6 +18,12 @@ export const SEASON = {
   phase: "playoffs", regularEnd: Date.UTC(2026, 9, 12) / 1000, regularIds: [],
 };
 export const playoffs = SEASON.phase === "playoffs";
+// Teams AD2L removed from the league (PlayOn team id → when, as Y-M-D). Their results still
+// count for everyone they played (wins and SoS), but they leave the final table, so the teams
+// below move up a place (lib/playoffs.js). New season: empty it.
+export const REMOVED = new Map([
+  [10282, "2026-10-09"], // PLASMA (Heroic/Aegis A), admins' announcement on Discord
+]);
 export const isPostseason = (s) => SEASON.regularEnd != null && (s.time ?? 0) > SEASON.regularEnd && !SEASON.regularIds.includes(s.id);
 export const groupStage = (series) => series.filter((s) => !isPostseason(s));
 

@@ -6,10 +6,10 @@
 //    - Model's picks: the same with every call the model's.
 //  - Possibilities: every way the remaining series (and the tiebreakers they set up) can go,
 //    as each team's chance of each place; click a cell or team for what it takes.
-import { playoffPicture, possibilities, pathsTo, pathsToEvent, TBD } from "../lib/playoffs.js";
+import { playoffPicture, possibilities, pathsTo, pathsToEvent, TBD, HEROIC_VERSIONS, HEROIC_DEFAULT } from "../lib/playoffs.js";
 import { info } from "../lib/glossary.js";
 import { esc, pct, teamLink, DIVISIONS } from "../core.js";
-import { groupStage } from "../lib/divisions.js";
+import { groupStage, REMOVED } from "../lib/divisions.js";
 import { ordinal as ord } from "../lib/ranks.js";
 
 const RULES = "https://dota.playon.gg/rules";
@@ -20,6 +20,7 @@ const sc = (m) => `${m.score[0]}–${m.score[1]}`;
 const scoreOdds = (m) => m.scores.map((s) => `${s.a}–${s.b} <span class="muted">${pct(s.p)}</span>`).join(" · ");
 const MODES = [["mine", "Your picks"], ["model", "Model's picks"]];
 const MODE_KEY = "po-mode";
+const VERSION_KEY = "po-heroic";
 const load = (k, fallback) => { try { return JSON.parse(localStorage.getItem(k)) ?? fallback; } catch { return fallback; } };
 const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* private window: not remembered */ } };
 
@@ -42,7 +43,13 @@ export function mountPlayoffs(el, src, d, ratings, myCalls = new Map(), { view =
   const state = { mode: load(MODE_KEY, "mine"), picks: watch ? { ...(watch.picks ?? {}) } : locked && share?.saved ? { ...share.saved } : load(pickKey, {}), weight: "equal", sel: null };
   if (!MODES.some(([id]) => id === state.mode)) state.mode = "mine";
   if (watch) state.mode = watch.model ? "model" : "mine";
+  // Heroic/Aegis: which reading of AD2L's week 8 (lib/playoffs.js HEROIC_VERSIONS).
+  state.version = split && HEROIC_VERSIONS.some(([id]) => id === load(VERSION_KEY, "")) ? load(VERSION_KEY, "") : HEROIC_DEFAULT;
   const possCache = {};
+  const versionBar = () => split ? `<div class="pd-toggle po-versions" role="group" aria-label="Heroic week 8"><span class="pd-lbl">Heroic week 8</span>${HEROIC_VERSIONS.map(([id, label]) => `<button type="button" data-version="${id}" aria-pressed="${id === state.version}">${label}</button>`).join("")}</div>
+    <p class="table-note keep">${state.version === "announced"
+      ? "AD2L's week 8 announcement has no game for Heroic's upper bracket in Division A, so Abz Jr, Josh A. Chaos and cheerful (all on 7 wins) are ordered by SoS."
+      : "The rules play off a tie across Heroic's upper/lower line, so this adds a Bo3 that AD2L's week 8 announcement didn't list."}</p>` : "";
 
   // Your picks go to the Leaderboard as you click (a short pause after the last click), so
   // others can open your bracket.
@@ -67,7 +74,7 @@ export function mountPlayoffs(el, src, d, ratings, myCalls = new Map(), { view =
     if (view === "odds") { el.innerHTML = possHtml(); return; }
     if (view === "team") { el.innerHTML = teamHtml(); return; }
     const bar = `<div class="pd-toggle po-modes" role="group" aria-label="Whose bracket">${MODES.map(([id, label]) => `<button type="button" data-pomode="${id}" aria-pressed="${id === state.mode}">${label}</button>`).join("")}</div>`;
-    el.innerHTML = `${watch ? "" : bar}${pictureHtml(state.mode === "mine")}`;
+    el.innerHTML = `${watch ? "" : bar}${versionBar()}${pictureHtml(state.mode === "mine")}`;
   };
 
   // ---------- your picks / the model's picks ----------
@@ -77,9 +84,9 @@ export function mountPlayoffs(el, src, d, ratings, myCalls = new Map(), { view =
     // bracket (not when watching someone else, whose bracket picks aren't saved).
     const live = mine && !watch && !locked, frozen = mine && !watch && !!locked;
     const p = playoffPicture(d.teams, d.series, ratings, live || frozen
-      ? { split, call: (s) => myCalls.get(s.id), choose: (k) => state.picks[k], blank: true }
-      : mine ? { split, call: (s) => myCalls.get(s.id), choose: watch?.picks ? (k) => state.picks[k] : undefined, blank: !!watch?.picks }
-      : { split });
+      ? { split, version: state.version, call: (s) => myCalls.get(s.id), choose: (k) => state.picks[k], blank: true }
+      : mine ? { split, version: state.version, call: (s) => myCalls.get(s.id), choose: watch?.picks ? (k) => state.picks[k] : undefined, blank: !!watch?.picks }
+      : { split, version: state.version });
     const score = (s, id) => (s.home === id ? s.home_score : s.away_score);
     const whose = (x) => (mine ? ` <span class="po-who${x.mine ? " me" : ""}">${x.mine ? (watch ? "their pick" : "your pick") : "model's pick"}</span>` : "");
 
@@ -184,7 +191,8 @@ export function mountPlayoffs(el, src, d, ratings, myCalls = new Map(), { view =
         </div></div>`;
     };
 
-    const heroicNote = split ? `<p class="po-heroic">Top 8 of each division make the playoffs. <b>Aegis</b>: 1st and 2nd of each division start in the upper bracket, 3rd and 4th in the lower. <b>Heroic</b>: 5th and 6th start upper, 7th and 8th lower. Each is a double-elimination bracket.</p>` : "";
+    const removed = d.teams.filter((t) => REMOVED.has(t.id));
+    const heroicNote = split ? `<p class="po-heroic">Top 8 of each division make the playoffs. <b>Aegis</b>: 1st and 2nd of each division start in the upper bracket, 3rd and 4th in the lower. <b>Heroic</b>: 5th and 6th start upper, 7th and 8th lower. Each is a double-elimination bracket.${removed.length ? ` ${removed.map((t) => `<b>${esc(t.name)}</b>`).join(", ")} ${removed.length === 1 ? "was" : "were"} removed from the league, so ${removed.length === 1 ? "it isn't" : "they aren't"} in the table below. ${removed.length === 1 ? "Its" : "Their"} results still count for the teams ${removed.length === 1 ? "it" : "they"} played.` : ""}</p>` : "";
     const splitBrackets = (p.brackets ?? []).map((x) => bracketHtml(x.bracket, { seedOf: x.labels, title: `${x.name} bracket` })).join("");
     const splitNote = splitBrackets ? `<p class="table-note keep">AD2L hasn't announced the cross-division matchups. Assumed: upper bracket A1 v B2 and B1 v A2, lower bracket A3 v B4 and B3 v A4 (Heroic the same with 5th–8th). The loser of A1's match plays the B3 v A4 winner, as in S47.</p>` : "";
     const lockedOn = locked ? new Date(locked * 1000).toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "";
@@ -255,7 +263,7 @@ export function mountPlayoffs(el, src, d, ratings, myCalls = new Map(), { view =
   const week8 = (tb) => tb === "*" ? "and the other week 8 tiebreakers falling right"
     : `Week 8: ${tb.split(",").map((x) => `${x[0] === "w" ? "beat" : "lose to"} ${esc(name[Number(x.slice(1))])}`).join(", then ")}`;
 
-  const possNow = () => (possCache[state.weight] ??= possibilities(d.teams, d.series, ratings, { split, weight: state.weight }));
+  const possNow = () => (possCache[`${state.weight}|${state.version}`] ??= possibilities(d.teams, d.series, ratings, { split, weight: state.weight, version: state.version }));
   // The summary columns: each line's label and a team's chance there (a running total, or with
   // `band` just that line's places).
   const summary = (dv) => {
@@ -267,7 +275,7 @@ export function mountPlayoffs(el, src, d, ratings, myCalls = new Map(), { view =
   // One team's chances: its summary, a bar per place, and what it takes for each.
   const teamHtml = () => {
     const P = possNow(), dv = P.divisions.find((x) => x.ids.includes(team));
-    if (!dv) return `<div class="panel empty">This team isn't in the table.</div>`;
+    if (!dv) return `<div class="panel empty">${REMOVED.has(team) ? "AD2L removed this team from the league, so it has no seed." : "This team isn't in the table."}</div>`;
     const dist = dv.dist.get(team), N = dv.ids.length;
     const best = dist.reduce((b, p, i) => (p > dist[b] ? i : b), 0);
     const sel = state.sel?.team === team ? state.sel : { team, place: null };
@@ -279,7 +287,7 @@ export function mountPlayoffs(el, src, d, ratings, myCalls = new Map(), { view =
       return p < 5e-4 ? `<div class="po-tbar zero" ${hue}>${inner}</div>` : `<button type="button" class="po-tbar${on ? " on" : ""}" ${hue} data-team="${team}" data-place="${i + 1}">${inner}</button>`;
     }).join("");
     const n = dv.open?.length;
-    return `${weightBar()}
+    return `${weightBar()}${versionBar()}
       <p class="po-lead">Where this team could finish the group stage (its seed, after week 8 tiebreakers), not where it finishes in the playoffs. ${dv.exact ? (n ? `${n} series left, ${dv.count} ways they can go.` : "Only week 8 tiebreakers are left.") : `Based on ${dv.count} simulated seasons.`} ${state.weight === "equal" ? "Every result counts the same." : "Weighted by the model's odds."} <b>Click a seed</b> to see what it takes.</p>
       <div class="po-tcards">${cards.map((c) => `<div class="po-stat"><span>${esc(c.label)}</span><b>${c.value}${c.note ? ` <i>${c.note}</i>` : ""}</b></div>`).join("")}</div>
       <div class="po-tbars">${bars}</div>
@@ -325,7 +333,7 @@ export function mountPlayoffs(el, src, d, ratings, myCalls = new Map(), { view =
       return `${dv.division ? `<h3 class="po-div">Division ${esc(dv.division)}</h3>` : ""}${table}${pick}${eventsHtml(dv)}`;
     };
 
-    return `${weightBar()}${lead}${P.divisions.map(divHtml).join("")}
+    return `${weightBar()}${versionBar()}${lead}${P.divisions.map(divHtml).join("")}
       <p class="table-note">Ties on wins: across a dividing line, a week 8 tiebreaker (counted both ways); for seed order, SoS, head to head, record against the highest common opponent, then a 1v1 mid for 1st or a coin flip for other seeds (both counted 50/50).</p>
       ${howHtml}`;
   };
@@ -453,6 +461,7 @@ export function mountPlayoffs(el, src, d, ratings, myCalls = new Map(), { view =
     if (t.hasAttribute("data-tocards")) { document.querySelector('.pp-tabs [data-tab="calls"]')?.click(); return; }
     if (t.hasAttribute("data-reset")) { if (locked) return; state.picks = {}; save(pickKey, state.picks); shareNow(); return keep(render); }
     if (t.dataset.weight) { state.weight = t.dataset.weight; return keep(render); }
+    if (t.dataset.version) { state.version = t.dataset.version; save(VERSION_KEY, state.version); return keep(render); }
     if (t.hasAttribute("data-goodds")) {
       // Predict opens on its remembered tab; drop this page's ?tab= so it doesn't carry over.
       try { localStorage.setItem("predictTab", "odds"); } catch {}

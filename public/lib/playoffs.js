@@ -20,10 +20,12 @@
 import { seriesOdds, modelCall, ODDS_SPREAD } from "./predict.js";
 import { isPlayed, gameWins, strengthOfSchedule } from "./schedule.js";
 import { ordinal as ord } from "./ranks.js";
-import { isPostseason, groupStage } from "./divisions.js";
+import { isPostseason, groupStage, REMOVED } from "./divisions.js";
 
 export const REG_WEEKS = 7;
 export const isBye = (t) => /\bbye week\b/i.test(t?.name ?? "");
+// In the final table: not a bye week and not removed from the league (lib/divisions.js REMOVED).
+const inTable = (t) => !isBye(t) && !REMOVED.has(t.id);
 
 const sig = (x) => 1 / (1 + Math.exp(-x));
 // Chance the first team wins one game: the same stretched gap as the series odds on Predict.
@@ -260,6 +262,8 @@ export function resolveTable(ids, series, ratings, lines, choose) {
     return { a, b, bestOf, note, key, ...callMatch(ratings, a, b, bestOf, choose?.(key, a, b, bestOf)), for: pName };
   };
   for (const line of lines) {
+    // A line AD2L settles without games (see linesFor): its ties are seed order, below.
+    if (line.unplayed) continue;
     let start = 0;
     const i = segs.findIndex((seg) => { const hit = start < line.after && start + seg.length > line.after; if (!hit) start += seg.length; return hit; });
     if (i < 0) continue;
@@ -371,7 +375,7 @@ export function bracket(seeds, ratings, choose, { fixed = false, blank = false }
 // `call` picks group-stage results and `choose` tiebreaker and bracket winners (a viewer's own
 // picks); whatever they leave open goes the model's way.
 // `blank`: bracket matches nobody picked stay open (see bracket).
-export function playoffPicture(teams, series, ratings, { split = false, call, choose: own, blank = false } = {}) {
+export function playoffPicture(teams, series, ratings, { split = false, call, choose: own, blank = false, version = HEROIC_DEFAULT } = {}) {
   const projected = projectSeries(teams, series, ratings, call);
   // Played postseason series settle their tiebreaker or bracket match, ahead of anyone's pick.
   const actual = postResults(series);
@@ -381,9 +385,9 @@ export function playoffPicture(teams, series, ratings, { split = false, call, ch
   const out = {
     series: projected,
     divisions: divs.map((div) => {
-      const ids = teams.filter((t) => (t.division ?? "") === div && !isBye(t)).map((t) => t.id);
+      const ids = teams.filter((t) => (t.division ?? "") === div && inTable(t)).map((t) => t.id);
       const mine = projected.filter((s) => ids.includes(s.home) || ids.includes(s.away));
-      const lines = linesFor(ids.length, split);
+      const lines = linesFor(ids.length, split, version);
       const table = resolveTable(ids, mine, ratings, lines.filter((l) => l.after < ids.length), choose);
       const seeds = table.rows.slice(0, 8).map((r) => r.id);
       for (const tb of table.tiebreakers) for (const m of tb.matches) actual.mark(m);
@@ -455,11 +459,11 @@ function postResults(series) {
 // locks (the first bracket series' start, null until one is scheduled) and each bracket match
 // already decided ({ bracket, id, label, winner, teams }). From the model's picture with the real
 // results in, so a pairing nobody has played yet is matched to the match the model expects.
-export function postseason(teams, series, ratings, { split = false } = {}) {
+export function postseason(teams, series, ratings, { split = false, version = HEROIC_DEFAULT } = {}) {
   const post = series.filter(isPostseason);
   const out = { roles: new Map(), lock: null, decided: [], bracketTeams: new Map() };
   if (!post.length) return out;
-  const pic = playoffPicture(teams, series, ratings, { split });
+  const pic = playoffPicture(teams, series, ratings, { split, version });
   const tbs = pic.divisions.flatMap((dv) => dv.tiebreakers.flatMap((tb) => tb.matches));
   const brackets = split ? pic.brackets.map((b) => [b.name, b.bracket]) : pic.divisions.map((dv) => ["", dv.bracket]);
   for (const s of post) {
@@ -498,11 +502,18 @@ export function bracketPoints(picks, decided, bracketTeams = new Map()) {
 // The dividing lines in a division's table.
 // `col` names the line's column on Possibilities: "this line or better", or with `band` just
 // the places between the line before and this one (Heroic/Aegis's four brackets).
-function linesFor(n, split) {
+// `unplayed`: a line whose ties AD2L settles as seed order, without games.
+// S48's week 8 announcement (Discord, 2026-10-11) set no game for a tie across Heroic's
+// upper/lower line (A: Abz Jr, Josh A. Chaos and cheerful on 7 wins for 2 upper places), where
+// the rules' table plays one. Both readings are kept as versions: "announced" settles it as
+// seed order (SoS first), "rules" plays it. New season: drop the choice.
+export const HEROIC_VERSIONS = [["announced", "As announced"], ["rules", "By the rules"]];
+export const HEROIC_DEFAULT = "announced";
+function linesFor(n, split, version = HEROIC_DEFAULT) {
   return split
     ? [{ after: 2, above: "Aegis upper bracket", below: "Aegis lower bracket", col: "Aegis upper", band: true },
       { after: 4, above: "Aegis lower bracket", below: "Heroic upper bracket", col: "Aegis lower", band: true },
-      { after: 6, above: "Heroic upper bracket", below: "Heroic lower bracket", col: "Heroic upper", band: true },
+      { after: 6, above: "Heroic upper bracket", below: "Heroic lower bracket", col: "Heroic upper", band: true, ...(version === "announced" && { unplayed: true }) },
       { after: 8, above: "Heroic lower bracket", below: "out", col: "Heroic lower", band: true }]
     : n >= 8 ? [{ after: 4, above: "upper bracket", below: "lower bracket", col: "Starts upper" }, { after: 8, above: "playoffs", below: "out", col: "Makes playoffs" }]
     : n > 4 ? [{ after: 4, above: "upper bracket", below: "lower bracket", col: "Starts upper" }] : [];
@@ -519,7 +530,7 @@ function linesFor(n, split) {
 // Per division: dist (team id → chance of each place, 1st first), exact / unposted / open /
 // count / total, and when exact, scenarios ({ res: outcome index per open series, w, at: team
 // id → Map "place|its week 8 results" → chance within that outcome }).
-export function possibilities(teams, series, ratings, { split = false, weight = "equal", samples = 4000, rng = Math.random, maxExact = 9 } = {}) {
+export function possibilities(teams, series, ratings, { split = false, weight = "equal", samples = 4000, rng = Math.random, maxExact = 9, version = HEROIC_DEFAULT } = {}) {
   const r = (id) => ratings.get(id) ?? 0;
   const odds = (s) => (weight === "model" ? seriesOdds(r(s.home), r(s.away)) : { home: 1 / 3, tie: 1 / 3, away: 1 / 3 });
   // A division's results never move another's table, so each is worked out on its own
@@ -531,8 +542,8 @@ export function possibilities(teams, series, ratings, { split = false, weight = 
     const open = dSeries.filter((s) => !isPlayed(s) && !isBye(teamOf.get(s.home)) && !isBye(teamOf.get(s.away)));
     const unposted = projectSeries(dTeams, dSeries, ratings).some((s) => s.paired);
     const exact = !unposted && open.length <= maxExact;
-    const ids = dTeams.filter((t) => !isBye(t)).map((t) => t.id);
-    const lines = linesFor(ids.length, split);
+    const ids = dTeams.filter(inTable).map((t) => t.id);
+    const lines = linesFor(ids.length, split, version);
     const dv = { division: div, ids, lines, dist: new Map(ids.map((id) => [id, new Array(ids.length).fill(0)])), scenarios: [], events: new Map(),
       exact, unposted, open: exact ? open : null, count: exact ? 3 ** open.length : samples, total: 0 };
     const run = (call, w, res) => {

@@ -3571,6 +3571,8 @@ button.po-slot.on.me { border-style: solid; border-color: var(--jade); }
 .po-seedpick button { font: 600 11px var(--mono); letter-spacing: .08em; text-transform: uppercase; padding: 6px 10px; color: var(--dust); background: var(--stone); border: 1px solid var(--seam); cursor: pointer; clip-path: none; }
 .po-seedpick button[aria-pressed="true"] { color: var(--bone); border-color: var(--accent); }
 .po-weightbar { margin: 20px 0 16px; }
+.po-versions { margin: 12px 0 4px; }
+.po-versions + .table-note { margin-top: 4px; }
 .po-poss th, .po-poss td { padding: 3px 4px; }
 .po-poss thead th { font: 600 10px var(--mono); letter-spacing: .08em; color: var(--dim); text-align: center; }
 .po-poss thead th.l { text-align: left; }
