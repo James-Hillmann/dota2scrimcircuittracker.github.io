@@ -4,7 +4,7 @@ import { info, wireInfo } from "./lib/glossary.js";
 import { countVisit } from "./lib/visits.js";
 import { searchIndex } from "./lib/search.js";
 import { loadSearch } from "./parts/searchindex.js";
-import { DIVISIONS as DIVISION_LIST, slugOf, fullName, divisionCss, SEASON } from "./lib/divisions.js";
+import { DIVISIONS as DIVISION_LIST, slugOf, fullName, divisionCss, SEASON, playoffs } from "./lib/divisions.js";
 import { esc, DIVISIONS, SOURCES, TM_KEY, timeSel, gameWeeker, seriesWeek, shortDate, divLite, allMatches, addressOf, routedAt, setRoutedAt, navigate, goToSection, showTab, app, tabInUrl, here, bySlug, timeSrc, allLoad, gameLeague, divUploaded, setTitle, myTeam, setMyTeam, myTeamOptions, teamFromOption } from "./core.js";
 import { weekOfFn } from "./parts/lanes.js";
 import { tabList, PLAYERS_PAGE_TABS, HEROES_PAGE_TABS, PREDICT_TABS, DRAFTER_MODES } from "./lib/pagetabs.js";
@@ -430,7 +430,9 @@ export function route() {
   document.body.dataset.league = src.key;
   const divLabel = DIVISIONS[src.key]?.views ? (src.view ? `Division ${src.view.toUpperCase()}` : "Combined") : "";
   const leagueTitle = src.all ? `AD2L ${SEASON.name} · All Divisions` : isAd2l ? `AD2L ${src.division}${divLabel ? ` · ${divLabel}` : ""}` : "Scrim League";
-  document.getElementById("league-name").innerHTML = src.all ? "AD2L<b>All Divisions</b>" : isAd2l ? `AD2L<b>${src.division}</b>${divLabel ? `<em class="div-badge">${src.view ? `Div ${src.view.toUpperCase()}` : DIVISIONS[src.key].views.join(" + ").toUpperCase()}</em>` : ""}` : "Scrim<b>League</b>";
+  // In the playoffs (lib/divisions.js SEASON.phase) every AD2L league gets a stamp over its name.
+  const stamp = playoffs && isAd2l ? `<span class="po-stamp" aria-label="Playoffs">Playoffs</span>` : "";
+  document.getElementById("league-name").innerHTML = (src.all ? "AD2L<b>All Divisions</b>" : isAd2l ? `AD2L<b>${src.division}</b>${divLabel ? `<em class="div-badge">${src.view ? `Div ${src.view.toUpperCase()}` : DIVISIONS[src.key].views.join(" + ").toUpperCase()}</em>` : ""}` : "Scrim<b>League</b>") + stamp;
   leagueMenu.querySelectorAll("a").forEach((a) => a.classList.toggle("current", a.dataset.league === src.key));
 
   // Pages that read through the time machine; `tm` marks them so its bar shows.

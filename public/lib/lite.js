@@ -6,7 +6,7 @@
 import { LANE_END_MIN } from "./lanes.js";
 
 const GAME_DROP = ["buildings", "objectives", "xp_adv", "gold_adv", "fights", "pauses", "vision", "fight_smokes"];
-const PLAYER_DROP = ["sen_pos", "items", "item_times", "networth_t", "max_hit", "bench", "smoke_kill_t"];
+const PLAYER_DROP = ["sen_pos", "items", "item_times", "networth_t", "max_hit", "bench", "smoke_kill_t", "xp_t", "tf_dmg"];
 
 export function liteDivision(d) {
   const { pubs, ...rest } = d;

@@ -148,6 +148,7 @@ const save = () => {
 let on = false;
 let tool = "snip";
 let pending = null; // { kind, area, box?, target?, strokes? } — the mark waiting for its note
+let editing = null; // the index of the saved note being edited in the list
 let drag = null;
 let drawTimer = 0;
 let seenPage = pageKey();
@@ -224,7 +225,17 @@ function build() {
 
   listBox.addEventListener("click", (e) => {
     const rm = e.target.closest("[data-remove]");
-    if (rm) { items.splice(Number(rm.dataset.remove), 1); save(); refresh(); renderList(); }
+    if (rm) { items.splice(Number(rm.dataset.remove), 1); editing = null; save(); refresh(); renderList(); return; }
+    const ed = e.target.closest("[data-edit]");
+    if (ed) { editing = Number(ed.dataset.edit); renderList(); return; }
+    if (e.target.closest("[data-save]")) saveEdit();
+    else if (e.target.closest("[data-cancel]")) { editing = null; renderList(); }
+  });
+  listBox.addEventListener("keydown", (e) => {
+    if (e.target.classList.contains("fb-edit") && e.key === "Enter" && !e.shiftKey) { e.preventDefault(); saveEdit(); }
+  });
+  listBox.addEventListener("input", (e) => {
+    if (e.target.classList.contains("fb-edit")) listBox.querySelector("[data-save]").disabled = !e.target.value.trim();
   });
   window.addEventListener("scroll", placeNote, { passive: true });
   window.addEventListener("resize", () => { placeNote(); drawPins(); });
@@ -479,12 +490,30 @@ function toggleList() {
   if (!listBox.hidden) renderList();
 }
 function renderList() {
+  if (editing != null && !items[editing]) editing = null;
   listBox.innerHTML = `<div class="fb-list-head"><b>Your notes</b><span>${items.length} of ${MAX_FEEDBACK_ITEMS}</span></div>`
     + (items.length ? `<ol>${items.map((it, i) => `<li>
         ${it.shot ? `<img src="${it.shot}" alt="">` : `<span class="fb-noshot">${KIND_LABEL[it.kind]}</span>`}
-        <div><b>${i + 1}. ${KIND_LABEL[it.kind]}</b> <small>${esc(new URL(it.page).pathname + new URL(it.page).search)}</small><p>${esc(it.note)}</p></div>
-        <button type="button" data-remove="${i}" title="Remove this note" aria-label="Remove note ${i + 1}">×</button></li>`).join("")}</ol>`
+        <div><b>${i + 1}. ${KIND_LABEL[it.kind]}</b> <small>${esc(new URL(it.page).pathname + new URL(it.page).search)}</small>
+          ${i === editing
+            ? `<textarea class="fb-edit" maxlength="1000" rows="3" aria-label="Edit note ${i + 1}">${esc(it.note)}</textarea>
+              <div class="fb-edit-row"><button type="button" class="fb-edit-save" data-save>Save</button><button type="button" class="fb-edit-cancel" data-cancel>Cancel</button></div>`
+            : `<p>${esc(it.note)}</p>`}</div>
+        <div class="fb-li-btns">${i === editing ? "" : `<button type="button" data-edit="${i}" title="Edit this note" aria-label="Edit note ${i + 1}">✎</button>`}
+          <button type="button" data-remove="${i}" title="Remove this note" aria-label="Remove note ${i + 1}">×</button></div></li>`).join("")}</ol>`
       : `<p class="fb-empty">Nothing yet. Pick a tool on the left and mark something.</p>`);
+  const ta = listBox.querySelector(".fb-edit");
+  if (ta) { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
+}
+// Keeps the edited note's text (an empty note isn't saved; remove it with × instead).
+function saveEdit() {
+  const ta = listBox.querySelector(".fb-edit");
+  if (editing == null || !ta) return;
+  const note = ta.value.trim();
+  if (!note) return;
+  items[editing] = { ...items[editing], note };
+  editing = null;
+  save(); refresh(); renderList();
 }
 
 // ---------- submit ----------
@@ -546,6 +575,7 @@ function onKey(e) {
     e.stopImmediatePropagation();
     if (!modal.hidden) modal.hidden = true;
     else if (pending || !noteBox.hidden) discard();
+    else if (editing != null) { editing = null; renderList(); }
     else if (!listBox.hidden) listBox.hidden = true;
     else setOn(false);
     return;

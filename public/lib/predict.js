@@ -13,6 +13,7 @@
 // 2-0 = p² + rho·p(1-p), 1-1 = 2p(1-p)(1-rho), 0-2 = (1-p)² + rho·p(1-p).
 
 import { phasedDraft } from "./draft.js";
+import { isPostseason } from "./divisions.js";
 
 const sig = (x) => 1 / (1 + Math.exp(-x));
 
@@ -70,6 +71,15 @@ export function seriesOdds(ra, rb) {
   const p = sig(ODDS_SPREAD * (ra - rb)), both = SERIES_CORR * p * (1 - p);
   return { game: p, home: p * p + both, tie: 2 * p * (1 - p) - 2 * both, away: (1 - p) * (1 - p) + both };
 }
+// A postseason series (tiebreakers and the bracket: lib/divisions.js) has a winner, no tie: the
+// chance each side wins a best-of-n (n odd) from the one-game chance, and the model's call is
+// the favourite.
+export function postOdds(ra, rb, bestOf = 3) {
+  const p = sig(ODDS_SPREAD * (ra - rb));
+  const home = bestOf === 3 ? p * p * (3 - 2 * p) : bestOf === 5 ? p ** 3 * (10 - 15 * p + 6 * p * p) : p;
+  return { game: p, home, tie: 0, away: 1 - home, bestOf };
+}
+export const postCall = (o) => (o.home >= 0.5 ? "home" : "away");
 export const outcomeOf = (s) => (s.home_score > s.away_score ? "home" : s.home_score < s.away_score ? "away" : "tie");
 export const favourite = (o) => ["home", "tie", "away"].sort((a, b) => o[b] - o[a])[0];
 
@@ -82,9 +92,10 @@ export function backtest(teams, series, params) {
   for (const t of nights(series)) {
     const r = fitRatings(teams, series, { ...params, before: t });
     for (const s of series.filter((x) => x.time === t && isPlayed(x))) {
-      const o = seriesOdds(r.get(s.home) ?? 0, r.get(s.away) ?? 0);
-      const actual = outcomeOf(s);
-      out.push({ s, odds: o, pick: modelCall(o), actual, correct: modelCall(o) === actual, p_actual: o[actual] });
+      const post = isPostseason(s);
+      const o = post ? postOdds(r.get(s.home) ?? 0, r.get(s.away) ?? 0) : seriesOdds(r.get(s.home) ?? 0, r.get(s.away) ?? 0);
+      const actual = outcomeOf(s), pick = post ? postCall(o) : modelCall(o);
+      out.push({ s, odds: o, pick, actual, correct: pick === actual, p_actual: o[actual] });
     }
   }
   return out;

@@ -1,9 +1,11 @@
 // AD2L Teams tab: standings, Matches (series by week) and Crosstable.
 import { lineChart, wireCharts } from "../lib/charts.js";
-import { isPlayed, seriesOdds, tune, fitRatings } from "../lib/predict.js";
+import { isPlayed, seriesOdds, postOdds, tune, fitRatings } from "../lib/predict.js";
 import { strengthOfSchedule, gameWins } from "../lib/schedule.js";
 import { info } from "../lib/glossary.js";
 import { weekStart, DIVISIONS, teamLink, pct, esc, app, pageHead, playerTabs, sortableTable, SOURCES, wirePlayerTabs } from "../core.js";
+import { groupStage, isPostseason } from "../lib/divisions.js";
+import { postseason } from "../lib/playoffs.js";
 import { pageTabs, STANDINGS_TABS } from "../lib/pagetabs.js";
 import { loading, errorBox } from "../parts/lanes.js";
 
@@ -91,7 +93,8 @@ function matchesHtml(src, d, ratings) {
 // empty. Combined Heroic gets one table per division (they never play each other). "" before
 // any series is played.
 function crossTableHtml(src, d, order) {
-  const { series, team, bye, gamesOf, weekNo, split } = seriesContext(src, d);
+  // The group stage only: a playoff rematch isn't a crosstable meeting.
+  const { series, team, bye, gamesOf, weekNo, split } = seriesContext(src, { ...d, series: groupStage(d.series) });
   if (!series.some(isPlayed)) return "";
   const meet = new Map();
   for (const s of series) {
@@ -138,20 +141,27 @@ export function upNextHtml(src, d) {
   const bye = new Set(d.teams.filter((t) => /\bbye week\b/i.test(t.name)).map((t) => t.id));
   const name = Object.fromEntries(d.teams.map((t) => [t.id, t.name]));
   const ratings = fitRatings(d.teams, d.series, tune(d.teams, d.series));
+  // Postseason series: their round and best-of (lib/playoffs.js postseason), a win bar (no tie).
+  const post = upcoming.some(isPostseason) && !src.all ? postseason(d.teams, d.series, ratings, { split: !!DIVISIONS[src.key]?.views && !src.view }) : null;
+  const roleOf = (s) => post?.roles.get(s.id) ?? { label: "Playoffs", bestOf: 3 };
   const date = (s) => new Date(s * 1000).toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
   const oddsBar = (o) => `<div class="st-odds" title="Model: 2–0 ${pct(o.home)} · 1–1 ${pct(o.tie)} · 0–2 ${pct(o.away)}">${
     [["home", "2–0", "h"], ["tie", "1–1", "t"], ["away", "0–2", "a"]].map(([k, lbl, c]) => `<span class="${c}" style="flex:${o[k].toFixed(3)}">${o[k] >= 0.14 ? `${lbl} ${pct(o[k])}` : ""}</span>`).join("")}</div>`;
+  const winBar = (o, s) => `<div class="st-odds" title="Model: ${esc(name[s.home])} ${pct(o.home)} · ${esc(name[s.away])} ${pct(o.away)}">${
+    [["home", "h"], ["away", "a"]].map(([k, c]) => `<span class="${c}" style="flex:${o[k].toFixed(3)}">${o[k] >= 0.14 ? pct(o[k]) : ""}</span>`).join("")}</div>`;
+  const anyPost = upcoming.slice(0, 10).some(isPostseason), anyGroup = upcoming.slice(0, 10).some((s) => !isPostseason(s));
   return `<div class="fixtures reveal">${upcoming.slice(0, 10).map((s, i) => {
       const real = name[s.home] && name[s.away] && !bye.has(s.home) && !bye.has(s.away);
-      const o = real && seriesOdds(ratings.get(s.home) ?? 0, ratings.get(s.away) ?? 0);
-      return `<div class="fixture st-next" style="--i:${i}">
+      const ps = isPostseason(s), role = ps ? roleOf(s) : null;
+      const o = real && (ps ? postOdds(ratings.get(s.home) ?? 0, ratings.get(s.away) ?? 0, role.bestOf) : seriesOdds(ratings.get(s.home) ?? 0, ratings.get(s.away) ?? 0));
+      return `<div class="fixture st-next${ps ? " st-post" : ""}" style="--i:${i}">
         <div class="fx-team a">${name[s.home] ? teamLink(src, name[s.home], s.home) : "TBD"}</div>
-        <div class="fx-score"><div class="meta">${date(s.time)}</div>
-          ${real ? `${oddsBar(o)}<div class="meta">Model leans ${esc(name[o.home >= o.away ? s.home : s.away])}${src.all ? "" : ` · <a href="${src.root}/predict">draft read on Predict</a>`}</div>` : `<div class="n" style="font-size:22px">VS</div>`}</div>
+        <div class="fx-score"><div class="meta">${ps ? `<b class="st-round">${esc(role.label)}${role.bestOf > 1 ? ` · Bo${role.bestOf}` : ""}</b> · ` : ""}${date(s.time)}</div>
+          ${real ? `${ps ? winBar(o, s) : oddsBar(o)}<div class="meta">Model leans ${esc(name[o.home >= o.away ? s.home : s.away])}${src.all ? "" : ` · <a href="${src.root}/predict">draft read on Predict</a>`}</div>` : `<div class="n" style="font-size:22px">VS</div>`}</div>
         <div class="fx-team b">${name[s.away] ? teamLink(src, name[s.away], s.away) : "TBD"}</div>
       </div>`;
     }).join("")}</div>
-    <p class="table-note">The model's odds, as on Predict. Green = the left team wins 2–0, gold = 1–1, red = the right team wins 2–0.</p>`;
+    <p class="table-note">The model's odds, as on Predict.${anyGroup ? " Green = the left team wins 2–0, gold = 1–1, red = the right team wins 2–0." : ""}${anyPost ? " Playoff series: each team's chance to win it." : ""}</p>`;
 }
 
 // ---------- AD2L standings ----------
@@ -162,7 +172,8 @@ export async function renderStandings(src) {
   let d;
   try { d = await src.data(); } catch (e) { app.innerHTML = `${pageHead(kicker, "Teams")}${errorBox(e)}`; return; }
 
-  const played = d.series.filter((s) => s.home_score != null && s.away_score != null && s.home_score + s.away_score > 0).sort((a, b) => (a.time ?? 0) - (b.time ?? 0));
+  // The table, SoS and records are the group stage's (postseason series: lib/divisions.js).
+  const played = groupStage(d.series).filter((s) => s.home_score != null && s.away_score != null && s.home_score + s.away_score > 0).sort((a, b) => (a.time ?? 0) - (b.time ?? 0));
   const bye = new Set(d.teams.filter((t) => /\bbye week\b/i.test(t.name)).map((t) => t.id));
   const name = Object.fromEntries(d.teams.map((t) => [t.id, t.name]));
   // The model behind Predict, so Rating matches that page.
@@ -186,7 +197,7 @@ export async function renderStandings(src) {
   const byId = Object.fromEntries(rows.map((r) => [r.id, r]));
   const teamById = new Map(d.teams.map((t) => [t.id, t]));
   // A coming bye week isn't an opponent: keep it out of "Still to play".
-  const sos = strengthOfSchedule(d.teams.map((t) => t.id), d.series.filter((s) => isPlayed(s) || (!bye.has(s.home) && !bye.has(s.away))));
+  const sos = strengthOfSchedule(d.teams.map((t) => t.id), groupStage(d.series).filter((s) => isPlayed(s) || (!bye.has(s.home) && !bye.has(s.away))));
 
   // Highlight cards. Biggest upset: the decided series whose result the model, fitted only on
   // the nights before it, thought least likely.
@@ -245,7 +256,7 @@ export async function renderStandings(src) {
     ${tabs.panels}`;
 
   // A bye is a forfeit win with no games behind it: its own muted square, not a real W.
-  const oppWins = gameWins(d.series);
+  const oppWins = gameWins(groupStage(d.series));
   const squares = (fs) => fs.map((f) => bye.has(f.opp)
     ? `<span class="sos-sq ${f.result} bye" title="Bye week: ${f.us}–${f.them} forfeit, no games played">BYE</span>`
     : `<a class="sos-sq ${f.result}" href="${src.root}/teams/${f.opp}"

@@ -170,7 +170,7 @@ export async function renderHero(src, slug) {
     won: g.won ? 1 : 0, vs: vsOf(g).name, vs_id: vsOf(g).id ?? null,
     kills: g.p.kills, deaths: g.p.deaths, assists: g.p.assists, net_worth: g.p.net_worth, gpm: g.p.gpm, hero_damage: g.p.hero_damage, link: src.link(g.m),
   })), "date", { toolbar: true });
-  if (h.games.length) wireGameAnalysis(src, "hero", h.games, gameRated);
+  if (h.games.length) wireGameAnalysis(src, "hero", h.games, gameRated, matches);
 }
 
 // Hero page Matchups tab: every hero seen with it and against it, with its record in those

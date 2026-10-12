@@ -1,11 +1,13 @@
 // Predictions: AD2L series calls and the scrim schedule. Loaded on demand.
 import { listTeams } from "../lib/teams.js";
 import { nameKey } from "../lib/players.js";
-import { tune, backtest, fitRatings, isPlayed, draftRead, predictDraft, seriesOdds, modelCall, crowd, standings, validPicks, favourite, outcomeOf, pickHistory, nightScores, TIE_EDGE } from "../lib/predict.js";
+import { tune, backtest, fitRatings, isPlayed, draftRead, predictDraft, seriesOdds, modelCall, postOdds, postCall, crowd, standings, validPicks, favourite, outcomeOf, pickHistory, nightScores, TIE_EDGE } from "../lib/predict.js";
+import { isPostseason, playoffs } from "../lib/divisions.js";
+import { postseason, bracketPoints } from "../lib/playoffs.js";
 import { listPredictions, listBrackets, saveBracket, currentUid, savePrediction, listFixtures, addFixture, moveFixture, deleteFixture } from "../lib/store.js";
 import { settle, asSeries, scrimRatings, fixtureBacktest, fixtureOdds, fixtureCall, fixtureScores, outcomes, outcomeLabel } from "../lib/fixtures.js";
 import { info } from "../lib/glossary.js";
-import { esc, app, pageHead, portrait, teamLink, playerLink, pct, SOURCES, allMatches, editUnlocked, when, unlockEdit, playerTabs, wirePlayerTabs } from "../core.js";
+import { esc, app, pageHead, portrait, teamLink, playerLink, pct, SOURCES, DIVISIONS, allMatches, editUnlocked, when, unlockEdit, playerTabs, wirePlayerTabs } from "../core.js";
 import { loading, errorBox } from "../parts/lanes.js";
 import { lastNight, sinceLabel } from "../parts/ranks.js";
 import { draftHtml, upload } from "./upload.js";
@@ -52,11 +54,15 @@ export async function renderPredict(src) {
   // Each division's picks carry its league key ("ad2l" = Champion).
   try { preds = (await listPredictions()).filter((p) => p.league === src.key); } catch (e) { console.warn(e); preds = null; }
   // Saved brackets (tiebreaker and bracket picks), newest per name, for the Leaderboard.
-  const savedBrackets = new Map();
+  const savedBrackets = new Map(), savedAt = new Map(), savedName = new Map();
   try {
     for (const b of (await listBrackets()).filter((x) => x.league === src.key).sort((a, b) => (a.updatedAt ?? 0) - (b.updatedAt ?? 0))) {
       let picks; try { picks = JSON.parse(b.picks); } catch { continue; }
-      if (picks && typeof picks === "object" && !Array.isArray(picks)) savedBrackets.set(nameKey(b.name), Object.fromEntries(Object.entries(picks).filter(([, v]) => Number.isInteger(v))));
+      if (picks && typeof picks === "object" && !Array.isArray(picks)) {
+        savedBrackets.set(nameKey(b.name), Object.fromEntries(Object.entries(picks).filter(([, v]) => Number.isInteger(v))));
+        savedAt.set(nameKey(b.name), b.updatedAt);
+        savedName.set(nameKey(b.name), b.name);
+      }
     }
   } catch (e) { console.warn(e); }
   const uid = await currentUid();
@@ -67,6 +73,16 @@ export async function renderPredict(src) {
   const ratings = fitRatings(d.teams, d.series, params);
   const since = lastNight(d);
   const now = Date.now();
+  // The playoff picture works on the whole league: Heroic's A and B views hold one division each,
+  // but its brackets mix both (ratings fitted to it, as on Combined). Postseason series
+  // (lib/divisions.js) are best-of with no tie: their round, the bracket lock and the bracket
+  // matches decided so far come from lib/playoffs.js postseason.
+  const full = src.view ? await SOURCES[src.key].data() : d;
+  const fullRatings = full === d ? ratings : fitRatings(full.teams, full.series, tune(full.teams, full.series));
+  const split = !!DIVISIONS[src.key]?.views;
+  const ps = postseason(full.teams, full.series, fullRatings, { split });
+  const bracketLocked = ps.lock != null && now >= ps.lock * 1000;
+  const roleOf = (s) => ps.roles.get(s.id) ?? { label: "Playoffs", bestOf: 3 };
 
   // This week's slate: the earliest night still to be played. A series whose result never
   // came (a 0–0 between teams that dropped out) stops counting 3 days after its start, so
@@ -77,7 +93,7 @@ export async function renderPredict(src) {
   const night = upcoming.length ? Math.min(...upcoming.map((s) => s.time)) : null;
   const week = upcoming.filter((s) => s.time === night);
   const mine = (sid) => (preds ?? []).filter((p) => p.series_id === sid && p.uid === uid).sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0))[0];
-  const label = (s, o) => (o === "tie" ? "1–1" : `${esc(teamName[o === "home" ? s.home : s.away])} 2–0`);
+  const label = (s, o) => (isPostseason(s) ? `${esc(teamName[o === "home" ? s.home : s.away])} wins` : o === "tie" ? "1–1" : `${esc(teamName[o === "home" ? s.home : s.away])} 2–0`);
 
   // The model's full draft for a series, in Captains Mode order, for either team on first
   // pick (not known ahead of time); a toggle switches between the two.
@@ -146,9 +162,10 @@ export async function renderPredict(src) {
 
   // One card per series: three pick buttons, each carrying the model's odds and how many
   // people took it; the model's call is tagged on its button.
-  const oddsOf = (s) => seriesOdds(ratings.get(s.home) ?? 0, ratings.get(s.away) ?? 0);
+  const oddsOf = (s) => (isPostseason(s) ? postOdds(ratings.get(s.home) ?? 0, ratings.get(s.away) ?? 0, roleOf(s).bestOf) : seriesOdds(ratings.get(s.home) ?? 0, ratings.get(s.away) ?? 0));
+  const callOf = (s) => (isPostseason(s) ? postCall(oddsOf(s)) : modelCall(oddsOf(s)));
   const card = (s) => {
-    const o = oddsOf(s), call = modelCall(o);
+    const o = oddsOf(s), call = callOf(s), post = isPostseason(s);
     const locked = now >= s.time * 1000;
     const my = mine(s.id);
     const c = preds ? crowd(preds, s) : null;
@@ -157,11 +174,12 @@ export async function renderPredict(src) {
         <div class="pred-teams"><span class="a">${teamLink(src, teamName[s.home], s.home)}</span><i>vs</i><span class="b">${teamLink(src, teamName[s.away], s.away)}</span></div>
         ${locked ? '<span class="pred-lock">Locked</span>' : ""}
       </div>
-      <div class="pred-picks" role="group" aria-label="Your pick">${OUTCOMES.map((k) => {
+      ${post ? `<div class="pred-round">${esc(roleOf(s).label)}${roleOf(s).bestOf > 1 ? ` · Bo${roleOf(s).bestOf}` : ""}</div>` : ""}
+      <div class="pred-picks${post ? " two" : ""}" role="group" aria-label="Your pick">${(post ? ["home", "away"] : OUTCOMES).map((k) => {
         const n = c ? Math.round(c[k] * c.n) : 0;
         // The buttons sit under their team's name, so the score alone says whose win it is.
         return `<button type="button" class="${k}" data-pick="${k}" aria-pressed="${my?.pick === k}" aria-label="${label(s, k)}" title="${label(s, k)}" ${locked || !preds ? "disabled" : ""}>
-          <span class="pk-main">${k === "home" ? "2–0" : k === "away" ? "0–2" : "1–1"}</span>
+          <span class="pk-main">${post ? "Wins" : k === "home" ? "2–0" : k === "away" ? "0–2" : "1–1"}</span>
           <span class="pk-sub">${Math.round(o[k] * 100)}%${c ? ` · ${n} pick${n === 1 ? "" : "s"}` : ""}${k === call ? ' · <b>model</b>' : ""}</span>
         </button>`;
       }).join("")}</div>
@@ -187,8 +205,19 @@ export async function renderPredict(src) {
   }
   if (week.length) {
     if (!board.has("\u0000model")) board.set("\u0000model", { name: "The model", model: true, points: 0, picks: 0, accuracy: null, now: {} });
-    for (const s of week) board.get("\u0000model").now[s.id] = modelCall(oddsOf(s));
+    for (const s of week) board.get("\u0000model").now[s.id] = callOf(s);
   }
+  // Bracket points (playoffs): 1 per decided bracket match whose winner the person picked, from a
+  // bracket saved before the lock (the first bracket match). The board ranks series points plus
+  // bracket points.
+  const showBracket = ps.decided.length > 0;
+  if (showBracket) for (const [k, picks] of savedBrackets) {
+    const at = savedAt.get(k);
+    if (!at || ps.lock == null || at.getTime() >= ps.lock * 1000) continue;
+    if (!board.has(k)) board.set(k, { name: savedName.get(k), points: 0, picks: 0, accuracy: null, now: {} });
+    board.get(k).bracket = bracketPoints(picks, ps.decided, ps.bracketTeams).points;
+  }
+  const total = (r) => r.points + (r.bracket ?? 0);
   // Change from last week: each row's score on the latest played night, and how their
   // accuracy moved against where it stood before that night (in points of %).
   const lastNightScore = new Map();
@@ -208,16 +237,17 @@ export async function renderPredict(src) {
         : `<span class="pb-delta ${diff > 0 ? "up" : diff < 0 ? "down" : "muted"}" title="Change since last week, in points of %">${diff > 0 ? "▲" : diff < 0 ? "▼" : "±"}${Math.abs(diff)}%</span>`,
     };
   };
-  const boardRows = [...board.entries()].sort(([, a], [, b]) => b.points - a.points || (b.accuracy ?? -1) - (a.accuracy ?? -1) || a.name.localeCompare(b.name));
-  const pickChip = (s, k) => (k ? `<span class="pk-chip ${k}" title="${k === "tie" ? "1–1" : `${esc(teamName[k === "home" ? s.home : s.away])} 2–0`}">${k === "tie" ? "1–1" : `${esc(teamName[k === "home" ? s.home : s.away])} 2–0`}</span>` : '<span class="muted">—</span>');
+  const boardRows = [...board.entries()].sort(([, a], [, b]) => total(b) - total(a) || b.points - a.points || (b.accuracy ?? -1) - (a.accuracy ?? -1) || a.name.localeCompare(b.name));
+  const pickChip = (s, k) => (k ? `<span class="pk-chip ${k}" title="${label(s, k)}">${label(s, k)}</span>` : '<span class="muted">—</span>');
   const boardHtml = boardRows.length ? `<div class="table-wrap sticky-name"><table class="pred-board">
-    <thead><tr><th scope="col" class="rank">#</th><th scope="col" class="l">Name</th><th scope="col">Points${info("points")}</th><th scope="col">Correct${info("correct")}</th>
+    <thead><tr><th scope="col" class="rank">#</th><th scope="col" class="l">Name</th><th scope="col">Points${info("points")}</th><th scope="col">Correct${info("correct")}</th>${showBracket ? `<th scope="col">Bracket${info("bracket_pts")}</th><th scope="col">Total</th>` : ""}
       ${week.map((s) => `<th scope="col" class="l pb-series"><span class="a">${esc(teamName[s.home])}</span><span class="b">${esc(teamName[s.away])}</span></th>`).join("")}</tr></thead>
     <tbody>${boardRows.map(([k, r], i) => `<tr class="${k === myKey ? "me" : ""}">
       <td class="rank${i < 3 && r.picks ? " lead" : ""}">${String(i + 1).padStart(2, "0")}</td>
       <td class="l"><button type="button" class="linkish pb-who" data-who="${r.model ? "model" : esc(k)}" aria-pressed="false" title="See ${esc(r.name)}'s picks and bracket"><i class="pb-dot" aria-hidden="true"></i>${r.model ? `<b>${esc(r.name)}</b>` : esc(r.name)}</button>${r.model ? ' <span class="tag">replayed</span>' : ""}</td>
       <td class="num">${r.picks ? `${delta(k, r).pts}${r.points}<span class="muted">/${r.picks}</span>` : '<span class="muted">—</span>'}</td>
       <td class="num">${r.accuracy == null ? '<span class="muted">—</span>' : `${delta(k, r).acc}${pct(r.accuracy)}`}</td>
+      ${showBracket ? `<td class="num">${r.bracket == null ? '<span class="muted">—</span>' : `${r.bracket}<span class="muted">/${ps.decided.length}</span>`}</td><td class="num"><b>${total(r)}</b></td>` : ""}
       ${week.map((s) => `<td class="l">${pickChip(s, r.now[s.id])}</td>`).join("")}</tr>`).join("")}</tbody>
   </table></div>` : "";
   // One played night: each series' result and how the model, the crowd and you called it.
@@ -296,7 +326,7 @@ export async function renderPredict(src) {
     </details>`;
   const boardTab = `
     <h2>Leaderboard</h2>
-    ${boardHtml ? `${boardHtml}<p class="table-note">Points = correct calls / series called. Columns on the right are this week's picks. <b>Click a name</b> for their pick history and bracket.</p>` : `<div class="panel empty">No picks yet.</div>`}
+    ${boardHtml ? `${boardHtml}<p class="table-note">Points = correct calls / series called.${showBracket ? " Bracket = bracket matches whose winner you picked, from a bracket saved before the playoffs started; Total ranks the board." : ""} Columns on the right are this week's picks. <b>Click a name</b> for their pick history and bracket.</p>` : `<div class="panel empty">No picks yet.</div>`}
     ${boardHtml ? `<section class="pb-view" id="pb-view" aria-live="polite"><p class="muted">Loading…</p></section>` : ""}
     ${past ? `<details class="how"><summary>Past weeks</summary>${past}<p class="table-note">Model: its pick that week, using only earlier results. Crowd: the most-picked call and how many made it. Picks made after a series started don't count.</p></details>` : ""}`;
   const tabs = playerTabs(pageTabs(PREDICT_TABS, src, [
@@ -374,11 +404,9 @@ export async function renderPredict(src) {
   // "Your picks" tab. Heroic's A and B views hold one division each, but its brackets mix
   // both, so the picture gets the whole league (and ratings fitted to it, as on Combined).
   const poBracket = document.getElementById("po-bracket"), poOdds = document.getElementById("po-odds");
-  const full = src.view ? await SOURCES[src.key].data() : d;
   if (!document.body.contains(poBracket)) return;
-  const fullRatings = full === d ? ratings : fitRatings(full.teams, full.series, tune(full.teams, full.series));
   const myCalls = new Map(full.series.filter((s) => !isPlayed(s)).map((s) => [s.id, mine(s.id)?.pick]).filter(([, k]) => k));
-  mountPlayoffs(poBracket, src, full, fullRatings, myCalls, { share: { name, saved: savedBrackets.get(myKey), save: (picks) => saveBracket(src.key, picks, name) } });
+  mountPlayoffs(poBracket, src, full, fullRatings, myCalls, { share: { name, saved: savedBrackets.get(myKey), save: (picks) => saveBracket(src.key, picks, name) }, locked: bracketLocked ? ps.lock : null });
 
   // Leaderboard: click a name for the bracket and final table their calls lead to. Fresh host
   // each time, since mountPlayoffs listens for clicks on its element.
@@ -393,7 +421,7 @@ export async function renderPredict(src) {
       const calls = new Map(row.model ? [] : fullValid.filter((p) => nameKey(p.name) === k && open.has(p.series_id)).map((p) => [p.series_id, p.pick]));
       const whose = row.model ? "The model's" : `${esc(row.name)}'s`;
       const history = row.model
-        ? [...bt.map((x) => ({ series_id: x.s.id, pick: x.pick })), ...week.map((s) => ({ series_id: s.id, pick: modelCall(oddsOf(s)) }))]
+        ? [...bt.map((x) => ({ series_id: x.s.id, pick: x.pick })), ...week.map((s) => ({ series_id: s.id, pick: callOf(s) }))]
         : valid.filter((p) => nameKey(p.name) === k);
       const hasBracket = row.model || savedBrackets.has(k) || calls.size;
       view.innerHTML = `<h3 class="pb-view-h">${whose} picks</h3>${historyHtml(row, history)}

@@ -55,7 +55,14 @@ re-check them each season); the draft model `cmdraft.js` (its page part `parts/c
 the "Items & fights" chart `itemlead.js`; gold `timeline.js`, charts `charts.js`; maps `wardmap.js`,
 `deathmap.js`, `towermap.js`, `fightmap.js`, the shared overlays `maplayers.js`; vision `vision.js`
 (the line of sight, shared with the sync) and `visionmap.js`; unticketed uploads `unticketed.js`;
-visitor counts `visits.js`; trimmed files `lite.js`.
+visitor counts `visits.js`; trimmed files `lite.js`. The player page's Compare tab is
+`parts/compare.js` (picks in the address as `?vs=key,key`).
+
+Tier scoring versions (`lib/tiers.js`, `VERSIONS`): every tunable number (points, multiplier
+ranges, padding, curve width) lives in a version. `LIVE` is what the whole site uses; `NEXT` is
+being tuned and only shows on the tier list's Model sub-tab, with its own (i) bubbles and "How
+it's scored". Change `NEXT` only. Switching over: set `LIVE` to it; to retire the tab, set `NEXT`
+to `LIVE`.
 
 Page text: no explainer prose on the pages. Explanations go in the (i) bubbles
 (`lib/glossary.js`). One rule in `style.css` hides `.table-note`, `.wm-intro`, `.wm-note`,
@@ -142,6 +149,25 @@ read it. A new division or season:
    lists; see "Firestore rules"). `test/divisions.test.js` fails until the repo copy has it.
 5. A new patch for vision: add its map dump to `VISION_MAPS` (`public/lib/vision.js`, keyed by
    OpenDota patch id); until then its games get no vision numbers.
+6. Season phase (`SEASON` in the same file): a new season starts `phase: "regular"`,
+   `regularEnd: null`, `regularIds: []`.
+
+**Playoffs.** When the group stage ends, set `phase: "playoffs"` and `regularEnd` (unix seconds,
+after the last group-stage night). Series PlayOn posts after `regularEnd` are the postseason:
+- The table, SoS, crosstable and team records ignore them (`groupStage`).
+- Up next and Predict read them as best-of with no tie. Predict cards take a winner only, which
+  the existing Firestore rules already allow.
+- Each one is matched to its week 8 tiebreaker or bracket match by its two teams
+  (`postseason` in `lib/playoffs.js`). Played ones settle that match on the Bracket tab.
+- The bracket locks at the first bracket series' start. Each decided bracket match whose winner
+  a person picked in a bracket saved before then scores 1 on the Leaderboard (Bracket and Total
+  columns).
+- Every AD2L league gets a Playoffs stamp in the top bar.
+
+A group-stage make-up played after `regularEnd` would read as postseason: add its series id to
+`regularIds`. The bracket shape, Bo3/Bo5 and the S47 lower-bracket crossover are the site's
+reading of the rules (`lib/playoffs.js` header). Check them against PlayOn's bracket when it's
+posted.
 
 ### Fields the sync writes, and backfills
 

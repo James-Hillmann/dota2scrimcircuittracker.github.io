@@ -36,6 +36,8 @@
 // Farm, damage, building damage, kills and assists are shares of the team's total, which
 // don't grow with game length the way per-minute numbers do.
 //
+// The constants named above (K_*, WEIGHTS, SURVIVAL, ranges) are per version: see VERSIONS.
+//
 // The reference (per-position means, anchors, win lengths, consistency spread, curve) comes
 // from the league itself: each AD2L division, or the scrim ledger, is scored against its own
 // games (tierModel on them; the Heroic A/B views pass the whole division's model). Ratings
@@ -44,32 +46,127 @@
 import { tierLaneResult } from "./lanes.js";
 
 export const MIN_GAMES = 3;
-export const K_PRIOR = 6;
-export const K_SPEED = 3;
-export const K_CONSISTENCY = 2;
-export const K_SHRINK = 3;
 const Z_CAP = 2.5;
-export const RATING_STRETCH = 1.5;
 
-// Multiplier ranges: [at 0, at 100] (opponents: [at 25%, at 75%] opponent win rate).
-export const MULT = {
-  survival: [0.85, 1.0],
-  consistency: [0.9, 1.0],
-  opponents: [0.9, 1.1],
-  winning: [0.7, 1.3],
+// Scoring versions: every number that tunes the scoring. LIVE is the one the whole site uses.
+// NEXT is being tuned and only shows on the tier list's Model tab, so changes go to NEXT and
+// never to LIVE; switching over is pointing LIVE at it. A model carries its version (`model.v`).
+const PRE = {
+  label: "Pre-playoff",
+  // metric -> the points it's worth, out of 100 stat points per role (core/support) or per
+  // position (1–5: see weightsOf). Negative = lower is
+  // better. A player missing a stat (screenshot uploads have no wards) has the rest scaled up
+  // to fill its points. See METRICS for definitions.
+  weights: {
+    // No lanewin for cores: laning already covers their lane.
+    core: { dmg: 16, farm: 15, kills: 15, gpm: 14, nw: 10, xpm: 8, assists: 8, tower: 5, lane: 5, stuns: 4 },
+    support: { vision: 16, dewards: 13, assists: 13, stuns: 8, kills: 8, lanewin: 7, heal: 7, stacks: 7, smokes: 5, dmg: 3, gpm: 3, dust: 2, sentries: 2, farm: 2, nw: 2, tower: 2 },
+  },
+  // Survival: its three parts' share of the survival score. Negative = lower is better.
+  survival: { deaths: -40, dead: -35, tanked: 25 },
+  // Multiplier ranges: [at 0, at 100] (opponents: [at 25%, at 75%] opponent win rate).
+  mult: { survival: [0.85, 1.0], consistency: [0.9, 1.0], opponents: [0.9, 1.1], winning: [0.7, 1.3] },
+  win_parts: { win: 2, speed: 1 }, // winning = (2 × win rate + 1 × win speed) / 3
+  // Stats where 100 is reached before the league's best: a few supports stack far more than
+  // everyone else, so 100 stacks sits 70% of the way from the worst to the best.
+  ease: { support: { stacks: 0.7 } },
+  k_prior: 6, k_speed: 3, k_consistency: 2, k_shrink: 3,
+  stretch: 1.5,
 };
-const WIN_PARTS = { win: 2, speed: 1 }; // winning = (2 × win rate + 1 × win speed) / 3
+// A version that differs from `base` only in the fields given (each replaces that field whole).
+const tweak = (base, changes) => ({ ...structuredClone(base), ...changes });
+export const VERSIONS = {
+  pre: PRE,
+  playoff: tweak(PRE, {
+    label: "Playoff",
+    // Consistency rewards as well as costs, and counts 1.5× as much (a 0.15 spread, was 0.10):
+    // the steadiest player gains 7.5%, the streakiest loses 7.5%.
+    mult: { ...PRE.mult, consistency: [0.925, 1.075] },
+    // Consistency as how often a player is near the top, not how much they swing against
+    // themselves (100s and an 80 read as streaky, though an 80 is still great): the share of
+    // their series in the top `consistency_top` (two quintiles) of every series at the position
+    // in the league.
+    consistency_top: 0.4,
+    // Winning as flat points, [at 0, at 100], added after the multipliers: the same for every
+    // player, not a share of their stat points. As a multiplier, strong players on winning teams
+    // got +20 or more from it (Heroic) and weak ones on losing teams lost as much.
+    winning_flat: [-15, 15],
+    // Opponent strength from a team rating (teamRatings), refitted without the series being
+    // scored, not from the opponent's raw win %: a strong team with a hard schedule can sit at
+    // 50%. The division's strongest team is the top of mult.opponents, its weakest the bottom.
+    opponents_by: "rating",
+    // Initiators (pos 3 and 4) absorb pressure and die doing it: survival costs them at most 10%,
+    // and damage taken per life weighs most in it.
+    survival_pos: {
+      3: { weights: { deaths: -35, dead: -25, tanked: 40 }, range: [0.9, 1.0] },
+      4: { weights: { deaths: -35, dead: -25, tanked: 40 }, range: [0.9, 1.0] },
+    },
+    // Points per position, not per role. GPM, net worth and XPM moved almost together
+    // (0.83–0.94 across cores), so net worth and farm share are gone; GPM and XPM stay. Damage
+    // taken share is new, mostly for offlaners. Healing is down to 3: few heroes heal.
+    weights: {
+      1: { gpm: 20, dmg: 20, xpm: 14, kills: 14, lane: 10, tower: 8, assists: 6, soak: 5, stuns: 3 },
+      2: { dmg: 18, xpm: 16, kills: 16, gpm: 14, lane: 10, assists: 10, stuns: 8, soak: 5, tower: 3 },
+      3: { dmg: 15, assists: 14, gpm: 13, soak: 12, xpm: 12, stuns: 12, kills: 8, lane: 8, tower: 6 },
+      4: { assists: 18, stuns: 12, dewards: 10, vision: 8, kills: 8, smokes: 8, lanewin: 7, gpm: 7, stacks: 6, dmg: 4, uptime: 3, xpm: 3, heal: 3, dust: 2, sentries: 1 },
+      5: { vision: 16, dewards: 15, assists: 13, lanewin: 9, stacks: 9, gpm: 7, uptime: 6, stuns: 6, kills: 5, smokes: 4, xpm: 3, heal: 3, sentries: 2, dust: 2 },
+    },
+    // Stat podium: impressive raw numbers, cores and supports apart. In each of a role's podium
+    // stats (PODIUM_STATS), the best three season averages a game among players whose main
+    // position is in that role (cores 1-3, supports 4-5; minGames+) get these points added to
+    // their score, before the rating curve. No shares or percentages.
+    podium: {
+      points: [1.25, 1, 0.75],
+      stats: {
+        core: ["damage", "gpm", "net_worth", "kills", "lh10", "xpm", "stuns", "taken", "assists"],
+        support: ["assists", "stuns", "kills", "wards_killed", "ward_life", "damage", "stacks", "healing", "obs"],
+      },
+    },
+  }),
+};
+export const LIVE = "pre";
+export const NEXT = "playoff";
 
-// metric -> the points it's worth, out of 100 stat points per role. Negative = lower is
-// better. A player missing a stat (screenshot uploads have no wards) has the rest scaled up
-// to fill its points. See METRICS for definitions.
-export const WEIGHTS = {
-  // No lanewin for cores: laning already covers their lane.
-  core: { dmg: 16, farm: 15, kills: 15, gpm: 14, nw: 10, xpm: 8, assists: 8, tower: 5, lane: 5, stuns: 4 },
-  support: { vision: 16, dewards: 13, assists: 13, stuns: 8, kills: 8, lanewin: 7, heal: 7, stacks: 7, smokes: 5, dmg: 3, gpm: 3, dust: 2, sentries: 2, farm: 2, nw: 2, tower: 2 },
+// A version's survival parts and range for a position: its own (survival_pos) or everyone's.
+export const survivalOf = (v, pos) => v.survival_pos?.[pos]?.weights ?? v.survival;
+export const survivalRange = (v, pos) => v.survival_pos?.[pos]?.range ?? v.mult.survival;
+// A version's points for a position: its own table when the version has one per position,
+// else its role's.
+export const perPosition = (v) => v.weights[1] != null;
+export const weightsOf = (v, pos) => (perPosition(v) ? v.weights[pos] : v.weights[pos <= 3 ? "core" : "support"]);
+
+// The live version's numbers, for everything outside the tier list's Model tab.
+const L = VERSIONS[LIVE];
+export const { weights: WEIGHTS, survival: SURVIVAL, mult: MULT, ease: EASE, k_prior: K_PRIOR, k_speed: K_SPEED, k_consistency: K_CONSISTENCY, k_shrink: K_SHRINK, stretch: RATING_STRETCH } = L;
+
+// Podium stats: raw numbers from one game (get(player, game); null = not in that game's data),
+// averaged a game.
+export const PODIUM_STATS = {
+  damage: { label: "Hero damage", get: (p) => p.hero_damage },
+  gpm: { label: "GPM", get: (p) => p.gpm },
+  xpm: { label: "XPM", get: (p) => p.xpm },
+  net_worth: { label: "Net worth", get: (p) => p.net_worth },
+  kills: { label: "Kills", get: (p) => p.kills },
+  lh10: { label: "Last hits at 10", get: (p) => p.lh10 ?? null },
+  taken: { label: "Damage taken", get: (p) => p.dmg_taken ?? null },
+  stuns: { label: "Stun seconds", get: (p) => p.stuns ?? null },
+  assists: { label: "Assists", get: (p) => p.assists },
+  wards_killed: { label: "Dewards", get: (p) => (p.obs_placed != null ? (p.obs_killed ?? 0) + (p.sen_killed ?? 0) : null) },
+  // Seconds the player's observers stayed up, on average (one killed early pulls it down).
+  // A ward still up at the end counts the time it had (its 6 minutes at most).
+  ward_life: { label: "Average ward uptime", get: (p, m) => {
+    const o = p.obs_pos;
+    if (!o || o.length < 5) return null;
+    let t = 0, n = 0;
+    for (let i = 0; i + 4 < o.length; i += 5) { t += o[i + 3] >= 0 ? o[i + 3] : Math.min(360, Math.max(0, m.duration_sec - Math.max(0, o[i + 2]))); n++; }
+    return t / n;
+  },
+  // Only players placing 5+ observers a game on average: a ward or two kept safe isn't a feat.
+  qualify: (rows) => { const xs = rows.map((r) => r.p.obs_placed).filter((x) => x != null); return xs.length > 0 && mean(xs) >= 5; } },
+  stacks: { label: "Stacks", get: (p) => p.camps_stacked ?? null },
+  obs: { label: "Observers placed", get: (p) => p.obs_placed ?? null },
+  healing: { label: "Healing", get: (p) => p.hero_healing ?? null },
 };
-// Survival: its three parts' share of the survival score. Negative = lower is better.
-export const SURVIVAL = { deaths: -40, dead: -35, tanked: 25 };
 
 // metric -> short label and definition (the info bubbles and "How it's scored" use these).
 export const METRICS = {
@@ -78,6 +175,7 @@ export const METRICS = {
   nw: { label: "Net worth", def: "Net worth at the end of the game, against what the same position has in a game that long." },
   dmg: { label: "Damage share", def: "Share of the team's hero damage." },
   tower: { label: "Building share", def: "Share of the team's damage to towers, barracks and the Ancient." },
+  soak: { label: "Damage taken share", def: "Share of the hero damage the team took that the player took: who stood in front." },
   xpm: { label: "XPM", def: "Experience per minute, against what the same position gets in a game that long." },
   kills: { label: "Kill share", def: "Share of the team's kills the player got the last hit on." },
   assists: { label: "Assist share", def: "Share of the team's kills the player assisted. Kill share + assist share = kill participation." },
@@ -85,6 +183,7 @@ export const METRICS = {
   lane: { label: "Laning", def: "Gold earned in the first 10 minutes as a % of the most a lane can give." },
   stuns: { label: "Stun time", def: "Seconds of disable on enemy heroes per minute." },
   vision: { label: "New vision", def: "Share of the map outside their base that their observer wards lit up first on the team, averaged over the game. Trees and cliffs block wards; ground a teammate already showed doesn't count. Older games have no number." },
+  uptime: { label: "Ward uptime", def: "Seconds of observer vision a minute: every observer's time alive, so one the enemy kills early counts only the time it lived. Sentries count half." },
   dewards: { label: "Dewards", def: "Enemy wards killed per 10 minutes; a sentry counts half an observer." },
   sentries: { label: "Sentries", def: "Sentry wards placed per 10 minutes." },
   dust: { label: "Dust", def: "Dust of Appearance used per 10 minutes." },
@@ -126,6 +225,14 @@ function phi(z) {
 const DEFAULT_CURVE = [50, 17];
 export const ratingOf = (score, [center, spread] = DEFAULT_CURVE) => 100 * phi((score - center) / spread);
 
+// Seconds a player's wards were up: obs_pos / sen_pos are flat groups of 5 (x, y, second placed,
+// seconds it lived or -1 if still up at the end, 1 if the enemy killed it).
+function wardSeconds(groups, duration) {
+  let t = 0;
+  for (let i = 0; i + 4 < groups.length; i += 5) t += groups[i + 3] >= 0 ? groups[i + 3] : Math.max(0, duration - Math.max(0, groups[i + 2]));
+  return t;
+}
+
 // One row per player per game: role, position, metrics (null = not in this game's data) and
 // the raw numbers the breakdown shows next to the shares.
 function gameRows(m) {
@@ -136,6 +243,7 @@ function gameRows(m) {
     const sum = (f) => team.reduce((s, p) => s + (f(p) ?? 0), 0);
     const kills = t === "a" ? m.score_a : m.score_b;
     const gold = sum((p) => p.gpm), dmg = sum((p) => p.hero_damage);
+    const taken = team.every((p) => p.dmg_taken != null) ? sum((p) => p.dmg_taken) : null;
     const tower = team.every((p) => p.tower_damage != null) ? sum((p) => p.tower_damage) : null;
     const byNw = [...team].sort((x, y) => y.net_worth - x.net_worth);
     for (const p of team) {
@@ -151,12 +259,14 @@ function gameRows(m) {
           farm: share(p.gpm, gold), gpm: p.gpm ?? null, nw: p.net_worth ?? null,
           dmg: share(p.hero_damage, dmg), xpm: p.xpm ?? null,
           tower: tower ? share(p.tower_damage, tower) : null,
+          soak: taken ? share(p.dmg_taken, taken) : null,
           kills: kills ? p.kills / kills : null, assists: kills ? p.assists / kills : null,
           lanewin: tierLaneResult(m, p),
           lane: p.lane_eff ?? null,
           stuns: p.stuns != null ? p.stuns / minutes : null,
           vision: p.new_vision ?? null,
           dewards: parsed ? per10((p.obs_killed ?? 0) + 0.5 * (p.sen_killed ?? 0)) : null,
+          uptime: p.obs_pos ? (wardSeconds(p.obs_pos, m.duration_sec) + 0.5 * wardSeconds(p.sen_pos ?? [], m.duration_sec)) / minutes : null,
           sentries: parsed ? per10(p.sen_placed) : null,
           dust: per10(p.dust_used), smokes: per10(p.smoke_used),
           stacks: p.camps_stacked,
@@ -174,13 +284,15 @@ function gameRows(m) {
 // A position's reference for a stat: [mean, sd], or [a, b, sd] for a line a + b·minutes.
 const expected = (ref, minutes) => (ref.length === 3 ? ref[0] + ref[1] * minutes : ref[0]);
 // Every metric a role is scored on: its stats plus survival's parts.
-const scoredMetrics = (role) => ({ ...WEIGHTS[role], ...SURVIVAL });
+const scoredMetrics = (pos, v) => ({ ...weightsOf(v, pos), ...survivalOf(v, pos) });
+// Every metric anyone in a role is scored on (with points per position, all its positions').
+const roleMetrics = (role, v) => Object.assign({}, ...(role === "core" ? [1, 2, 3] : [4, 5]).map((n) => scoredMetrics(n, v)));
 
 // Each row's capped, direction-flipped z per metric (higher = better) and the value it was
 // compared with.
 function scoreRow(row, model) {
   row.z = {}; row.exp = {};
-  for (const [metric, w] of Object.entries(scoredMetrics(row.role))) {
+  for (const [metric, w] of Object.entries(scoredMetrics(row.pos, model.v))) {
     const v = row.metrics[metric], ref = model.positions[row.pos]?.[metric];
     if (v == null || !ref) continue;
     const e = expected(ref, row.minutes), sd = ref[ref.length - 1];
@@ -236,29 +348,67 @@ function teamGames(rows) {
     const k = `${r.match.id ?? r.match.match_id}|${r.us}`;
     if (seen.has(k) || !r.us) continue;
     seen.add(k);
-    (by.get(r.us) ?? by.set(r.us, []).get(r.us)).push({ opp: r.them, won: r.won });
+    (by.get(r.us) ?? by.set(r.us, []).get(r.us)).push({ opp: r.them, won: r.won, series: r.series });
   }
   return by;
 }
-// An opponent's game win % outside games against `us`, shrunk toward 50% by K_PRIOR games.
-function oppStrength(teams, them, us) {
+// teamGames for a league's games, made once per game list (`rows` its game rows), so every tier
+// list and model of one league shares it and the opponent ratings fitted on it.
+const teamsMemo = new WeakMap();
+const teamsOf = (matches, rows) => teamsMemo.get(matches) ?? teamsMemo.set(matches, teamGames(rows)).get(matches);
+
+// Team strength from game results: Bradley-Terry (a team beats another with chance
+// 1 / (1 + e^(r_them - r_us))), pulled toward even by a ridge of `lambda` so a team with few
+// games can't run off, fitted without the games of series `skip`. teams: teamGames.
+function teamRatings(teams, skip, lambda = 0.5) {
+  const ids = [...teams.keys()], at = new Map(ids.map((t, i) => [t, i]));
+  const games = [], n = new Float64Array(ids.length);
+  for (const [t, gs] of teams) for (const g of gs) {
+    if (!g.won || g.series === skip || !at.has(g.opp)) continue;
+    games.push([at.get(t), at.get(g.opp)]);
+    n[at.get(t)]++; n[at.get(g.opp)]++;
+  }
+  const r = new Float64Array(ids.length);
+  // Newton steps with a diagonal Hessian bound (each game's curvature is at most 1/4).
+  for (let it = 0; it < 60; it++) {
+    const grad = r.map((x) => -lambda * x);
+    for (const [w, l] of games) { const p = 1 / (1 + Math.exp(r[w] - r[l])); grad[w] += p; grad[l] -= p; }
+    for (let i = 0; i < r.length; i++) r[i] += grad[i] / (lambda + 0.25 * n[i]);
+  }
+  return new Map(ids.map((t, i) => [t, r[i]]));
+}
+// An opponent's strength 0-1 (the weakest team 0, the strongest 1) from ratings fitted without
+// series `series`. One fit per series per league, kept.
+const ratingMemo = new WeakMap();
+function oppRating(teams, them, series) {
+  const m = ratingMemo.get(teams) ?? ratingMemo.set(teams, new Map()).get(teams);
+  let f = m.get(series);
+  if (!f) {
+    const r = teamRatings(teams, series), vals = [...r.values()];
+    f = { r, lo: Math.min(...vals), hi: Math.max(...vals) };
+    m.set(series, f);
+  }
+  return f.hi > f.lo && f.r.has(them) ? (f.r.get(them) - f.lo) / (f.hi - f.lo) : 0.5;
+}
+// An opponent's game win % outside games against `us`, shrunk toward 50% by k_prior games.
+function oppStrength(teams, them, us, kPrior) {
   const gs = (teams.get(them) ?? []).filter((g) => g.opp !== us);
-  return (gs.filter((g) => g.won).length + K_PRIOR / 2) / (gs.length + K_PRIOR);
+  return (gs.filter((g) => g.won).length + kPrior / 2) / (gs.length + kPrior);
 }
 
-// A player's average z per metric over some games, padded with K_SHRINK games at 0 (the
+// A player's average z per metric over some games, padded with k_shrink games at 0 (the
 // position average): { metric: [shrunk z, games] }.
-function shrunkZ(rrows) {
+function shrunkZ(rrows, kShrink) {
   const sum = {}, n = {};
   for (const r of rrows) for (const [m, z] of Object.entries(r.z)) { sum[m] = (sum[m] ?? 0) + z; n[m] = (n[m] ?? 0) + 1; }
-  return Object.fromEntries(Object.keys(sum).map((m) => [m, [sum[m] / (n[m] + K_SHRINK), n[m]]]));
+  return Object.fromEntries(Object.keys(sum).map((m) => [m, [sum[m] / (n[m] + kShrink), n[m]]]));
 }
 
 // Per player and unit (a role, or a position): each metric's 0–100 from their shrunk average
 // against that unit's `anchors` ({ metric: [0, 100] }), plus their average value and position
 // expectation for the breakdown.
-function metricScores(rrows, weights, anchors) {
-  const zs = shrunkZ(rrows), sum = {}, n = {};
+function metricScores(rrows, weights, anchors, kShrink) {
+  const zs = shrunkZ(rrows, kShrink), sum = {}, n = {};
   for (const [m, [z, games]] of Object.entries(zs)) {
     if (!(m in weights)) continue;
     sum[m] = z; n[m] = games;
@@ -266,7 +416,7 @@ function metricScores(rrows, weights, anchors) {
   const sh = shares(weights, new Set(Object.keys(n)));
   return Object.keys(sh).map((m) => {
     const with_ = rrows.filter((r) => r.z[m] != null);
-    const rawKey = { farm: "gpm", dmg: "dmg", tower: "tower", kills: "kills", assists: "assists", tanked: "taken" }[m];
+    const rawKey = { farm: "gpm", dmg: "dmg", tower: "tower", kills: "kills", assists: "assists", tanked: "taken", soak: "taken" }[m];
     const rawVals = rawKey ? with_.map((r) => r.raw[rawKey]).filter((v) => v != null) : [];
     return {
       metric: m, weight: weights[m], share: sh[m], games: n[m],
@@ -284,8 +434,12 @@ function metricScores(rrows, weights, anchors) {
 // `pos_anchors` (a position's list: see tierModels) scores each position's games against that
 // position's own anchors, so a player's off-position games are judged by the position played.
 function scorePlayers(rows, model, { consistency = true, teams = teamGames(rows) } = {}) {
-  const unitOf = model.pos_anchors ? (r) => r.pos : (r) => r.role;
-  const anchorsOf = (u) => (model.pos_anchors ? model.pos_anchors[u] : model.anchors[u]);
+  const v = model.v;
+  // With points per position, each position is its own unit even on a whole-league model (its
+  // anchors are then the role's).
+  const byPos = model.pos_anchors || perPosition(v);
+  const unitOf = byPos ? (r) => r.pos : (r) => r.role;
+  const anchorsOf = (u) => (model.pos_anchors ? model.pos_anchors[u] : model.anchors[typeof u === "number" ? (u <= 3 ? "core" : "support") : u]);
   const series = seriesRows(rows, unitOf);
   const byPlayer = new Map();
   for (const r of rows) {
@@ -314,8 +468,8 @@ function scorePlayers(rows, model, { consistency = true, teams = teamGames(rows)
     const roles = [];
     for (const u of [...new Set(a.rows.map(unitOf))].sort()) {
       const rrows = a.rows.filter((r) => unitOf(r) === u), rl = rrows[0].role;
-      const stats = metricScores(rrows, WEIGHTS[rl], anchorsOf(u));
-      const surv = metricScores(rrows, SURVIVAL, anchorsOf(u));
+      const stats = metricScores(rrows, typeof u === "number" ? weightsOf(v, u) : v.weights[rl], anchorsOf(u), v.k_shrink);
+      const surv = metricScores(rrows, typeof u === "number" ? survivalOf(v, u) : v.survival, anchorsOf(u), v.k_shrink);
       roles.push({
         role: rl, unit: u, games: rrows.length, stats, survival: surv,
         points: stats.reduce((t, s) => t + s.share * s.score, 0),
@@ -342,7 +496,7 @@ function scorePlayers(rows, model, { consistency = true, teams = teamGames(rows)
       if (!r?.stats.length) { s.points = null; continue; }
       s.points = r.stats.reduce((t, st) => {
         if (s.z[st.metric] == null) return t;
-        const sc = linear100((s.z[st.metric] * st.games) / (st.games + K_SHRINK), anchorsOf(s.unit)[st.metric]) + (st.score - st.linear);
+        const sc = linear100((s.z[st.metric] * st.games) / (st.games + v.k_shrink), anchorsOf(s.unit)[st.metric]) + (st.score - st.linear);
         return t + (st.share * sc * s.n[st.metric] * r.games) / (s.games * st.games);
       }, 0);
     }
@@ -350,20 +504,28 @@ function scorePlayers(rows, model, { consistency = true, teams = teamGames(rows)
     const seriesPts = scoredSeries.map((s) => s.points);
 
     // Consistency: spread of the player's series stat points, pulled toward the pool's typical
-    // spread by K_CONSISTENCY series.
+    // spread by k_consistency series.
     const c = model.consistency;
-    let spread = null, consistencyScore = 50;
-    if (c) {
+    let spread = null, consistencyScore = 50, topHits = null;
+    if (c?.top) {
+      // Series in the league's top share, padded with k_consistency series at the league's rate.
+      topHits = seriesPts.filter((x) => x >= c.cut).length;
+      const share = (topHits + v.k_consistency * c.top) / (seriesPts.length + v.k_consistency);
+      consistencyScore = c.best > c.worst ? clamp(((share - c.worst) / (c.best - c.worst)) * 100, 0, 100) : 50;
+    } else if (c) {
       const dof = Math.max(0, seriesPts.length - 1);
-      spread = (dof * (seriesPts.length > 1 ? sdOf(seriesPts) : 0) + K_CONSISTENCY * c.typical) / (dof + K_CONSISTENCY);
+      spread = (dof * (seriesPts.length > 1 ? sdOf(seriesPts) : 0) + v.k_consistency * c.typical) / (dof + v.k_consistency);
       consistencyScore = c.worst > c.best ? clamp(((c.worst - spread) / (c.worst - c.best)) * 100, 0, 100) : 50;
     }
 
     // Opponents: each game's opponent strength -> a factor; each series takes its games' average,
     // and the season's multiplier weights each series by its stat points (a big series against a
     // strong team counts more than one against a weak team).
-    const oppOf = (r) => (r.them ? oppStrength(teams, r.them, r.us) : 0.5);
-    const factor = (rate) => lerp(MULT.opponents, (rate - 0.25) / 0.5);
+    // By rating (opponents_by "rating"): strength 0-1 straight onto the range. By win %: 25% -> the
+    // bottom, 75% -> the top.
+    const byRating = v.opponents_by === "rating";
+    const oppOf = (r) => (!r.them ? 0.5 : byRating ? oppRating(teams, r.them, r.series) : oppStrength(teams, r.them, r.us, v.k_prior));
+    const factor = (rate) => (byRating ? lerp(v.mult.opponents, rate) : lerp(v.mult.opponents, (rate - 0.25) / 0.5));
     const oppRate = mean(a.rows.map(oppOf));
     for (const s of a.series) {
       const rs = a.rows.filter((r) => r.series === s.series && unitOf(r) === s.unit);
@@ -374,23 +536,25 @@ function scorePlayers(rows, model, { consistency = true, teams = teamGames(rows)
     const oppMult = weighted > 0 ? scoredSeries.reduce((t, s) => t + s.games * s.points * s.opp, 0) / weighted : mean(a.rows.map((r) => factor(oppOf(r))));
 
     const winRows = a.rows.filter((r) => r.won);
-    const winShrunk = (wins + K_PRIOR * 0.5) / (games + K_PRIOR);
+    const winShrunk = (wins + v.k_prior * 0.5) / (games + v.k_prior);
     const win = clamp(((winShrunk - 0.25) / 0.5) * 100, 0, 100);
-    const speed = (winRows.reduce((s, r) => s + winSpeed(r.minutes, model.win_minutes), 0) + K_SPEED * 50) / (winRows.length + K_SPEED);
-    const winning = (WIN_PARTS.win * win + WIN_PARTS.speed * speed) / (WIN_PARTS.win + WIN_PARTS.speed);
+    const speed = (winRows.reduce((s, r) => s + winSpeed(r.minutes, model.win_minutes), 0) + v.k_speed * 50) / (winRows.length + v.k_speed);
+    const winning = (v.win_parts.win * win + v.win_parts.speed * speed) / (v.win_parts.win + v.win_parts.speed);
 
+    // Winning: a multiplier, or with `winning_flat` flat points added after the multipliers.
+    const winPts = v.winning_flat ? lerp(v.winning_flat, winning / 100) : 0;
     const mult = {
-      survival: lerp(MULT.survival, survival / 100),
-      consistency: consistency ? lerp(MULT.consistency, consistencyScore / 100) : 1,
+      survival: lerp(survivalRange(v, pos), survival / 100), // the main position's range
+      consistency: consistency ? lerp(v.mult.consistency, consistencyScore / 100) : 1,
       opponents: oppMult,
-      winning: lerp(MULT.winning, winning / 100),
+      winning: v.winning_flat ? 1 : lerp(v.mult.winning, winning / 100),
     };
-    const score = statPoints * mult.survival * mult.consistency * mult.opponents * mult.winning;
+    const score = statPoints * mult.survival * mult.consistency * mult.opponents * mult.winning + winPts;
     const teamEntries = Object.entries(a.teams).sort((x, y) => y[1] - x[1]);
     return {
       key: a.key, name: a.p.name, account_id: a.p.account_id ?? null, rank_tier: a.rank_tier,
       team: teamEntries[0]?.[0] ?? null, standin: teamEntries.length > 0 && teamEntries[0][1] === 0,
-      role, games, wins, role_games: roleGames, pos, pos_games: posGames,
+      version: model.version, role, games, wins, role_games: roleGames, pos, pos_games: posGames,
       roles: roles.sort((x, y) => (x.role === role ? -1 : y.role === role ? 1 : 0)),
       // Per series: stat points, and a score = those × that series' opponent factor × the
       // season's survival, consistency and winning. Both average (weighted by games) to the
@@ -398,15 +562,57 @@ function scorePlayers(rows, model, { consistency = true, teams = teamGames(rows)
       series: a.series.map((s) => ({
         series: s.series, role: s.role, pos: typeof s.unit === "number" ? s.unit : null, games: s.games, wins: s.wins, vs: s.vs, time: s.time,
         points: s.points, opp: s.opp, opp_rate: s.opp_rate,
-        score: s.points == null ? null : s.points * s.opp * mult.survival * mult.consistency * mult.winning,
+        score: s.points == null ? null : s.points * s.opp * mult.survival * mult.consistency * mult.winning + winPts,
       })).sort((x, y) => (y.time ?? 0) - (x.time ?? 0)),
       series_points: seriesPts,
-      stat_points: statPoints, survival, consistency: consistencyScore, spread, opp_rate: oppRate,
+      stat_points: statPoints, survival, consistency: consistencyScore, spread, top_hits: topHits, top_cut: c?.top ? c.cut : null, opp_rate: oppRate,
       win_minutes: winRows.length ? mean(winRows.map((r) => r.minutes)) : null,
-      win_shrunk: winShrunk, win, speed, winning, mult, score,
+      win_shrunk: winShrunk, win, speed, winning, mult, score, win_points: v.winning_flat ? winPts : null,
       top_heroes: Object.entries(a.heroes).sort((x, y) => y[1] - x[1]).slice(0, 3).map(([h]) => h),
     };
   });
+}
+
+// Stat podium (versions with `podium`): the league's top three in each podium stat, by season
+// average a game of the raw number (players with minGames+ games, any position). `rows`: the
+// whole league's game rows. Returns key -> { points, places: [{ metric, place, points }] }.
+function leaguePodium(rows, v, minGames) {
+  const out = new Map();
+  if (!v.podium) return out;
+  const byPlayer = new Map();
+  for (const r of rows) { const k = keyOf(r.p); (byPlayer.get(k) ?? byPlayer.set(k, []).get(k)).push(r); }
+  const field = [...byPlayer].filter(([, rs]) => rs.length >= minGames);
+  // Grouped (stats keyed by "core" / "support", or by position 1-5): each group ranks the players
+  // whose main position (most games; ties the lower number) falls in it, on its own stats. A
+  // list: everyone at once.
+  const mainPos = (rs) => { const c = {}; for (const r of rs) c[r.pos] = (c[r.pos] ?? 0) + 1; return Number(Object.entries(c).sort((x, y) => y[1] - x[1] || x[0] - y[0])[0][0]); };
+  const inGroup = (k, pos) => (k === "core" ? pos <= 3 : k === "support" ? pos >= 4 : pos === Number(k));
+  const groups = Array.isArray(v.podium.stats)
+    ? [[field, v.podium.stats]]
+    : Object.entries(v.podium.stats).map(([k, stats]) => [field.filter(([, rs]) => inGroup(k, mainPos(rs))), stats]);
+  for (const [group, stats] of groups) for (const m of stats) {
+    const q = PODIUM_STATS[m].qualify;
+    const avgs = (q ? group.filter(([, rs]) => q(rs)) : group).map(([k, rs]) => { const xs = rs.map((r) => PODIUM_STATS[m].get(r.p, r.match)).filter((x) => x != null); return [k, xs.length ? mean(xs) : null]; })
+      .filter(([, a]) => a != null).sort((a, b) => b[1] - a[1]);
+    v.podium.points.forEach((pts, i) => {
+      if (!avgs[i]) return;
+      const e = out.get(avgs[i][0]) ?? out.set(avgs[i][0], { points: 0, places: [] }).get(avgs[i][0]);
+      e.places.push({ metric: m, place: i + 1, points: pts });
+      e.points += pts;
+    });
+  }
+  for (const e of out.values()) e.places.sort((a, b) => a.place - b.place);
+  return out;
+}
+// Adds each player's podium points (from leaguePodium) to their score. Sets p.podium and
+// p.score_base (the score before it).
+function addPodium(players, podium, v) {
+  if (!v.podium) return;
+  for (const p of players) {
+    p.score_base = p.score;
+    p.podium = podium.get(p.key) ?? { points: 0, places: [] };
+    p.score += p.podium.points;
+  }
 }
 
 // Least-squares line y = a + b·x, and the spread of what's left over.
@@ -419,18 +625,16 @@ function lineFit(xs, ys) {
 }
 
 // [lowest, highest] of a list, or null with fewer than two.
-// Stats where 100 is reached before the league's best: a few supports stack far more than
-// everyone else, so 100 stacks sits 70% of the way from the worst to the best.
-export const EASE = { support: { stacks: 0.7 } };
-
 const ends = (xs) => (xs.length >= 2 ? [Math.min(...xs), Math.max(...xs)] : null);
 
 // The reference a tier list is scored against. `matches` is the league's games: one AD2L
 // division, or the scrim ledger. `minGames`: the games a player needs to count toward the
 // anchors and the curve (lower when the time machine picks only a week or two). `pos` (1–5):
 // a model for one position, whose anchors, consistency and curve come from that position's
-// games and players only, so its tier list rates pos 4s against pos 4s.
-export function tierModel(matches, { minGames = MIN_GAMES, pos = null } = {}) {
+// games and players only, so its tier list rates pos 4s against pos 4s. `version`: a key of
+// VERSIONS, the scoring numbers to use.
+export function tierModel(matches, { minGames = MIN_GAMES, pos = null, version = LIVE } = {}) {
+  const v = VERSIONS[version];
   const all = matches.flatMap(gameRows);
   const positions = {};
   for (const pos of [1, 2, 3, 4, 5]) {
@@ -443,10 +647,10 @@ export function tierModel(matches, { minGames = MIN_GAMES, pos = null } = {}) {
       positions[pos][metric] = LENGTH_FIT.has(metric) ? lineFit(with_.map((r) => r.minutes), vs) : [mean(vs), sdOf(vs)];
     }
   }
-  const model = { games: matches.length, pos, positions, anchors: {}, win_minutes: all.filter((r) => r.won && r.pos === 1).map((r) => r.minutes).sort((a, b) => a - b) };
+  const model = { version, v, games: matches.length, pos, positions, anchors: {}, win_minutes: all.filter((r) => r.won && r.pos === 1).map((r) => r.minutes).sort((a, b) => a - b) };
   for (const r of all) scoreRow(r, model);
   // Opponent strength always from every game; everything else from the rows this model rates.
-  const teams = teamGames(all), rows = pos ? all.filter((r) => r.pos === pos) : all;
+  const teams = teamsOf(matches, all), rows = pos ? all.filter((r) => r.pos === pos) : all;
   // Anchors, from every player with minGames+ games in a role. 100 is the best shrunk season
   // average at a stat (the number players are scored on), so the league's best gets all its
   // points. 0 is the worst single series by such a player, flat out, so every series and season
@@ -457,29 +661,38 @@ export function tierModel(matches, { minGames = MIN_GAMES, pos = null } = {}) {
   const perfs = seriesRows(rows).filter((s) => eligible.has(`${s.key}|${s.role}`));
   for (const role of ["core", "support"]) {
     model.anchors[role] = {};
-    const players = [...byPlayerRole.values()].filter((rs) => rs[0].role === role && rs.length >= minGames).map(shrunkZ);
+    const players = [...byPlayerRole.values()].filter((rs) => rs[0].role === role && rs.length >= minGames).map((rs) => shrunkZ(rs, v.k_shrink));
     const here = perfs.filter((s) => s.role === role);
-    for (const metric of Object.keys(scoredMetrics(role))) {
+    for (const metric of Object.keys(roleMetrics(role, v))) {
       const best = ends(players.filter((z) => z[metric]).map((z) => z[metric][0]));
       const worst = ends(here.filter((s) => s.z[metric] != null).map((s) => s.z[metric]));
       // Too few players or series to find a best and a worst: fall back to ±1 sd.
       const [lo, hi] = best && worst ? [Math.min(worst[0], best[1] - 1e-6), best[1]] : [-1, 1];
       // Some stats are easier to max: 100 sits part of the way to the best player.
-      model.anchors[role][metric] = [lo, lo + (hi - lo) * (EASE[role]?.[metric] ?? 1)];
+      model.anchors[role][metric] = [lo, lo + (hi - lo) * (v.ease[role]?.[metric] ?? 1)];
     }
   }
   // Consistency reference: eligible players' series spreads (2+ series).
   const first = scorePlayers(rows, model, { consistency: false, teams }).filter((p) => p.games >= minGames && p.series_points.length >= 2);
   const sds = first.map((p) => sdOf(p.series_points)).sort((a, b) => a - b);
-  if (sds.length) {
+  if (v.consistency_top && sds.length) {
+    // The bar: the series score that `consistency_top` of all eligible players' series reach.
+    const all = first.flatMap((p) => p.series_points).sort((a, b) => a - b);
+    const cut = all[Math.min(all.length - 1, Math.floor(all.length * (1 - v.consistency_top)))];
+    const shares = first.map((p) => (p.series_points.filter((x) => x >= cut).length + v.k_consistency * v.consistency_top) / (p.series_points.length + v.k_consistency));
+    const e = ends(shares);
+    model.consistency = { top: v.consistency_top, cut, best: e ? e[1] : v.consistency_top + 0.2, worst: e ? e[0] : v.consistency_top - 0.2 };
+  } else if (sds.length) {
     const typical = sds[Math.floor(sds.length / 2)];
     // Anchors on the shrunk spreads, the same way players are scored.
-    const shrunk = first.map((p) => { const dof = p.series_points.length - 1; return (dof * sdOf(p.series_points) + K_CONSISTENCY * typical) / (dof + K_CONSISTENCY); });
+    const shrunk = first.map((p) => { const dof = p.series_points.length - 1; return (dof * sdOf(p.series_points) + v.k_consistency * typical) / (dof + v.k_consistency); });
     const e = ends(shrunk);
     model.consistency = { typical, best: e ? e[0] : typical * 0.5, worst: e ? e[1] : typical * 1.5 };
   }
-  const scores = scorePlayers(rows, model, { teams }).filter((p) => p.games >= minGames).map((p) => p.score).sort((a, b) => a - b);
-  model.curve = scores.length >= 5 ? [scores[Math.floor(scores.length / 2)], RATING_STRETCH * sdOf(scores)] : DEFAULT_CURVE;
+  const season = scorePlayers(rows, model, { teams });
+  addPodium(season, leaguePodium(all, v, minGames), v);
+  const scores = season.filter((p) => p.games >= minGames).map((p) => p.score).sort((a, b) => a - b);
+  model.curve = scores.length >= 5 ? [scores[Math.floor(scores.length / 2)], v.stretch * sdOf(scores)] : DEFAULT_CURVE;
   // One game's score sits closer to the middle than a season's (no averaging luck out, and the
   // shrinking pulls one game hard), so on the season curve almost no game reached S or D.
   // Game ratings get their own curve, fitted the same way to every player-game in the league,
@@ -487,7 +700,7 @@ export function tierModel(matches, { minGames = MIN_GAMES, pos = null } = {}) {
   const byGame = new Map();
   for (const r of rows) { const k = r.match.id ?? r.match.match_id; (byGame.get(k) ?? byGame.set(k, []).get(k)).push(r); }
   const games = [...byGame.values()].flatMap((rs) => scorePlayers(rs, model, { teams }).map((p) => p.score)).sort((a, b) => a - b);
-  model.game_curve = games.length >= 10 ? [games[Math.floor(games.length / 2)], RATING_STRETCH * sdOf(games)] : model.curve;
+  model.game_curve = games.length >= 10 ? [games[Math.floor(games.length / 2)], v.stretch * sdOf(games)] : model.curve;
   return model;
 }
 
@@ -496,9 +709,9 @@ export function tierModel(matches, { minGames = MIN_GAMES, pos = null } = {}) {
 // and also carries every position's anchors (`pos_anchors`) and the whole set (`set`), so a
 // player with games at several positions is scored on all of them, each against the position
 // played.
-export function tierModels(matches, { minGames = MIN_GAMES } = {}) {
+export function tierModels(matches, { minGames = MIN_GAMES, version = LIVE } = {}) {
   const set = {};
-  for (const n of [1, 2, 3, 4, 5]) set[n] = tierModel(matches, { minGames, pos: n });
+  for (const n of [1, 2, 3, 4, 5]) set[n] = tierModel(matches, { minGames, pos: n, version });
   const pos_anchors = Object.fromEntries([1, 2, 3, 4, 5].map((n) => [n, set[n].anchors[n <= 3 ? "core" : "support"]]));
   for (const n of [1, 2, 3, 4, 5]) Object.assign(set[n], { pos_anchors, set });
   return set;
@@ -511,15 +724,19 @@ export function tierModels(matches, { minGames = MIN_GAMES } = {}) {
 export function tierList(matches, { minGames = MIN_GAMES, model = null, pos = null } = {}) {
   model ??= pos ? tierModels(matches, { minGames })[pos] : tierModel(matches, { minGames });
   const rows = matches.flatMap(gameRows).map((r) => scoreRow(r, model));
-  const teams = teamGames(rows);
+  const teams = teamsOf(matches, rows);
   let players = scorePlayers(rows, model, { teams });
   if (pos) players = players.filter((p) => p.pos === pos);
+  addPodium(players, leaguePodium(rows, model.v, minGames), model.v);
   for (const p of players) { p.rating_exact = ratingOf(p.score, model.curve); p.rating = Math.round(p.rating_exact); p.curve = model.curve; }
   const mixed = new Map(players.filter((p) => Object.values(p.pos_games).filter((n) => n).length > 1).map((p) => [p.key, p]));
   if (pos && mixed.size) {
     for (const n of [1, 2, 3, 4, 5]) {
       const m = model.set[n], here = rows.filter((r) => r.pos === n && mixed.has(keyOf(r.p)));
       for (const q of scorePlayers(here, m, { teams })) {
+        // The list's own position carries the player's podium places (earned in this list).
+        const p = mixed.get(q.key);
+        if (n === pos && p.podium) { q.podium = p.podium; q.score_base = q.score; q.score += p.podium.points; }
         q.rating_exact = ratingOf(q.score, m.curve); q.rating = Math.round(q.rating_exact); q.curve = m.curve;
         (mixed.get(q.key).by_pos ??= []).push(q); // a full player result for just the games at pos n
       }

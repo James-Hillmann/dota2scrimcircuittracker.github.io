@@ -25,6 +25,7 @@ import { buildingsFrom } from "../../public/lib/towermap.js";
 import { deathsFrom } from "../../public/lib/deathmap.js";
 import { itemsFrom } from "../../public/lib/items.js";
 import { laneFields } from "./lane-fields.js";
+import { timingFields } from "./timing-fields.js";
 import { combatFields, gameExtras, firstDeathOf, detailOf, detailName, detailJson } from "./combat-fields.js";
 import { leagueJson } from "./league-json.js";
 import { wardLog, visionMap, visionFields } from "./vision.js";
@@ -427,6 +428,8 @@ async function buildGame(id) {
       // Lane result (gold and XP at 10 min, against the lane opponent), hero damage taken
       // (survival), and utility used by supports: dust and smokes (sentries are sen_placed).
       xp10: Array.isArray(p.xp_t) ? p.xp_t[10] ?? null : null,
+      // XP by minute and hero damage per teamfight (see scripts/sync/timing-fields.js).
+      ...timingFields(d, p),
       // Laning (see public/lib/lanes.js): the replay's lane, and last hits / denies at 10 min.
       ...laneFields(p),
       dmg_taken: p.damage_taken ? Object.entries(p.damage_taken).filter(([k]) => k.startsWith("npc_dota_hero_")).reduce((t, [, v]) => t + v, 0) : null,

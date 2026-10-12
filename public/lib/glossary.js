@@ -1,20 +1,37 @@
-import { METRICS } from "./tiers.js";
+import { METRICS, VERSIONS, LIVE, PODIUM_STATS } from "./tiers.js";
 
 // Info bubbles: a small "i" next to a stat's label that explains it. One popover for the
 // whole page; hover shows it with a mouse, tap/click pins it (the only way on phones),
 // Escape or a click elsewhere closes it. Obvious labels (K, D, A, Games, Win %) get none.
 
+// The tier-list bubbles whose numbers come from a scoring version: tm_x for the live one,
+// tm_x@<version> for the others (the tier list's Model tab). See tierInfo.
+function tierBubbles(v, at) {
+  const x = (n) => `×${n.toFixed(Number.isInteger(Math.round(n * 1e6) / 1e4) ? 2 : 3)}`, mid = ([a, b]) => (a + b) / 2, m = v.mult;
+  return {
+    [`tm_stat100${at}`]: `The stat on a 0–100 scale: 100 = the league's best average for the role (players with 3+ games), 0 = the worst single series by such a player, so a weak stat reads low instead of 0. Averages are padded with ${v.k_shrink} games at the position average, so short records don't swing to the ends. Support stacks are easier: 100 sits ${Math.round((v.ease.support?.stacks ?? 1) * 100)}% of the way from the worst stacker to the best.`,
+    [`tm_survival${at}`]: `Deaths, time spent dead and hero damage taken per life, each against the same position, as one 0–100. Scales the stat points from ${x(m.survival[0])} (0) to ${x(m.survival[1])} (100)${m.survival[1] === 1 ? ": dying less keeps more of what you earned" : ""}.${v.survival_pos ? ` Pos ${Object.keys(v.survival_pos).join(" and ")} (initiators) lose at most ${Math.round((1 - Object.values(v.survival_pos)[0].range[0]) * 100)}%, and damage taken per life weighs most for them.` : ""}`,
+    [`tm_consistency${at}`]: v.consistency_top
+      ? `How many of the player's series reach the league's top ${Math.round(v.consistency_top * 100)}% of series at their position (padded with ${v.k_consistency} series at the league's rate). The most reliable player in the league is ${x(m.consistency[1])}, the least ${x(m.consistency[0])}.`
+      : `How much the player's stat points swing from series to series (±), pulled toward the typical swing for short records. The steadiest player in the league is ${x(m.consistency[1])}, the streakiest ${x(m.consistency[0])}.`,
+    [`tm_opponents${at}`]: v.opponents_by === "rating"
+      ? `How strong each opponent is: a team rating from the division's game results, adjusted for who each team beat and refitted without the series being scored. The strongest team is ${x(m.opponents[1])}, the weakest ${x(m.opponents[0])}. The shown % is the average opponent's strength (0% weakest, 100% strongest); the multiplier weights each series by its stat points.`
+      : `Each opponent's game win % against other teams (padded with ${v.k_prior} even games): 75% → ${x(m.opponents[1])}, 50% → ${x(mid(m.opponents))}, 25% → ${x(m.opponents[0])}. The shown % is the average opponent; the multiplier weights each series by its stat points, so big series against strong teams count more.`,
+    [`tm_winning${at}`]: `${v.win_parts.win === 2 && v.win_parts.speed === 1 ? "Two parts win rate to one part win speed" : `${v.win_parts.win} parts win rate to ${v.win_parts.speed} win speed`}, as a 0–100. Win rate is padded with ${v.k_prior} even games, then 25% → 0 and 75% → 100; win speed scores each win by the share of this league's wins that took longer. ${v.winning_flat ? `Flat points added after the multipliers, the same for every player: 0 → ${v.winning_flat[0]}, 50 → ${(v.winning_flat[0] + v.winning_flat[1]) / 2}, 100 → +${v.winning_flat[1]}.` : `50 → ${x(mid(m.winning))}, 100 → ${x(m.winning[1])}, 0 → ${x(m.winning[0])}.`}`,
+    ...(v.podium ? { [`tm_podium${at}`]: `A bonus for impressive numbers: ${Array.isArray(v.podium.stats) ? `the league's top three averages a game in ${v.podium.stats.map((m) => PODIUM_STATS[m].label).join(", ")} (raw numbers, any position)` : `the top three averages a game among cores (pos 1–3) or supports (pos 4–5), in that role's podium stats (raw numbers; listed in "How it's scored")`} get ${v.podium.points.map((n, i) => `+${n} for ${["1st", "2nd", "3rd"][i]}`).join(", ")}, added after the multipliers and before the rating curve.` } : {}),
+    [`tm_curve${at}`]: `Everything above this row comes from your own games. This row compares you with the rest of the league. Scores bunch up (the typical player lands near 60), so a curve spreads them out: the league's median score rates 50, one curve width above rates 84, two rate 98, one below rates 16, and 0 and 100 stay nearly out of reach. The curve is ${v.stretch} × the spread of the league's scores wide. The number here is the rating minus the score, so the column adds up to your rating.`,
+  };
+}
+// A tier-list bubble for a scoring version: its own text when the numbers differ from the live one.
+export const tierInfo = (id, version) => info(version && version !== LIVE && INFO[`${id}@${version}`] ? `${id}@${version}` : id);
+
 export const INFO = {
   // Tier-list breakdown (one bubble per stat comes from METRICS in tiers.js)
   ...Object.fromEntries(Object.entries(METRICS).map(([m, d]) => [`tm_${m}`, d.def])),
   tm_avg: "The league average for the same position. GPM and net worth are matched to this player's game length, since both climb as games go on.",
-  tm_stat100: "The stat on a 0–100 scale: 100 = the league's best average for the role (players with 3+ games), 0 = the worst single series by such a player, so a weak stat reads low instead of 0. Averages are padded with 3 games at the position average, so short records don't swing to the ends. Support stacks are easier: 100 sits 70% of the way from the worst stacker to the best.",
   tm_points: "Stat rows: points out of the 100 stat points (the stat's points × its 0–100); the most it can give is after the slash. Multiplier rows: the points it adds or takes away (its × factor underneath). All rows add up to the score.",
-  tm_survival: "Deaths, time spent dead and hero damage taken per life, each against the same position, as one 0–100. Scales the stat points from ×0.85 (0) to ×1.00 (100): dying less keeps more of what you earned.",
-  tm_consistency: "How much the player's stat points swing from series to series (±), pulled toward the typical swing for short records. The steadiest player in the league is ×1.00, the streakiest ×0.90.",
-  tm_opponents: "Each opponent's game win % against other teams (padded with 6 even games): 75% → ×1.10, 50% → ×1.00, 25% → ×0.90. The shown % is the average opponent; the multiplier weights each series by its stat points, so big series against strong teams count more.",
-  tm_winning: "Two parts win rate to one part win speed, as a 0–100. Win rate is padded with 6 even games, then 25% → 0 and 75% → 100; win speed scores each win by the share of this league's wins that took longer. 50 → ×1.00, 100 → ×1.30, 0 → ×0.70.",
-  tm_curve: "Everything above this row comes from your own games. This row compares you with the rest of the league. Scores bunch up (the typical player lands near 60), so a curve spreads them out: the league's median score rates 50, one curve width above rates 84, two rate 98, one below rates 16, and 0 and 100 stay nearly out of reach. The curve is 1.5 × the spread of the league's scores wide. The number here is the rating minus the score, so the column adds up to your rating.",
+  ...tierBubbles(VERSIONS[LIVE], ""),
+  ...Object.fromEntries(Object.keys(VERSIONS).filter((k) => k !== LIVE).flatMap((k) => Object.entries(tierBubbles(VERSIONS[k], `@${k}`)))),
   tm_series: "Stats: the series' stat points, padded the same way as the season (a great series can pass 100). Opp.: that opponent's strength factor. Score: stats × opp. × the season's survival, consistency and winning. Weighted by games, the series average to the season row.",
   // Series standings (AD2L)
   w: "Series won 2–0.",
@@ -189,6 +206,7 @@ export const INFO = {
 
   // Predictions
   points: "Correct calls / series called.",
+  bracket_pts: "Playoffs: 1 point for each bracket match whose winner you picked, from the bracket you saved on the Bracket tab before the first bracket match. Week 8 tiebreakers count as series picks instead.",
   correct: "Share of calls that were right.",
   model_col: "What the model would have picked, using only results from before it. Where shown, the % is the chance it gave the actual result.",
   crowd_col: "The most-picked call, and how many people picked.",

@@ -5,7 +5,7 @@ import { wardMapHtml, wardsOf, wireWardMaps } from "../lib/wardmap.js";
 import { gameGoldHtml, wireGameGold } from "../lib/gamegold.js";
 import { info } from "../lib/glossary.js";
 import { ordinal } from "../lib/ranks.js";
-import { pct, fmt, kg, dur, esc, portrait, shortDate, playerLink, heroLink, teamLink, when, leagueShort } from "../core.js";
+import { pct, fmt, kg, dur, esc, portrait, shortDate, playerLink, heroLink, teamLink, when, leagueShort, allLeagues } from "../core.js";
 import { rateOf } from "./draft.js";
 
 // ---------- Game analysis (player page) ----------
@@ -65,13 +65,60 @@ const GA_STATS = [
   ]],
 ];
 
-// Place among the game's ten for one stat: { rank, of, tied } (null when this player lacks it).
-function gamePlace(m, p, val, dir) {
+// Place among `players` for one stat: { rank, of, tied } (null when this player lacks it).
+function placeAmong(players, p, val, dir) {
   const mine = val(p);
   if (mine == null) return null;
-  const vs = m.players.map(val).filter((v) => v != null);
+  const vs = players.map(val).filter((v) => v != null);
   const better = vs.filter((v) => (dir < 0 ? v < mine : v > mine)).length;
   return { rank: better + 1, of: vs.length, tied: vs.filter((v) => v === mine).length };
+}
+
+// What the stat line ranks against, kept while the page is open: `pool` "game" (the ten in
+// the game), "pos" (every game at their position) or "all" (every player-game, any role);
+// `leagues` adds every other league's games to the last two.
+const cmp = { pool: "game", leagues: false };
+// ctx: { matches: the page league's games, others: every other league's (null until loaded) }.
+const poolMemo = new Map();
+function poolOf(src, ctx, p) {
+  const pos = cmp.pool === "pos" && p.position != null ? p.position : null;
+  const lists = cmp.leagues && ctx.others ? [ctx.matches, ...ctx.others] : [ctx.matches];
+  const k = `${pos}|${lists.length}`;
+  let byKey = poolMemo.get(ctx);
+  if (!byKey) poolMemo.set(ctx, (byKey = new Map()));
+  if (!byKey.has(k)) byKey.set(k, lists.flatMap((ms) => ms.flatMap((m) => m.players ?? [])).filter((q) => pos == null || q.position === pos));
+  return byKey.get(k);
+}
+const showLeagues = (src) => !src.all;
+
+function statLineHtml(src, m, p, ctx) {
+  const inGame = cmp.pool === "game" || !ctx;
+  const players = inGame ? m.players : poolOf(src, ctx, p);
+  const wide = cmp.leagues && !inGame && showLeagues(src);
+  const loadingOthers = wide && !ctx.others;
+  const where = wide ? "every league" : leagueShort(src);
+  const what = inGame ? `the ${m.players.length} players in the game`
+    : cmp.pool === "pos" && p.position != null ? `every pos ${p.position} game in ${where}` : `every player's games in ${where}, any role`;
+  const tile = ([label, val, shown, sub, dir], k) => {
+    const q = placeAmong(players, p, val, dir || 1);
+    // In a pool bigger than a game, green / red are the top / bottom tenth.
+    const cut = inGame ? 3 : Math.max(1, Math.round((q?.of ?? 0) / 10));
+    const tone = !q || !dir ? "" : q.rank === 1 && q.tied === 1 ? " best" : q.rank <= cut ? " good" : q.rank > q.of - cut ? " bad" : "";
+    return `<div class="ga-stat${tone}" style="--i:${k}"><div class="ga-top"><div class="k">${label}</div>${q ? `<div class="ga-rk">${q.tied > 1 ? "=" : ""}${ordinal(q.rank)}<small>/${q.of}</small></div>` : ""}</div>
+      <div class="v">${shown(p)}</div><div class="s">${sub(p, m) || "&nbsp;"}</div></div>`;
+  };
+  const groups = GA_STATS.map(([name, stats]) => {
+    const have = stats.filter(([, val]) => val(p) != null);
+    return have.length ? `<div class="ga-group"><div class="ga-group-h">${name}</div><div class="ga-stats">${have.map(tile).join("")}</div></div>` : "";
+  }).join("");
+  const seg = (v, label) => `<button type="button" class="seg${cmp.pool === v ? " on" : ""}" data-cmp="${v}" aria-pressed="${cmp.pool === v}">${label}</button>`;
+  const bar = ctx ? `<div class="ga-cmp" role="group" aria-label="Rank against"><span class="ga-cmp-l">Rank against</span>
+      <span class="segs">${seg("game", "This game")}${p.position != null ? seg("pos", `Pos ${p.position}`) : ""}${seg("all", "All roles")}</span>
+      ${showLeagues(src) ? `<button type="button" class="seg ga-cmp-x${cmp.leagues ? " on" : ""}" data-cmp-leagues aria-pressed="${cmp.leagues}"${inGame ? " disabled title=\"Pick a position or All roles first\"" : ""}>+ Other leagues</button>` : ""}
+    </div>` : "";
+  const tones = inGame ? "gold = best in the game, green = top 3, red = bottom 3" : "gold = the best of all, green = top tenth, red = bottom tenth";
+  return `<h3 class="ga-h3">Stat line <small>place in brackets, among ${what}: ${tones}${loadingOthers ? " · loading the other leagues…" : ""}</small></h3>
+    ${bar}${groups}`;
 }
 
 // The game picker, GA_PAGE games a page, newest first; `page` defaults to the selected game's.
@@ -103,7 +150,7 @@ function gamePickerHtml(src, mode, games, gi, rated, page = Math.floor(gi / GA_P
   return `<div class="ga-pick" role="group" aria-label="Pick a game">${tiles}</div>${pager}`;
 }
 
-export function gameAnalysisHtml(src, mode, games, gi, rated) {
+export function gameAnalysisHtml(src, mode, games, gi, rated, ctx = null) {
   const g = games[gi], m = g.m, p = g.p, i = m.players.indexOf(p);
   const list = rated[gi], me = list.find((r) => r.key === playerKey(p));
   const sideOfKey = Object.fromEntries(m.players.map((q) => [playerKey(q), q.team]));
@@ -173,38 +220,46 @@ export function gameAnalysisHtml(src, mode, games, gi, rated) {
     </details>`;
   }
 
-  const tile = ([label, val, shown, sub, dir], k) => {
-    const q = gamePlace(m, p, val, dir || 1);
-    const tone = !q || !dir ? "" : q.rank === 1 && q.tied === 1 ? " best" : q.rank <= 3 ? " good" : q.rank > q.of - 3 ? " bad" : "";
-    return `<div class="ga-stat${tone}" style="--i:${k}"><div class="k">${label}</div><div class="v">${shown(p)}</div>
-      <div class="s">${sub(p, m) || "&nbsp;"}</div>${q ? `<div class="ga-rk">${q.tied > 1 ? "=" : ""}${ordinal(q.rank)}<small>/${q.of}</small></div>` : ""}</div>`;
-  };
-  const groups = GA_STATS.map(([name, stats]) => {
-    const have = stats.filter(([, val]) => val(p) != null);
-    return have.length ? `<div class="ga-group"><div class="ga-group-h">${name}</div><div class="ga-stats">${have.map(tile).join("")}</div></div>` : "";
-  }).join("");
-
   // Wards only: kills and deaths are on the gold chart and the page's own deaths map.
   const map = i >= 0 ? wardMapHtml([{ label: p.hero, cls: "s-mine", wards: wardsOf(p) }], { id: "ga-map" }) : "";
   const gold = i >= 0 ? gameGoldHtml(m, i, { id: "ga-gold" }) : "";
   return `<div class="ga-picker reveal" data-gi="${gi}">${gamePickerHtml(src, mode, games, gi, rated)}</div>
     ${head}
     ${impact}
-    <h3 class="ga-h3">Stat line <small>place among the ${m.players.length} players in brackets: gold = best in the game, green = top 3, red = bottom 3</small></h3>
-    ${groups}
+    <div class="ga-statline">${statLineHtml(src, m, p, ctx)}</div>
     ${gold ? `<h3 class="ga-h3">Gold &amp; events${info("game_gold")}<small>Their gold against the enemy at the same position, their team's lead underneath, and what happened when. Hover for any minute.</small></h3>${gold}` : ""}
     ${map ? `<h3 class="ga-h3">Wards</h3>${map}` : `<p class="table-note keep">No wards on record for this game${src.ad2l ? "" : " (screenshot uploads don't have them)"}.</p>`}`;
 }
 
-export function wireGameAnalysis(src, mode, games, rated) {
+// `matches`: the page league's games, which the stat line can rank against.
+export function wireGameAnalysis(src, mode, games, rated, matches) {
   const box = document.getElementById("game-box");
   if (!box) return;
+  const ctx = { matches, others: null };
+  let othersReady = null;
+  const statLine = () => {
+    const wrap = box.querySelector(".ga-statline"), gi = +box.querySelector(".ga-picker")?.dataset.gi;
+    if (wrap && games[gi]) wrap.innerHTML = statLineHtml(src, games[gi].m, games[gi].p, ctx);
+  };
+  const loadOthers = () => (othersReady ??= allLeagues(src).then((all) => {
+    ctx.others = all.filter((x) => x.key !== src.key).map((x) => x.matches);
+    statLine();
+  }).catch(() => { othersReady = null; }));
+  if (cmp.leagues && cmp.pool !== "game" && showLeagues(src)) loadOthers();
+  statLine();
   const show = (gi) => {
-    box.innerHTML = gameAnalysisHtml(src, mode, games, gi, rated);
+    box.innerHTML = gameAnalysisHtml(src, mode, games, gi, rated, ctx);
     wireWardMaps(box);
     wireGameGold(box);
   };
   box.addEventListener("click", (e) => {
+    const c = e.target.closest("button[data-cmp], button[data-cmp-leagues]");
+    if (c) {
+      if (c.dataset.cmp) cmp.pool = c.dataset.cmp;
+      else cmp.leagues = !cmp.leagues;
+      if (cmp.leagues && cmp.pool !== "game" && showLeagues(src)) loadOthers();
+      return statLine();
+    }
     const b = e.target.closest("button.ga-g");
     if (b) return show(+b.dataset.gi);
     // Paging only swaps the tiles; the game shown stays.

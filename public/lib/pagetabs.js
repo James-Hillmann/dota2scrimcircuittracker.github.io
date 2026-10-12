@@ -8,7 +8,7 @@ export const TEAM_TABS = [
   ["chances", "Outcomes", { ad2l: true }], ["lanes", "Laning", { ad2l: true }], ["map", "Map"],
 ];
 export const PLAYER_TABS = [
-  ["stats", "Stats"], ["heroes", "Heroes"], ["combat", "Combat"], ["lanes", "Laning", { ad2l: true }],
+  ["stats", "Stats"], ["compare", "Compare"], ["heroes", "Heroes"], ["combat", "Combat"], ["lanes", "Laning", { ad2l: true }],
   ["items", "Items"], ["map", "Map"], ["games", "Games"],
 ];
 export const HERO_TABS = [

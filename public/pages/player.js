@@ -1,5 +1,5 @@
 // Player page.
-import { playerHistory, hasDetails, draftSlotRecord } from "../lib/stats.js";
+import { playerHistory, hasDetails, draftSlotRecord, playerLeaderboard } from "../lib/stats.js";
 import { tierList, gameRatings, rankLabel } from "../lib/tiers.js";
 import { byPlayer } from "../lib/timeline.js";
 import { wireCharts } from "../lib/charts.js";
@@ -16,6 +16,8 @@ import { playerItemsHtml, wireItemHeroes } from "../parts/items.js";
 import { loading, errorBox, laneCutsOf, lanesPageHtml } from "../parts/lanes.js";
 import { statRows, heroRanks, statRanksHtml, heroRanksHtml, pubSection, pubPrepHtml, allTimeSection, overallStats, overallHeroes } from "../parts/ranks.js";
 import { tierRef, tierBreakdown } from "../parts/tiers.js";
+import { compareHtml, wireCompare } from "../parts/compare.js";
+import { radarSvg, roleScores } from "../parts/radar.js";
 
 // ---------- Player page ----------
 
@@ -30,6 +32,7 @@ function wireTierModal() {
   const lock = () => document.documentElement.classList.toggle("modal-open", dlg.open);
   new MutationObserver(lock).observe(dlg, { attributes: true, attributeFilter: ["open"] });
   open.onclick = () => { dlg.showModal(); dlg.querySelector(".tm-body").scrollTop = 0; };
+  document.querySelectorAll("[data-open-tier]").forEach((b) => (b.onclick = open.onclick));
   dlg.querySelector(".tm-close").onclick = () => dlg.close();
   dlg.addEventListener("click", (e) => { if (e.target === dlg) dlg.close(); });
   dlg.querySelectorAll("a[href^='#']").forEach((a) => a.addEventListener("click", () => dlg.close()));
@@ -76,11 +79,9 @@ export async function renderPlayer(src, key) {
       return ["Building damage", fmt(Math.round(mine / gs.length)), `per game · ${team ? pct(mine / team) : "—"} of their team's`, "building_dmg"];
     })(),
     ...(s.map_games ? [
-      ["Vision", `${dec(s.obs_pg)} / ${dec(s.sen_pg)}`, "observers / sentries placed per game", "vision"],
-      ["Dewards", dec(s.dewards_pg), "enemy wards killed per game", "dewards_pg"],
+      ["Vision", `${dec(s.obs_pg)} / ${dec(s.sen_pg)} / ${dec(s.dewards_pg)}`, "observers / sentries placed / enemy wards killed per game", "vision"],
       ["Stacks", dec(s.stacks_pg), "camps stacked per game", "stacks_pg"],
       ["Creeps", `${Math.round(s.lane_pg)} / ${Math.round(s.neutral_pg)}`, `lane / neutral per game · ${pct(s.neutral_share)} neutral`, "creeps"],
-      ["Objectives", `${s.roshans} / ${s.tormentors}`, "Roshan / Tormentor last hits", "objectives"],
     ] : []),
   ];
   const vsOf = ({ m, p }) => (p.team === "a" ? { name: m.team_b, id: m.team_b_id } : { name: m.team_a, id: m.team_a_id });
@@ -88,13 +89,19 @@ export async function renderPlayer(src, key) {
     <div class="k">Best game · ${label}</div><div class="v">${value}</div>
     <div class="s">${esc(g.p.hero)} · vs ${esc(vsOf(g).name)} · ${g.won ? "Won" : "Lost"}</div></a>`;
 
+  // Tier profile: the radar of their main-role stats, first in the cards (two rows tall).
+  const mainStats = tierOf?.roles?.[0]?.stats ?? [];
+  const radar = mainStats.length >= 3 ? `<button type="button" class="card radar-card t-${tierOf.tier}" data-open-tier title="Open the tier breakdown">
+      <div class="k">Tier profile · 0–100 <span class="rc-go" aria-hidden="true">↗</span></div>
+      ${radarSvg([{ name: s.name, cls: "rc-shape", scores: roleScores(tierOf) }], mainStats.map((x) => x.metric), `${s.name}'s tier stats, 0 to 100`)}</button>` : "";
   const tabs = playerTabs(pageTabs(PLAYER_TABS, src, [
-      ["stats", `<div class="cards player-cards reveal" style="--cols:${Math.ceil((cards.length + 3) / 2)}">${cards.map(([k, v, t, tip], i) => `<div class="card" style="--i:${i}"><div class="k">${k}${info(tip)}</div><div class="v">${v}</div><div class="s">${t}</div></div>`).join("")}
+      ["stats", `<div class="cards player-cards reveal${radar ? " has-radar" : ""}" style="--cols:${Math.ceil((cards.length + 3) / 2)}">${radar}${cards.map(([k, v, t, tip], i) => `<div class="card" style="--i:${i}"><div class="k">${k}${info(tip)}</div><div class="v">${v}</div><div class="s">${t}</div></div>`).join("")}
           ${bestCard("Most damage", h.best.damage, fmt(h.best.damage.p.hero_damage), cards.length)}
           ${bestCard("Best KDA", h.best.kda, `${h.best.kda.p.kills}/${h.best.kda.p.deaths}/${h.best.kda.p.assists}`, cards.length + 1)}
           ${bestCard("Top GPM", h.best.gpm, fmt(h.best.gpm.p.gpm), cards.length + 2)}
         </div>
         <div id="stat-ranks-box" data-key="${esc(key)}">${statRanksHtml(src, key, rows, null)}</div>`],
+      ["compare", compareHtml(key)],
       ["heroes", `<div id="hero-ranks-box" data-key="${esc(key)}">${heroRanksHtml(src, key, h, ratings, null)}</div>
         ${draftSlotHtml(draftSlotRecord(matches, byPlayer(key)), src, s.name, rateOf(h.games, gameRated))}
         ${src.ad2l ? pubSection(src, key) + pubPrepHtml(src, key, h.games) + `<div id="alltime-box" data-key="${esc(key)}"></div>` : ""}`],
@@ -144,6 +151,7 @@ export async function renderPlayer(src, key) {
   wireWardMaps(app);
   wireDeathMaps(app);
   wireTowerMaps(app);
+  wireCompare(src, key, playerLeaderboard(detailed), new Map([...tl.tiers.flatMap(({ tier, players }) => players.map((p) => ({ ...p, tier }))), ...tl.unranked].map((p) => [p.key, p])), { matches: detailed, cuts: laneCuts_ });
   // Overall places fill in once every league has loaded (still this player's page?).
   if (src.ad2l) Promise.all([overallStats(src), overallHeroes(src)]).then(([os, oh]) => {
     const box = (id) => { const el = document.getElementById(id); return el?.dataset.key === key ? el : null; };
@@ -181,5 +189,5 @@ export async function renderPlayer(src, key) {
     kills: g.p.kills, deaths: g.p.deaths, assists: g.p.assists, net_worth: g.p.net_worth, gpm: g.p.gpm, xpm: g.p.xpm,
     hero_damage: g.p.hero_damage, kill_participation: g.p.kill_participation ?? null, link: src.link(g.m),
   })), "date", { toolbar: true });
-  wireGameAnalysis(src, "player", h.games, gameRated);
+  wireGameAnalysis(src, "player", h.games, gameRated, matches);
 }

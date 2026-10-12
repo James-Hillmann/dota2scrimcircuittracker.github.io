@@ -16,7 +16,7 @@ import { drawLayers } from "./maplayers.js";
 export const WARD_IMG = { obs: "https://cdn.cloudflare.steamstatic.com/apps/dota2/images/dota_react/items/ward_observer.png", sen: "https://cdn.cloudflare.steamstatic.com/apps/dota2/images/dota_react/items/ward_sentry.png" };
 export const IMG = { src: "img/minimap.webp", x0: 56.94, x1: 206.2, y0: 62.3, y1: 202.8 };
 // The map is point-symmetric about the midpoint of the fountains; mirroring uses that centre.
-const CX = (74.6 + 182.9) / 2, CY = (78.0 + 177.9) / 2;
+export const CX = (74.6 + 182.9) / 2, CY = (78.0 + 177.9) / 2;
 export const Y = (y) => 256 - y; // grid y goes up, SVG y goes down
 export const VB = { x: IMG.x0, y: Y(IMG.y1), w: IMG.x1 - IMG.x0, h: IMG.y1 - IMG.y0 };
 const attr = (s) => String(s).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");

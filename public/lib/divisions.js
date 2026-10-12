@@ -7,7 +7,19 @@
 
 // The season every division belongs to. dotaLeague: the Dota league id the sync checks
 // each match against.
-export const SEASON = { name: "S48", long: "Season 48", dotaLeague: 20077 };
+// phase: "regular" or "playoffs" (the top bar's Playoffs stamp, playoff Up next and Predict).
+// regularEnd: when the group stage ended (unix seconds). Series starting after it are the
+// postseason (week 8 tiebreakers, then the bracket): kept out of the group-stage table, SoS and
+// records, and read as best-of-3 with no tie on Up next and Predict. A group-stage make-up
+// played after it would read as postseason: list its PlayOn series id in regularIds.
+// New season: phase "regular", regularEnd null, regularIds [].
+export const SEASON = {
+  name: "S48", long: "Season 48", dotaLeague: 20077,
+  phase: "playoffs", regularEnd: Date.UTC(2026, 9, 12) / 1000, regularIds: [],
+};
+export const playoffs = SEASON.phase === "playoffs";
+export const isPostseason = (s) => SEASON.regularEnd != null && (s.time ?? 0) > SEASON.regularEnd && !SEASON.regularIds.includes(s.id);
+export const groupStage = (series) => series.filter((s) => !isPostseason(s));
 
 // Menu order: lowest division first.
 // key: the id in data files (public/data/<key>.json), Firestore and predictions.

@@ -20,6 +20,7 @@
 import { seriesOdds, modelCall, ODDS_SPREAD } from "./predict.js";
 import { isPlayed, gameWins, strengthOfSchedule } from "./schedule.js";
 import { ordinal as ord } from "./ranks.js";
+import { isPostseason, groupStage } from "./divisions.js";
 
 export const REG_WEEKS = 7;
 export const isBye = (t) => /\bbye week\b/i.test(t?.name ?? "");
@@ -108,7 +109,7 @@ function callSeries(s, teamOf, ratings, call) {
 // played on another night doesn't count as its own week. `call`: see callSeries.
 export function projectSeries(teams, series, ratings, call) {
   const teamOf = new Map(teams.map((t) => [t.id, t]));
-  const real = series.filter((s) => teamOf.has(s.home) && teamOf.has(s.away));
+  const real = groupStage(series).filter((s) => teamOf.has(s.home) && teamOf.has(s.away));
   let out = real.map((s) => (isPlayed(s) ? { ...s } : { ...callSeries(s, teamOf, ratings, call), projected: true }));
   const divs = [...new Set(teams.map((t) => t.division ?? ""))];
   let next = -1;
@@ -370,8 +371,12 @@ export function bracket(seeds, ratings, choose, { fixed = false, blank = false }
 // `call` picks group-stage results and `choose` tiebreaker and bracket winners (a viewer's own
 // picks); whatever they leave open goes the model's way.
 // `blank`: bracket matches nobody picked stay open (see bracket).
-export function playoffPicture(teams, series, ratings, { split = false, call, choose, blank = false } = {}) {
+export function playoffPicture(teams, series, ratings, { split = false, call, choose: own, blank = false } = {}) {
   const projected = projectSeries(teams, series, ratings, call);
+  // Played postseason series settle their tiebreaker or bracket match, ahead of anyone's pick.
+  const actual = postResults(series);
+  // Without picks or results, `choose` stays unset so the model's own wording stays (1v1 mids).
+  const choose = own || actual.any ? (k, a, b, ...rest) => actual.winner(k, a, b) ?? own?.(k, a, b, ...rest) : undefined;
   const divs = [...new Set(teams.map((t) => t.division ?? ""))].sort();
   const out = {
     series: projected,
@@ -381,7 +386,8 @@ export function playoffPicture(teams, series, ratings, { split = false, call, ch
       const lines = linesFor(ids.length, split);
       const table = resolveTable(ids, mine, ratings, lines.filter((l) => l.after < ids.length), choose);
       const seeds = table.rows.slice(0, 8).map((r) => r.id);
-      return { division: div, lines, ...table, bracket: split ? null : bracket(seeds, ratings, choose, { blank }) };
+      for (const tb of table.tiebreakers) for (const m of tb.matches) actual.mark(m);
+      return { division: div, lines, ...table, bracket: split ? null : actual.markAll(bracket(seeds, ratings, actual.chooser(seeds, choose), { blank })) };
     }),
   };
   if (split) {
@@ -394,10 +400,99 @@ export function playoffPicture(teams, series, ratings, { split = false, call, ch
         seeds.push(id);
         if (id != null) labels.set(id, `${dv.division}${from + k + 1}`);
       }
-      return { name, labels, bracket: bracket(seeds, ratings, choose, { fixed: true, blank }) };
+      return { name, labels, bracket: actual.markAll(bracket(seeds, ratings, choose, { fixed: true, blank })) };
     });
   }
   return out;
+}
+
+// ---------- the postseason as played ----------
+
+// Played postseason series (lib/divisions.js isPostseason) as match results. winner(key, a, b):
+// the winner of the match between a and b with that key, when they've played it. The same two
+// teams can meet twice (upper round 1, then the grand final): their series go to their matches
+// in the order the matches ask, oldest series first, and a key keeps the one it got. mark(m)
+// flags a match decided that way (`real`, with the series' score from a's side), markAll a
+// bracket's. chooser(seeds, choose): `choose` plus seed 1's pick of opponent from who it played.
+function postResults(series) {
+  const byPair = new Map();
+  for (const s of series.filter((x) => isPostseason(x) && isPlayed(x) && x.home_score !== x.away_score).sort((x, y) => (x.time ?? 0) - (y.time ?? 0))) {
+    const k = pairKey(s.home, s.away);
+    (byPair.get(k) ?? byPair.set(k, []).get(k)).push(s);
+  }
+  const taken = new Map(), used = new Map();
+  const seriesFor = (key, a, b) => {
+    if (taken.has(key)) return taken.get(key);
+    if (a == null || b == null || a === TBD || b === TBD || !key || key.startsWith("mid:") || key === "pick") return null;
+    const pk = pairKey(a, b), n = used.get(pk) ?? 0, s = byPair.get(pk)?.[n] ?? null;
+    if (s) { used.set(pk, n + 1); taken.set(key, s); }
+    return s;
+  };
+  const winnerOf = (s) => (s.home_score > s.away_score ? s.home : s.away);
+  const mark = (m) => {
+    const s = m.key ? taken.get(m.key) : null;
+    if (!s) return m;
+    const [x, y] = s.home === m.a ? [s.home_score, s.away_score] : [s.away_score, s.home_score];
+    return Object.assign(m, { real: true, mine: false, series_id: s.id, score: [Math.max(x, y), Math.min(x, y)], result: [x, y] });
+  };
+  return {
+    any: byPair.size > 0,
+    winner: (key, a, b) => { const s = seriesFor(key, a, b); return s ? winnerOf(s) : undefined; },
+    mark,
+    markAll: (b) => { if (b) for (const m of b.matches) mark(m); return b; },
+    chooser: (seeds, choose) => choose && ((k, ...rest) => {
+      if (k !== "pick") return choose(k, ...rest);
+      const [s1, s3, s4] = [seeds[0], seeds[2], seeds[3]];
+      if (s1 != null && s3 != null && byPair.has(pairKey(s1, s3))) return 3;
+      if (s1 != null && s4 != null && byPair.has(pairKey(s1, s4))) return 4;
+      return choose(k, ...rest);
+    }),
+  };
+}
+
+// The postseason as the schedule stands: for each postseason series, what it is ({ kind:
+// "tiebreak" or "bracket", label, bestOf, bracket name for Heroic/Aegis }), when the bracket
+// locks (the first bracket series' start, null until one is scheduled) and each bracket match
+// already decided ({ bracket, id, label, winner, teams }). From the model's picture with the real
+// results in, so a pairing nobody has played yet is matched to the match the model expects.
+export function postseason(teams, series, ratings, { split = false } = {}) {
+  const post = series.filter(isPostseason);
+  const out = { roles: new Map(), lock: null, decided: [], bracketTeams: new Map() };
+  if (!post.length) return out;
+  const pic = playoffPicture(teams, series, ratings, { split });
+  const tbs = pic.divisions.flatMap((dv) => dv.tiebreakers.flatMap((tb) => tb.matches));
+  const brackets = split ? pic.brackets.map((b) => [b.name, b.bracket]) : pic.divisions.map((dv) => ["", dv.bracket]);
+  for (const s of post) {
+    const pk = pairKey(s.home, s.away);
+    const byId = (m) => m.series_id === s.id;
+    const tb = tbs.find(byId) ?? tbs.find((m) => !m.real && pairKey(m.a, m.b) === pk);
+    if (tb) { out.roles.set(s.id, { kind: "tiebreak", label: "Tiebreaker", bestOf: tb.bestOf ?? 1 }); continue; }
+    for (const [name, b] of brackets) {
+      const m = b?.matches.find(byId) ?? b?.matches.find((x) => !x.real && x.a !== TBD && x.b !== TBD && x.a != null && x.b != null && pairKey(x.a, x.b) === pk);
+      if (m) { out.roles.set(s.id, { kind: "bracket", label: name ? `${name} ${m.label.toLowerCase()}` : m.label, bestOf: m.bestOf, bracket: name, match: m.id }); break; }
+    }
+    if (!out.roles.has(s.id)) out.roles.set(s.id, { kind: "bracket", label: "Playoffs", bestOf: 3 });
+  }
+  const starts = post.filter((s) => out.roles.get(s.id)?.kind === "bracket" && s.time).map((s) => s.time);
+  out.lock = starts.length ? Math.min(...starts) : null;
+  for (const [name, b] of brackets) out.bracketTeams.set(name, new Set((b?.matches ?? []).flatMap((m) => [m.a, m.b]).filter((x) => x != null && x !== TBD)));
+  for (const [name, b] of brackets) for (const m of b?.matches ?? []) if (m.real) out.decided.push({ bracket: name, id: m.id, label: m.label, winner: m.winner, teams: [m.a, m.b] });
+  return out;
+}
+
+// One saved bracket's points: 1 for each decided bracket match whose winner the person picked
+// for that match (their pick for it may have had other teams in it, so the match is found by
+// its id and, for Heroic/Aegis, by the bracket its picked winner belongs to). Tiebreakers and
+// seed 1's pick don't score here (tiebreakers are series picks on the Predictions tab).
+// picks: { "<match id>:<pair>": winner team id }. bracketTeams: bracket name -> Set of its teams.
+export function bracketPoints(picks, decided, bracketTeams = new Map()) {
+  let points = 0;
+  for (const m of decided) {
+    const teamsHere = bracketTeams.get(m.bracket);
+    const mine = Object.entries(picks).filter(([k, w]) => k.startsWith(`${m.id}:`) && (!teamsHere || teamsHere.has(w)));
+    if (mine.some(([, w]) => w === m.winner)) points++;
+  }
+  return { points, of: decided.length };
 }
 
 // The dividing lines in a division's table.
@@ -431,7 +526,7 @@ export function possibilities(teams, series, ratings, { split = false, weight = 
   // (Heroic: 3^6 and 3^5 outcomes rather than 3^11).
   const divisions = [...new Set(teams.map((t) => t.division ?? ""))].sort().map((div) => {
     const dTeams = teams.filter((t) => (t.division ?? "") === div), inDiv = new Set(dTeams.map((t) => t.id));
-    const dSeries = series.filter((s) => inDiv.has(s.home) && inDiv.has(s.away));
+    const dSeries = groupStage(series).filter((s) => inDiv.has(s.home) && inDiv.has(s.away));
     const teamOf = new Map(dTeams.map((t) => [t.id, t]));
     const open = dSeries.filter((s) => !isPlayed(s) && !isBye(teamOf.get(s.home)) && !isBye(teamOf.get(s.away)));
     const unposted = projectSeries(dTeams, dSeries, ratings).some((s) => s.paired);

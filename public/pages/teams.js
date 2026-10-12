@@ -15,7 +15,7 @@ import { lengthHtml } from "../lib/combat-charts.js";
 import { tune, fitRatings, pubsSince } from "../lib/predict.js";
 import { decodeTotals } from "../lib/herogrid.js";
 import { isBye } from "../lib/playoffs.js";
-import { SEASON } from "../lib/divisions.js";
+import { SEASON, groupStage } from "../lib/divisions.js";
 import { SOURCES, divCache, app, pageHead, esc, portrait, floorOf, playerLink, teamLink, seriesDraftsHtml, dur, when, heroHref, shortDate, heroLink, playerTabs, teamMapHtml, mapCard, wardView, crumbs, wirePlayerTabs, wireMapCards, sortableTable, pct, fmt, scrollToSection, pubStart, pubStartLabel, PUB_DAYS } from "../core.js";
 import { pageTabs, TEAM_TABS } from "../lib/pagetabs.js";
 import { loading, errorBox, laneCutsOf, teamLanesHtml } from "../parts/lanes.js";
@@ -48,7 +48,7 @@ export async function renderTeams(src, slug) {
   if (ad2l) {
     // AD2L records from PlayOn's series scores (official; complete even when a game's
     // stats couldn't be found).
-    const recs = seriesRecords(ad2l.series);
+    const recs = seriesRecords(groupStage(ad2l.series)); // the group stage: postseason series don't rank teams
     teams = teams.map((t) => ({ ...t, ...(recs.get(t.id) ?? { wins: 0, losses: 0, games: 0 }) })).sort((a, b) => b.wins - a.wins || a.losses - b.losses || a.name.localeCompare(b.name));
   }
   const table = new Map(standingsRows(matches).map((r) => [r.slug, r])); // form and streak, from games
