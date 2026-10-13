@@ -178,6 +178,9 @@ Backfills refill a field for games already synced, from the cached OpenDota matc
 - **Items** — `items` and `item_times` per player (`public/lib/items.js`):
   `node scripts/backfill/items-backfill.js`. After a patch adds items:
   `node scripts/gen/gen-item-meta.js` regenerates `public/lib/items-data.js`.
+- **Fantasy card art** — one image and style per hero in `scripts/gen/hero-art-picks.json`
+  (Fav's picks; `src` is the original URL). After editing it or when a new hero needs art:
+  `node scripts/gen/gen-hero-art.js` rewrites `public/img/hero-art/` and `public/lib/hero-art.js`.
 - **Laning** — `lane_role` (OpenDota's own lanes; older games fall back to positions: 1+5 safe,
   2 mid, 3+4 off), `roaming`, `lh10`, `dn10`: `node scripts/backfill/lanes-backfill.js`.
 - **Combat** — per player `apm`, `tf_part`, `first_blood`, `multi`, `streaks`, `kill_t`,

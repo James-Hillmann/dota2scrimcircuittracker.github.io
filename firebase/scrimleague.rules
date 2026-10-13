@@ -191,6 +191,28 @@
         && (request.auth.uid == resource.data.uid || request.auth.token.email == "jonahbyu@gmail.com");
     }
 
+    // Player cards: a player's own choices for their Fantasy card, id "<account>". Only that
+    // account's Steam sign-in can write it. hero: a hero id (null = their most played), pos: the
+    // role they play now, 1–5 (null = their most played position).
+    match /scrimLeague/data/cards/{cardId} {
+      allow get: if true;
+      allow list: if request.query.limit <= 5000;
+      allow create, update: if request.auth != null
+        && request.auth.token.steam is int
+        && request.auth.uid == 'steam:' + string(request.auth.token.steam)
+        && cardId == string(request.auth.token.steam)
+        && request.resource.data.keys().hasOnly(['v', 'account', 'hero', 'pos', 'uid', 'updatedAt'])
+        && request.resource.data.keys().size() == 6
+        && request.resource.data.v == 1
+        && request.resource.data.account == request.auth.token.steam
+        && (request.resource.data.hero == null || (request.resource.data.hero is int && request.resource.data.hero >= 1 && request.resource.data.hero <= 300))
+        && (request.resource.data.pos == null || (request.resource.data.pos is int && request.resource.data.pos >= 1 && request.resource.data.pos <= 5))
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.updatedAt == request.time;
+      allow delete: if request.auth != null
+        && (request.auth.uid == resource.data.uid || request.auth.token.email == "jonahbyu@gmail.com");
+    }
+
     // Scrim fixtures: upcoming scrims anyone can put on the schedule for predictions. Only
     // teams, start time and format; results come from uploaded games (matched by teams and
     // time on the client). Rescheduling changes start/best_of only; delete is open to anyone

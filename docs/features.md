@@ -629,17 +629,42 @@ play the whole Heroic/Aegis game. Predict's "Your name" bar hides on this tab (F
   anonymous one that owns this browser's uploads is untouched. Only the Steam ID is shared.
 - **Each week** — five picks, one per position (Pos 1 Carry … Pos 5 Hard support), from rostered
   players of teams with a series that week (no byes, no stand-ins); never yourself, teammates
-  fine. A lineup bar (one tab per position, showing its pick) sits over a deck of player cards
-  for the open position: tier and rating (playoff model), top hero's portrait art filling the card
-  (`heroVert`, Valve's `_vert.jpg`; wide image if missing), printed as a worn stencil to match the
-  display type (posterize filter `#ft-paint` in pages/fantasy.js, speckle mask `img/grit.png` from
-  `scripts/gen/gen-grit.js`), three most-played
-  heroes with games, and games, win %, average K/D/A and GPM in the league. Cards of players whose
-  most-played position is that slot come first, best rated first; the rest fold under "Everyone
+  fine. "Your official picks", a dark display case, stands each pick's card face up on a lit
+  pedestal engraved with its position (click the card to turn it over; the pedestal is the tab
+  for that position; a back under 200px wide uses a compact layout; on a phone the case scrolls
+  sideways). It sits over a deck of player cards
+  for the open position: tier and rating (playoff model), top hero's art filling the card in that
+  hero's style. Fav picked one image and one style per hero (`scripts/gen/hero-art-picks.json`:
+  loading screens, arcana and release art from the Dota 2 wiki, Valve's site and the Steam
+  market); `node scripts/gen/gen-hero-art.js` self-hosts them as `img/hero-art/<slug>.webp` and
+  writes `lib/hero-art.js`. Styles (style.css `.ft-card[data-style]`, SVG filters in
+  pages/fantasy.js): stencil, the default worn print to match the display type (posterize
+  `#ft-paint`, speckle mask `img/grit.png` from `scripts/gen/gen-grit.js`), clean, cinematic,
+  ember, frost, ink and noir. A hero without a pick (a new one) gets Valve's `_vert.jpg` as
+  stencil; art that fails to load falls back to the wide image. Each card is a trading card (5:7)
+  in a metal frame of its tier's colour: the front shows the art, tier shield, main position and a
+  nameplate (name, team, card hero) with a Pick button; clicking the card anywhere else (or its
+  turn button, from the keyboard) turns it to the back: games, win %, average
+  K/D/A, then GPM, XPM, hero damage and last hits for a core (pos 1–3) or observer/sentry wards
+  placed, camps stacked and healing for a support (pos 4–5); latest medal with Core or Support,
+  games per position, and the three most-played heroes with games and win %, plus a Pick button. On a mouse the card tilts toward
+  the pointer with a foil shine; picking lifts it (gold frame, the button reads "Picked") and drops it onto its
+  pedestal before moving on. Reduced motion turns the animations off. Cards of players whose role is
+  that slot come first, best rated first; the rest fold under "Everyone
   else". Picking a card moves on to the next empty slot; picking it again clears it; a player
-  picked elsewhere shows "In pos N", and picking them moves them. Picks can be
+  picked elsewhere is dimmed with "In pos N · move here" on its button, and picking them moves
+  them. Signed out, the buttons read "Sign in to pick" and start the Steam sign-in. Picks can be
   changed until the week's first series starts (weeks run Monday to Monday UTC). The database
   stamps each save with server time; a save after the lock never counts.
+- **Your card** — signed in, and on a roster in the league you're viewing, your own card shows
+  above the week (you can't pick yourself, so it isn't in the deck). Pick the hero on its front
+  (any hero; default your most played) and your role (Pos 1–5; default the position you've played
+  most). Use the role for a role swap: your card moves to that position's deck, its back shows that
+  role's numbers, and its position pill gets a dot (role set by the player). Points don't change,
+  since every pick scores as the slot it fills. The card updates as you choose; **Save card**
+  stores it in Firestore `scrimLeague/data/cards/<account>`, which only that account's Steam
+  sign-in can write (rules: `firebase/scrimleague.rules`). One card per player, shared by every
+  division.
 - **Announced series** — series the admins announce before PlayOn posts them
   (`lib/divisions.js` ANNOUNCED) count as that week's series, so the week opens on time; PlayOn's
   own series replace them when the sync brings them, and their games count by teams and week.
@@ -654,4 +679,4 @@ play the whole Heroic/Aegis game. Predict's "Your name" bar hides on this tab (F
   played, last week; open a name for each week's picks and points. Your latest locked week shows
   above it pick by pick, dropped games struck through.
 - Local preview only: `?fantasy_now=<unix seconds>` sets the clock, to see an open week out of
-  season.
+  season; `?fantasy_me=<account id>` shows the tab as that player (their own card), display only.

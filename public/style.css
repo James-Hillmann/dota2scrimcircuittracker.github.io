@@ -4402,82 +4402,292 @@ td .gtags, .hist-games .gtags { margin-left: 4px; }
 .ft-week, .ft-last, .ft-board-wrap { margin: 0 0 32px; }
 .ft-lock, .ft-total { font: 400 12px var(--mono); letter-spacing: .08em; color: var(--dust); margin-left: 10px; text-transform: none; }
 .ft-total { font-size: 18px; color: var(--accent); }
-/* Lineup bar: one tab per position, showing its pick */
-.ft-lineup { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin: 0 0 18px; scroll-margin-top: 130px; }
-.ft-slot {
-  position: relative; display: grid; grid-template-rows: auto auto 1fr; gap: 2px; min-height: 92px; padding: 10px 12px; text-align: left;
-  background: var(--stone); border: 1px solid var(--seam); border-bottom: 3px solid var(--seam-2); color: var(--dust); cursor: pointer;
-  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 0 100%); transition: border-color .12s, background .12s;
+/* The display case: your lineup, each pick standing on a lit pedestal with its position engraved
+   on the front. Always dark (it holds the cards). Clicking a pick turns it over; the pedestal is
+   the tab that shows that position's deck. */
+.ft-case {
+  position: relative; margin: 0 0 22px; padding: 16px 18px 0; overflow: hidden; scroll-margin-top: 130px;
+  border: 1px solid rgba(232, 182, 76, .32); border-radius: 6px;
+  background:
+    radial-gradient(90% 60% at 50% 0%, rgba(232, 182, 76, .13), transparent 70%),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, .018) 0 1px, transparent 1px 6px),
+    linear-gradient(#1a1610, #0c0b09 62%, #070606);
+  box-shadow: inset 0 1px 0 rgba(255, 236, 190, .12), inset 0 0 0 1px rgba(0, 0, 0, .6), 0 22px 50px rgba(0, 0, 0, .45);
 }
-.ft-slot:hover { border-color: var(--seam-2); }
-.ft-slot[aria-selected="true"] { border-color: rgba(var(--accent-rgb), .6); border-bottom-color: var(--accent); background: rgba(var(--accent-rgb), .08); }
-.ft-slot-pos { font: 700 11px var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--accent); }
-.ft-slot-role { font: 400 20px/1 var(--display); text-transform: uppercase; color: var(--bone); }
-.ft-slot-pick { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 13px; color: var(--dim); font-style: italic; min-width: 0; }
-.ft-slot.filled .ft-slot-pick { font-style: normal; color: var(--bone); }
-.ft-slot-pick img { width: 44px; height: 25px; object-fit: cover; flex: none; border: 1px solid var(--seam-2); }
-.ft-slot-pick b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.ft-case::after { /* the glass's glare */
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(115deg, rgba(255, 255, 255, .05), transparent 22%, transparent 70%, rgba(255, 255, 255, .03));
+}
+.ft-case-title { display: flex; align-items: center; gap: 14px; margin: 0 0 4px; color: #e8b64c; }
+.ft-case-title::before, .ft-case-title::after { content: ""; flex: 1; height: 1px; background: linear-gradient(90deg, transparent, rgba(232, 182, 76, .6)); }
+.ft-case-title::after { transform: scaleX(-1); }
+.ft-case-title span { font: 400 22px/1 var(--display); letter-spacing: .22em; text-transform: uppercase; text-shadow: 0 0 18px rgba(232, 182, 76, .45); }
+.ft-lineup { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 16px; align-items: end; }
+.ft-slot { position: relative; display: flex; flex-direction: column; align-items: center; padding-top: 22px; cursor: pointer; }
+.ft-slot::before { /* the spotlight from above */
+  content: ""; position: absolute; z-index: 0; top: 0; left: -6%; right: -6%; bottom: 30px; pointer-events: none;
+  background: radial-gradient(55% 75% at 50% 0, rgba(255, 232, 180, .2), rgba(255, 232, 180, .05) 60%, transparent 80%);
+  opacity: .5; transition: opacity .3s;
+}
+.ft-slot.active::before, .ft-slot:hover::before { opacity: 1; }
+.ft-stage { position: relative; z-index: 2; width: min(100%, 260px); margin-bottom: -10px; }
+.ft-stage::after { /* the card's shadow on the pedestal top */
+  content: ""; position: absolute; z-index: -1; left: 8%; right: 8%; bottom: -6px; height: 20px; border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(0, 0, 0, .85), transparent); filter: blur(2px);
+}
+.ft-stage .ft-card { width: 100%; }
+.ft-stage .ft-card .ft-tilt { --lift: -4px; }
+.ft-stage .ft-card:hover .ft-tilt { --lift: -10px; }
+.ft-empty {
+  display: grid; place-items: center; align-content: center; gap: 4px; aspect-ratio: 5 / 7; border-radius: 14px;
+  border: 1px dashed rgba(232, 182, 76, .35); background: rgba(232, 182, 76, .03);
+  font: 700 11px var(--mono); letter-spacing: .24em; text-transform: uppercase; color: rgba(243, 237, 227, .4);
+}
+.ft-empty b { font: 400 54px/1 var(--display); letter-spacing: 0; color: rgba(232, 182, 76, .22); }
+.ft-slot.active .ft-empty { border-color: rgba(232, 182, 76, .7); color: rgba(243, 237, 227, .7); }
+.ft-plinth {
+  all: unset; box-sizing: border-box; position: relative; z-index: 1; width: min(100%, 300px); padding: 26px 8px 14px; cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; gap: 3px; text-align: center;
+  background:
+    linear-gradient(90deg, rgba(0, 0, 0, .45), transparent 18%, transparent 82%, rgba(0, 0, 0, .45)),
+    linear-gradient(#4b3e29, #2c2419 12px, #15110d 13px, #1c1711 40%, #0e0c09);
+  clip-path: polygon(4% 0, 96% 0, 100% 100%, 0 100%);
+  box-shadow: inset 0 2px 0 rgba(232, 182, 76, .55), inset 0 -3px 0 rgba(0, 0, 0, .5);
+  transition: box-shadow .2s;
+}
+.ft-plinth::before { /* the lit top of the pedestal */
+  content: ""; position: absolute; left: 5%; right: 5%; top: 0; height: 18px;
+  background: radial-gradient(60% 100% at 50% 0, rgba(232, 182, 76, .4), transparent); opacity: .5; transition: opacity .2s;
+}
+.ft-slot.active .ft-plinth { box-shadow: inset 0 2px 0 #f5c862, inset 0 -3px 0 #e8b64c; }
+.ft-slot.active .ft-plinth::before, .ft-slot:hover .ft-plinth::before { opacity: 1; }
+.ft-plinth:focus-visible { outline: 2px solid #f3ede3; outline-offset: -4px; }
+.ft-slot-pos { font: 700 10px var(--mono); letter-spacing: .26em; text-transform: uppercase; color: #e8b64c; }
+.ft-slot-role {
+  font: 400 20px/1 var(--display); letter-spacing: .06em; text-transform: uppercase; white-space: nowrap;
+  color: #d9cfbf; text-shadow: 0 -1px 0 rgba(0, 0, 0, .8), 0 1px 0 rgba(255, 255, 255, .08);
+}
+.ft-slot.active .ft-slot-role { color: #f3ede3; text-shadow: 0 0 12px rgba(232, 182, 76, .5); }
 /* Player cards */
 .ft-deck { margin: 0 0 20px; }
-.ft-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 16px; }
+.ft-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 26px 20px; padding-top: 10px; }
 .ft-rest { margin-top: 16px; }
 .ft-rest > summary { cursor: pointer; font: 600 12px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--dust); margin-bottom: 12px; }
+.ft-defs { position: absolute; width: 0; height: 0; overflow: hidden; }
+/* Player cards: trading cards (5:7) in a metal frame of their tier's colour. The front is the
+   hero art with a nameplate; the turn button flips to the back, the player's league numbers.
+   Layers: .ft-card (perspective, sizing) > .ft-tilt (lift and mouse tilt) > .ft-flip (the turn)
+   > .ft-front / .ft-back. Sizes scale with the card's width (container units). */
 .ft-card {
-  --tc: #8a8074; --tc-rgb: 138, 128, 116;
-  position: relative; isolation: isolate; display: flex; flex-direction: column; justify-content: flex-end; min-height: 380px; padding: 0 0 12px;
-  text-align: left; overflow: hidden; cursor: pointer; background: var(--stone); border: 1px solid var(--seam); border-top: 3px solid var(--tc); color: #f3ede3;
-  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 18px), calc(100% - 18px) 100%, 0 100%);
-  transition: transform .15s cubic-bezier(.2, .8, .2, 1), box-shadow .15s, border-color .15s;
+  --tc: #8a8074; --tc-rgb: 138, 128, 116; --frame: 6px; --r: 14px; --turn: clamp(28px, 12cqi, 34px);
+  position: relative; aspect-ratio: 5 / 7; max-width: 100%; perspective: 1100px; container-type: inline-size; color: #f3ede3;
 }
 .ft-card.t-S { --tc: var(--gold); --tc-rgb: 232, 182, 76; }
 .ft-card.t-A { --tc: var(--jade); --tc-rgb: var(--jade-rgb); }
 .ft-card.t-B { --tc: #b9c6c0; --tc-rgb: 185, 198, 192; }
 .ft-card.t-D { --tc: var(--ember); --tc-rgb: var(--ember-rgb); }
-.ft-card:hover:not(:disabled) { transform: translateY(-4px); border-color: rgba(var(--tc-rgb), .6); box-shadow: 0 10px 30px rgba(0, 0, 0, .35), 0 0 24px rgba(var(--tc-rgb), .18); }
-.ft-card:disabled { cursor: default; }
-.ft-card[aria-pressed="true"] { border-color: var(--accent); border-top-color: var(--accent); box-shadow: 0 0 0 2px var(--accent), 0 0 34px rgba(var(--accent-rgb), .35); }
-.ft-card[aria-pressed="true"]::after, .ft-card[data-taken]:not([data-taken=""])::after {
-  content: "Picked"; position: absolute; z-index: 3; top: 10px; right: 10px; padding: 3px 8px; font: 700 11px var(--mono); letter-spacing: .12em; text-transform: uppercase;
-  background: var(--accent); color: var(--on-accent);
+.ft-card.picked { --tc: var(--accent); --tc-rgb: var(--accent-rgb); }
+.ft-tilt {
+  position: absolute; inset: 0; transform-style: preserve-3d;
+  transform: translateY(var(--lift, 0px)) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+  transition: transform .4s cubic-bezier(.2, .8, .2, 1);
 }
-.ft-card[data-taken]:not([data-taken=""]) { opacity: .55; }
-.ft-card[data-taken]:not([data-taken=""])::after { content: attr(data-taken); background: var(--seam-2); color: var(--bone); }
-.ft-card > span { position: relative; z-index: 2; }
-.ft-defs { position: absolute; width: 0; height: 0; overflow: hidden; }
-/* The hero fills the card as a worn stencil print (the #ft-paint filter in pages/fantasy.js); a
-   dark wash from the bottom keeps the type readable. */
-.ft-card > .ft-art { position: absolute; inset: 0; z-index: 0; overflow: hidden; background: #0d0c0b; }
+.ft-card:hover .ft-tilt { --lift: -6px; transition-duration: .15s; }
+.ft-card.picked .ft-tilt { --lift: -8px; }
+.ft-flip { position: absolute; inset: 0; transform-style: preserve-3d; transition: transform .7s cubic-bezier(.35, 1.35, .45, 1); }
+.ft-card.flipped .ft-flip { transform: rotateY(180deg); }
+
+/* Both faces: a frame (the border, a brushed-metal sheen over the tier colour) around an inner panel. */
+.ft-card .ft-face {
+  all: unset; box-sizing: border-box; position: absolute; inset: 0; display: block; overflow: hidden; cursor: pointer;
+  backface-visibility: hidden; -webkit-backface-visibility: hidden;
+  border: var(--frame) solid transparent; border-radius: var(--r);
+  background:
+    linear-gradient(#0d0c0b, #0d0c0b) padding-box,
+    linear-gradient(155deg, rgba(255, 255, 255, .55), rgba(255, 255, 255, .06) 28%, rgba(0, 0, 0, .32) 62%, rgba(255, 255, 255, .28)) border-box,
+    linear-gradient(var(--tc), var(--tc)) border-box;
+  box-shadow: 0 14px 30px rgba(0, 0, 0, .5), 0 3px 8px rgba(0, 0, 0, .45);
+  transition: box-shadow .3s;
+}
+.ft-card:hover .ft-face { box-shadow: 0 22px 40px rgba(0, 0, 0, .55), 0 0 26px rgba(var(--tc-rgb), .22); }
+.ft-card.picked .ft-face { box-shadow: 0 0 0 2px var(--accent), 0 0 38px rgba(var(--accent-rgb), .45), 0 22px 40px rgba(0, 0, 0, .55); }
+.ft-card .ft-face:focus-visible { outline: 2px solid var(--bone); outline-offset: 3px; }
+.ft-card .ft-front:disabled { cursor: default; }
+.ft-card .ft-back { transform: rotateY(180deg); } /* after .ft-face's all: unset */
+/* The inner keyline of the art window. */
+.ft-front::before {
+  content: ""; position: absolute; inset: 0; z-index: 3; pointer-events: none; border-radius: calc(var(--r) - var(--frame));
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .2), inset 0 0 22px rgba(0, 0, 0, .55);
+}
+
+/* Front. The hero fills the window (style filters below); a dark wash from the bottom keeps the type readable. */
+.ft-front > .ft-art { position: absolute; inset: 0; z-index: 0; overflow: hidden; background: #0d0c0b; }
 .ft-art img {
-  width: 100%; height: 100%; object-fit: cover; object-position: center 15%; display: block; transform: scale(1.02); transition: transform .4s;
+  width: 100%; height: 100%; object-fit: cover; object-position: center 15%; display: block; transform: scale(1.02); transition: transform .5s;
   filter: url(#ft-paint) contrast(1.2) saturate(1.35);
   -webkit-mask: url("img/grit.png") var(--grit, 0 0) / 256px 256px; mask: url("img/grit.png") var(--grit, 0 0) / 256px 256px; /* scripts/gen/gen-grit.js */
 }
-.ft-card:hover .ft-art img { transform: scale(1.07); }
+.ft-card:hover .ft-art img { transform: scale(1.06); }
+/* Each hero's art and style (lib/hero-art.js, Fav's picks; filters in pages/fantasy.js). Loading
+   screens are wide, so they crop a little lower; cut-outs sit on a tier-coloured glow. Every style
+   but stencil drops the grit mask. */
+.ft-card.src-ls .ft-art img { object-position: center 30%; }
+.ft-card.src-cut .ft-art { background: radial-gradient(80% 60% at 50% 32%, rgba(var(--tc-rgb), .55), rgba(var(--tc-rgb), .12) 55%, #0b0a09 80%); }
+.ft-card.src-crop .ft-art img { object-position: center top; height: 70%; transform: scale(1.25); transform-origin: 50% 0; }
+.ft-card.src-render .ft-art img { object-position: center 20%; transform: scale(1.35); transform-origin: 50% 20%; }
+.ft-card[data-style]:not([data-style="stencil"]) .ft-art img { -webkit-mask: none; mask: none; }
+.ft-art::before { content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none; }
+.ft-card[data-style="clean"] .ft-art img { filter: contrast(1.08) saturate(1.12); }
+.ft-card[data-style="cinema"] .ft-art img { filter: contrast(1.18) saturate(.85) sepia(.18) brightness(.95); }
+.ft-card[data-style="cinema"] .ft-art::before { background: radial-gradient(120% 80% at 50% 35%, transparent 45%, rgba(0, 0, 0, .7) 100%); }
+.ft-card[data-style="ember"] .ft-art img { filter: url(#ft-ember) contrast(1.1); }
+.ft-card[data-style="frost"] .ft-art img { filter: url(#ft-frost) contrast(1.1); }
+.ft-card[data-style="ink"] .ft-art img { filter: url(#ft-ink) saturate(1.3); }
+.ft-card[data-style="noir"] .ft-art img { filter: grayscale(1) url(#ft-paint) contrast(1.5) brightness(.95); }
+.ft-card[data-style="noir"] .ft-art::before { background: linear-gradient(90deg, rgba(var(--tc-rgb), .35), transparent 70%); mix-blend-mode: color; }
 .ft-art::after {
   content: ""; position: absolute; inset: 0; pointer-events: none;
-  background: linear-gradient(180deg, rgba(0, 0, 0, .25) 0%, transparent 22%, transparent 34%, rgba(10, 9, 8, .82) 62%, rgba(10, 9, 8, .96) 100%),
-    linear-gradient(90deg, rgba(var(--tc-rgb), .28), transparent 55%);
+  background: linear-gradient(180deg, rgba(0, 0, 0, .3) 0%, transparent 20%, transparent 46%, rgba(10, 9, 8, .78) 70%, rgba(10, 9, 8, .96) 100%);
 }
-.ft-card > .ft-tier {
-  position: absolute; top: 0; left: 0; z-index: 2; display: flex; align-items: baseline; gap: 5px; padding: 6px 16px 7px 10px;
-  font: 400 30px/1 var(--display); color: var(--on-accent); background: var(--tc); clip-path: polygon(0 0, 100% 0, calc(100% - 12px) 100%, 0 100%);
+/* Tier: a shield in the top corner. */
+.ft-card .ft-tier {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+  width: clamp(36px, 17cqi, 50px); aspect-ratio: 46 / 54; padding-bottom: 6%;
+  font: 400 clamp(22px, 11cqi, 32px)/.9 var(--display); color: #14110d;
+  background: linear-gradient(160deg, rgba(255, 255, 255, .55), rgba(255, 255, 255, 0) 45%, rgba(0, 0, 0, .18)), var(--tc);
+  clip-path: polygon(0 0, 100% 0, 100% 74%, 50% 100%, 0 74%);
 }
-.ft-tier small { font: 700 12px var(--mono); }
-.ft-main { margin: 0 12px 4px; font: 700 10px var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--tc); text-shadow: 0 1px 6px #000; }
-.ft-name { margin: 0 12px; font: 400 34px/.95 var(--display); text-transform: uppercase; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-shadow: 0 2px 14px rgba(0, 0, 0, .8); }
-.ft-tm { margin: 4px 12px 10px; font-size: 12px; color: rgba(243, 237, 227, .72); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ft-heroes { display: flex; gap: 6px; margin: 0 12px 12px; min-height: 30px; }
-.ft-h { position: relative; display: block; flex: 1 1 0; max-width: 33%; }
-.ft-h img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; display: block; border: 1px solid rgba(255, 255, 255, .18); }
-.ft-h b { position: absolute; right: 2px; bottom: 2px; padding: 0 4px; font: 700 10px/1.5 var(--mono); background: rgba(0, 0, 0, .75); color: #fff; }
-.ft-stats { display: grid; grid-template-columns: repeat(4, auto); justify-content: space-between; gap: 4px; margin: 0 12px; padding-top: 10px; border-top: 1px solid rgba(255, 255, 255, .14); }
-.ft-stats > span { display: flex; flex-direction: column; gap: 2px; font: 600 9px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: rgba(243, 237, 227, .6); }
-.ft-stats b { font: 600 13px var(--mono); letter-spacing: 0; color: #f3ede3; }
+.ft-card .ft-tier small { font: 700 clamp(8px, 3.6cqi, 11px) var(--mono); letter-spacing: .02em; }
+.ft-front > .ft-tier { position: absolute; z-index: 4; top: 0; left: 10%; filter: drop-shadow(0 3px 5px rgba(0, 0, 0, .5)); }
+.ft-pos {
+  position: absolute; z-index: 4; top: 9px; right: calc(var(--turn) + 15px); padding: 4px 8px; border-radius: 99px;
+  font: 700 clamp(8px, 3.8cqi, 11px)/1 var(--mono); letter-spacing: .12em; text-transform: uppercase;
+  color: #f3ede3; background: rgba(12, 11, 10, .62); border: 1px solid rgba(255, 255, 255, .22); backdrop-filter: blur(4px);
+}
+.ft-pos.here { color: #14110d; background: var(--tc); border-color: transparent; }
+.ft-plate { position: absolute; z-index: 4; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; gap: 3px; padding: 0 7% 8% 7%; }
+.ft-plate::before { content: ""; width: 26px; height: 2px; margin-bottom: 5px; background: var(--tc); }
+.ft-name { font: 400 clamp(22px, 13cqi, 36px)/.92 var(--display); text-transform: uppercase; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-shadow: 0 2px 14px rgba(0, 0, 0, .8); }
+.ft-tm { font-size: clamp(10px, 4.6cqi, 13px); color: rgba(243, 237, 227, .75); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ft-sig { margin-top: 2px; font: 600 clamp(8px, 3.6cqi, 10px) var(--mono); letter-spacing: .1em; text-transform: uppercase; color: rgba(var(--tc-rgb), .95); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Foil: a soft light that follows the mouse (--mx/--my from pages/fantasy.js) and a sheen band. */
+.ft-shine {
+  position: absolute; inset: 0; z-index: 5; pointer-events: none; border-radius: calc(var(--r) - var(--frame)); opacity: 0; transition: opacity .3s; mix-blend-mode: soft-light;
+  background: radial-gradient(circle at var(--mx, 50%) var(--my, 20%), rgba(255, 255, 255, .32), transparent 38%),
+    linear-gradient(115deg, transparent 36%, rgba(255, 255, 255, .16) 47%, transparent 56%) calc(var(--mx, 50%) * 1.4 - 20%) 0 / 200% 100% no-repeat;
+}
+.ft-card:hover .ft-shine { opacity: 1; }
+/* Picked for another slot: the art dims (the pick button names the slot). */
+.ft-card[data-taken]:not([data-taken=""]) .ft-art, .ft-card[data-taken]:not([data-taken=""]) .ft-back > :not(.ft-pickbtn) { opacity: .45; }
+.ft-card .ft-front { cursor: pointer; }
+
+/* Flip button: top right of the card, on either face. */
+.ft-card .ft-turn {
+  all: unset; box-sizing: border-box; position: absolute; z-index: 8; top: 13px; right: 13px; transform: translateZ(1px);
+  display: grid; place-items: center; width: var(--turn); aspect-ratio: 1; border-radius: 50%; cursor: pointer;
+  color: #f3ede3; background: rgba(12, 11, 10, .66); border: 1px solid rgba(255, 255, 255, .28); backdrop-filter: blur(4px);
+  transition: background .2s, color .2s, rotate .4s cubic-bezier(.3, 1.4, .5, 1);
+}
+.ft-card .ft-turn svg { width: 52%; fill: currentColor; }
+.ft-card .ft-turn:hover { background: var(--tc); color: #14110d; rotate: 180deg; }
+.ft-card .ft-turn:focus-visible { outline: 2px solid var(--bone); outline-offset: 2px; }
+
+/* Back: the player's numbers on a dark panel tinted by the tier. */
+.ft-card .ft-back {
+  display: flex; flex-direction: column; gap: 2.6cqi; padding: 5cqi 5.5cqi 4.5cqi; cursor: default;
+  background:
+    radial-gradient(130% 70% at 0 0, rgba(var(--tc-rgb), .28), transparent 60%) padding-box,
+    repeating-linear-gradient(135deg, rgba(255, 255, 255, .025) 0 2px, transparent 2px 7px) padding-box,
+    linear-gradient(#15130f, #0f0e0c) padding-box,
+    linear-gradient(155deg, rgba(255, 255, 255, .55), rgba(255, 255, 255, .06) 28%, rgba(0, 0, 0, .32) 62%, rgba(255, 255, 255, .28)) border-box,
+    linear-gradient(var(--tc), var(--tc)) border-box;
+}
+.ft-card .ft-back > * { flex-shrink: 0; }
+.ft-bhead { display: flex; align-items: center; gap: 3.5cqi; min-width: 0; padding-right: calc(var(--turn) + 4px); }
+.ft-bhead .ft-tier { width: clamp(30px, 13cqi, 40px); font-size: clamp(18px, 9cqi, 26px); }
+.ft-bhead .ft-tier { flex: none; }
+.ft-bname { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.ft-bname .ft-name { font-size: clamp(18px, 10cqi, 28px); text-shadow: none; }
+.ft-medal { font: 600 clamp(8px, 3.6cqi, 10px) var(--mono); letter-spacing: .1em; text-transform: uppercase; color: rgba(var(--tc-rgb), 1); }
+.ft-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 2.6cqi 2cqi; padding: 3cqi 0; border-block: 1px solid rgba(255, 255, 255, .12); }
+.ft-stats > span { display: flex; flex-direction: column; gap: 2px; min-width: 0; font: 600 clamp(7px, 3.2cqi, 9px) var(--mono); letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; color: rgba(243, 237, 227, .55); }
+.ft-stats > span.wide { grid-column: span 2; }
+.ft-stats b { font: 600 clamp(11px, 5.2cqi, 15px) var(--mono); letter-spacing: 0; color: #f3ede3; white-space: nowrap; }
+.ft-label { font: 700 clamp(7px, 3.2cqi, 9px) var(--mono); letter-spacing: .16em; text-transform: uppercase; color: rgba(var(--tc-rgb), 1); margin-bottom: -1.5cqi; }
+.ft-posbars { display: grid; grid-template-columns: repeat(5, 1fr); gap: 2cqi; height: 12cqi; }
+.ft-posbars > span { display: flex; flex-direction: column; justify-content: flex-end; gap: 2px; min-height: 0; }
+.ft-posbars i { display: block; min-height: 2px; border-radius: 2px 2px 0 0; background: rgba(var(--tc-rgb), .55); }
+.ft-posbars .here i { background: var(--accent); }
+.ft-posbars b { font: 700 clamp(7px, 3cqi, 9px)/1 var(--mono); text-align: center; color: rgba(243, 237, 227, .6); }
+.ft-heroes { display: flex; flex-direction: column; gap: 1.6cqi; }
+.ft-hrow { display: grid; grid-template-columns: 15cqi minmax(0, 1fr) auto; align-items: center; gap: 3cqi; font-size: clamp(10px, 4.4cqi, 13px); }
+.ft-h { position: relative; display: block; }
+.ft-h img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; display: block; border-radius: 3px; border: 1px solid rgba(255, 255, 255, .18); }
+.ft-h b { display: none; }
+.ft-hname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ft-hrec { font: 600 clamp(8px, 3.6cqi, 10px) var(--mono); color: rgba(243, 237, 227, .6); white-space: nowrap; }
+/* Pick buttons: one under the nameplate, one at the foot of the back. Picked: an outline. */
+.ft-card .ft-pickbtn {
+  padding: 3cqi; border-radius: 7px; clip-path: none; text-align: center; cursor: pointer;
+  font: 700 clamp(9px, 4cqi, 11px) var(--mono); letter-spacing: .12em; text-transform: uppercase;
+  background: var(--accent); border: 0; color: var(--on-accent);
+}
+.ft-card .ft-bpick { margin-top: auto; }
+.ft-card .ft-fpick { margin-top: 3cqi; box-shadow: 0 4px 12px rgba(0, 0, 0, .45); }
+.ft-card .ft-pickbtn:hover { background: #f5c862; }
+.ft-card .ft-pickbtn:focus-visible { outline: 2px solid var(--bone); outline-offset: 2px; }
+.ft-card.picked .ft-pickbtn { background: rgba(12, 11, 10, .7); color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.ft-card[data-taken]:not([data-taken=""]) .ft-pickbtn { background: rgba(12, 11, 10, .7); color: var(--bone); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .35); }
+
+/* A small card's back (under 200px, e.g. the display case on a phone): two stat columns, no
+   position bars, the top hero. */
+@container (width < 200px) {
+  .ft-mini .ft-back { gap: 3cqi; padding: 5cqi; }
+  .ft-mini .ft-bhead .ft-tier { display: none; }
+  .ft-mini .ft-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2cqi 4cqi; padding: 3cqi 0; }
+  .ft-mini .ft-stats > span { font-size: clamp(7px, 4.4cqi, 9px); }
+  .ft-mini .ft-stats b { font-size: clamp(10px, 6.4cqi, 14px); }
+  .ft-mini .ft-posbars, .ft-mini .ft-label { display: none; }
+  .ft-mini .ft-back .ft-heroes .ft-hrow:nth-child(n + 2) { display: none; }
+  .ft-mini .ft-hrow { grid-template-columns: 22cqi minmax(0, 1fr); }
+  .ft-mini .ft-hrec { display: none; }
+}
+
+/* The pick-up: the card lifts off the table, tips toward you, and settles raised. */
+@keyframes ft-pickup {
+  0% { transform: translateY(0) scale(1); }
+  30% { transform: translateY(-28px) scale(1.07) rotateX(10deg) rotateZ(-2deg); }
+  62% { transform: translateY(-12px) scale(1.03) rotateZ(1deg); }
+  100% { transform: translateY(-8px) scale(1); }
+}
+.ft-card.pickup { z-index: 5; }
+.ft-card.pickup .ft-tilt { animation: ft-pickup .6s cubic-bezier(.2, .8, .2, 1); }
+.ft-slot.pop .ft-stage { animation: ft-land .55s cubic-bezier(.2, .8, .2, 1); }
+@keyframes ft-land { 0% { transform: translateY(-26px) scale(1.06); opacity: .4; } 60% { transform: translateY(3px) scale(.99); opacity: 1; } 100% { transform: none; } }
+
 @media (max-width: 760px) {
-  .ft-lineup { grid-template-columns: repeat(5, minmax(96px, 1fr)); overflow-x: auto; }
-  .ft-grid { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+  .ft-case { padding: 12px 10px 0; }
+  .ft-lineup { grid-template-columns: repeat(5, minmax(170px, 1fr)); gap: 10px; overflow-x: auto; overscroll-behavior-x: contain; }
+  .ft-slot-role { font-size: 16px; }
+  .ft-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 210px), 1fr)); }
 }
-@media (prefers-reduced-motion: reduce) { .ft-card, .ft-art img { transition: none; } .ft-card:hover:not(:disabled) { transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .ft-tilt, .ft-flip, .ft-art img, .ft-shine, .ft-card .ft-turn { transition: none; }
+  .ft-card:hover .ft-tilt { --lift: 0px; }
+  .ft-card.pickup .ft-tilt, .ft-slot.pop .ft-stage { animation: none; }
+}
+/* Your card: your own card beside the hero and role choices (pages/fantasy.js). A role the
+   player set has a dot on its pill. */
+.ft-mine { margin: 0 0 32px; }
+.ft-mine-row { display: grid; grid-template-columns: minmax(0, 240px) minmax(0, 420px); gap: 20px 28px; align-items: start; padding-top: 10px; }
+.ft-mine-form { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.ft-mine-form label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--dust); }
+.ft-mine-form select { max-width: 100%; }
+.ft-mine-form .ft-note { margin: 0; }
+.ft-mine-save { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
+.ft-card.own .ft-front { cursor: default; }
+.ft-pos.set::before { content: ""; display: inline-block; width: 5px; height: 5px; margin: 0 5px 1px 0; border-radius: 50%; background: currentColor; vertical-align: middle; }
+@media (max-width: 560px) { .ft-mine-row { grid-template-columns: minmax(0, 1fr); } .ft-mine-card { max-width: 260px; } }
 .ft-save { display: flex; flex-wrap: wrap; align-items: end; gap: 12px 16px; }
 .ft-save label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--dust); }
 .ft-msg { font-size: 13px; color: var(--dust); }

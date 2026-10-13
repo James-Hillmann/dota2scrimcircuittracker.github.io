@@ -1,0 +1,891 @@
+{
+ "abaddon": {
+  "hero": "Abaddon",
+  "style": "cinema",
+  "cls": "src-ls",
+  "label": "Enveloping Despair Loading Screen",
+  "src": "https://static.wikia.nocookie.net/dota2_gamepedia/images/b/b6/Enveloping_Despair_Loading_Screen_4x3.png/revision/latest/scale-to-width-down/600?cb=20160822105931"
+ },
+ "alchemist": {
+  "hero": "Alchemist",
+  "style": "clean",
+  "cls": "src-ls",
+  "label": "Loading Screen of the Darkbrew Enforcer",
+  "src": "https://community.fastly.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttydbPaERSR0Wqmu7LAocGIm52k-5XvHr0MmzMH6Z9hlm-Yj7_lHYQg_4k5_u_C5k4_2vbK1jJ8-ADXWVxOA4seM4H3nkxUwksWvdwtarInmVOlcoDZIlRucM5ELsmoLuNe-3tgeNjZUFk3t4_jDfRQ"
+ },
+ "ancient_apparition": {
+  "hero": "Ancient Apparition",
+  "style": "stencil",
+  "cls": "src-vert",
+  "label": "Valve portrait",
+  "src": "https://cdn.cloudflare.steamstatic.com/apps/dota2/images/heroes/ancient_apparition_vert.jpg"
+ },
+ "antimage": {
+  "hero": "Anti-Mage",
+  "style": "ember",
+  "cls": "src-ls",
+  "label": "Broken Scale Loading Screen",
+  "src": "https://static.wikia.nocookie.net/dota2_gamepedia/images/c/c1/Broken_Scale_Loading_Screen_4x3.png/revision/latest/scale-to-width-down/600?cb=20160821170215"
+ },
+ "arc_warden": {
+  "hero": "Arc Warden",
+  "style": "stencil",
+  "cls": "src-ls",
+  "label": "Fractured Envoy Loading Screen",
+  "src": "https://static.wikia.nocookie.net/dota2_gamepedia/images/6/6b/Fractured_Envoy_Loading_Screen_4x3.png/revision/latest/scale-to-width-down/600?cb=20160822135044"
+ },
+ "axe": {
+  "hero": "Axe",
+  "style": "stencil",
+  "cls": "src-ls",
+  "label": "Good Day Sir",
+  "src": "https://static.wikia.nocookie.net/dota2_gamepedia/images/1/10/Good_Day_Sir_4x3.png/revision/latest/scale-to-width-down/600?cb=20141218190259"
+ },
+ "bane": {
+  "hero": "Bane",
+  "style": "stencil",
+  "cls": "src-ls",
+  "label": "Loading Screen of Lucid Torment",
+  "src": "https://community.fastly.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttydbPaERSR0Wqmu7LAocGIm52k-5XvHr0MmzMH6Z9hlg-o_15lXoVhj1oZjp-ipP4vO8bbdSLP-SCm6extFls_NsSif9kE0m5mTQwtepJC2WZ1IiDpIkF-UJshe6xoLjZbnn71PYj4MTnn743TQJsHgJOnpXFA"
+ },
+ "batrider": {
+  "hero": "Batrider",
+  "style": "clean",
+  "cls": "src-ls",
+  "label": "Burning Jack Bomber Loading Screen",
+  "src": "https://static.wikia.nocookie.net/dota2_gamepedia/images/2/2a/Burning_Jack_Bomber_Loading_Screen_4x3.png/revision/latest/scale-to-width-down/600?cb=20160821171616"
+ },
+ "beastmaster": {
+  "hero": "Beastmaster",
+  "style": "cinema",
+  "cls": "src-ls",
+  "label": "Chimera's Rage Loading Screen",
+  "src": "https://static.wikia.nocookie.net/dota2_gamepedia/images/8/88/Chimera%27s_Rage_Loading_Screen_4x3.png/revision/latest/scale-to-width-down/600?cb=20160821174631"
+ },
+ "bloodseeker": {
+  "hero": "Bloodseeker",
+  "style": "stencil",
+  "cls": "src-ls",
+  "label": "Tribal Terror Loading Screen",
+  "src": "https://static.wikia.nocookie.net/dota2_gamepedia/images/b/bb/Tribal_Terror_Loading_Screen_4x3.png/revision/latest/scale-to-width-down/600?cb=20140607135232"
+ },
+ "bounty_hunter": {
+  "hero": "Bounty Hunter",
+  "style": "ember",
+  "cls": "src-ls",
+  "label": "Twin Blades Loading Screen",
+  "src": "https://static.wikia.nocookie.net/dota2_gamepedia/images/0/0b/Twin_Blades_Loading_Screen_4x3.png/revision/latest/scale-to-width-down/600?cb=20140705143829"
+ },
+ "brewmaster": {
+  "hero": "Brewmaster",
+  "style": "clean",
+  "cls": "src-ls",
+  "label": "Fortified Brew Loading Screen",
+  "src": "https://community.fastly.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttydbPaERSR0Wqmu7LAocGIm52k-5XvHr0MmzMH6Z9hl78ZD25lboTCKjzsS0wiBJ6uWRZaV-NPWBQDfDwOp06bcxGCzhx0105D7XwtepdH6WPw8lCZd4F7Vb4UG-m9LmM778p1uJQMa3VMw"
+ },
+ "bristleback": {
+  "hero": "Bristleback",
+  "style": "ember",
+  "cls": "src-ls",
+  "label": "Charge of the Wrathrunner Loading Screen",
+  "src": "https://static.wikia.nocookie.net/dota2_gamepedia/images/a/ad/Charge_of_the_Wrathrunner_Loading_Screen_4x3.png/revision/latest/scale-to-width-down/600?cb=20160821174317"
+ },
+ "broodmother": {
+  "hero": "Broodmother",
+  "style": "frost",
+  "cls": "src-ls",
+  "label": "Amber Queen Loading Screen",
+  "src": "https://static.wikia.nocookie.net/dota2_gamepedia/images/7/7d/Amber_Queen_Loading_Screen_4x3.png/revision/latest/scale-to-width-down/600?cb=20160819190951"
+ },
+ "centaur": {
+  "hero": "Centaur Warrunner",
+  "style": "clean",
+  "cls": "src-ls",
+  "label": "Warlord of Hell Loading Screen",
+  "src": "https://static.wikia.nocookie.net/dota2_gamepedia/images/f/ff/Warlord_of_Hell_Loading_Screen_4x3.png/revision/latest/scale-to-width-down/600?cb=20140829205229"
+ },
+ "chaos_knight": {
+  "hero": "Chaos Knight",
+  "style": "clean",
+  "cls": "src-ls",
+  "label": "Charge of the Baleful Reign Loading Screen",
+  "src": "https://static.wikia.nocookie.net/dota2_gamepedia/images/7/7c/Charge_of_the_Baleful_Reign_Loading_Screen_4x3.png/revision/latest/scale-to-width-down/600?cb=20160821173347"
+ },
+ "chen": {
+  "hero": "Chen",
+  "style": "cinema",
+  "cls": "src-vert",
+  "label": "Valve portrait",
+  "src": "https://cdn.cloudflare.steamstatic.com/apps/dota2/images/heroes/chen_vert.jpg"
+ },
+ "clinkz": {
+  "hero": "Clinkz",
+  "style": "cinema",
+  "cls": "src-ls",
+  "label": "Province of the Hunt Eternal Loading Screen",
+  "src": "https://community.fastly.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttydbPaERSR0Wqmu7LAocGIm52k-5XvHr0MmzMH6Z9hlx8YDm613iRSLikYPswipO4eareptpJfeBD2OVxdFlv_RlcCGmmwkioQKJlY79KCXAcFMoDZB0QbEJ4UKxwdHgMe22sgbXjdpAyXj9i3wc7nw-sOkGA6Zxq_DJz1aWTkY0bnw"
+ },
+ "rattletrap": {
+  "hero": "Clockwerk",
+  "style": "stencil",
+  "cls": "src-ls",
+  "label": "Artisan of Havoc Loading Screen",
+  "src": "https://static.wikia.nocookie.net/dota2_gamepedia/images/b/b3/Artisan_of_Havoc_Loading_Screen_16x9.png/revision/latest/scale-to-width-down/600?cb=20141219104327"
+ },
+ "crystal_maiden": {
+  "hero": "Crystal Maiden",
+  "style": "stencil",
+  "cls": "src-ls",
+  "label": "Spirit of the Frozen Flow Loading Screen",
+  "src": "https://community.fastly.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttydbPaERSR0Wqmu7LAocGIm52k-5XvHr0MmzMH6Z9hl78ZD25lboTCKjzsS0wiFJ9uG6aahSLfGaCmKej-xw6Lk5Girqw09wtW3TwoquIHmfOw4gCZcjQO4M4UOxx9bkN-K34QbAy9USzwFMoeU"
+ },
+ "dark_seer": {
+  "hero": "Dark Seer",
+  "style": "stencil",
+  "cls": "src-ls",
+  "label": "Loading Screen of the Vizier Exile",
+  "src": "https://community.fastly.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttydbPaERSR0Wqmu7LAocGIm52k-5XvHr0MmzMH6Z9hl8-Zfx-FDoVA7Oipfj6StY5vOgV6hiIfSaAGCv0u1kteRnAXC2xk0jsmnXnNb8eXLGbAMhWcF3R7YL4xa8k4bhM--0sQzb2tpHxX_gznQeOHrRAzk"
+ },
+ "dark_willow": {
+  "hero": "Dark Willow",
+  "style": "stencil",
+  "cls": "src-vert",
+  "label": "Valve portrait",
+  "src": "https://cdn.cloudflare.steamstatic.com/apps/dota2/images/heroes/dark_willow_vert.jpg"
+ },
+ "dawnbreaker": {
+  "hero": "Dawnbreaker",
+  "style": "stencil",
+  "cls": "src-ls",
+  "label": "Valve/wiki art",
+  "src": "https://static.wikia.nocookie.net/dota2_gamepedia/images/a/a1/Dawnbreaker_Lore.png/revision/latest?cb=20210731010533"
+ },
+ "dazzle": {
+  "hero": "Dazzle",
+  "style": "stencil",
+  "cls": "src-ls",
+  "label": "Valve/wiki art",
+  "src": "https://static.wikia.nocookie.net/dota2_gamepedia/images/6/63/DazzleLoree.png/revision/latest?cb=20240512033741"
+ },
+ "death_prophet": {
+  "hero": "Death Prophet",
+  "style": "cinema",
+  "cls": "src-ls",
+  "label": "Fatal Blossom Loading Screen",
+  "src": "https://static.wikia.nocookie.net/dota2_gamepedia/images/3/32/Fatal_Blossom_Loading_Screen_4x3.png/revision/latest/scale-to-width-down/600?cb=20160822131026"
+ },
+ "disruptor": {
+  "hero": "Disruptor",
+  "style": "ink",
+  "cls": "src-ls",
+  "label": "Bindings of the Galvanized Spark Loading Screen",
+  "src": "https://static.wikia.nocookie.net/dota2_gamepedia/images/a/a0/Bindings_of_the_Galvanized_Spark_Loading_Screen_4x3.png/revision/latest/scale-to-width-down/600?cb=20160821154901"
+ },
+ "doom_bringer": {
+  "hero": "Doom",
+  "style": "ember",
+  "cls": "src-ls",
+  "label": "Fires of Vashundol Loading Screen",
+  "src": "https://static.wikia.nocookie.net/dota2_gamepedia/images/4/41/Fires_of_Vashundol_Loading_Screen_4x3.png/revision/latest/scale-to-width-down/600?cb=20160822132324"
+ },
+ "dragon_knight": {
+  "hero": "Dragon Knight",
+  "style": "stencil",
+  "cls": "src-ls",
+  "label": "Dragon's Ascension Loading Screen",
+  "src": "https://community.fastly.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttydbPaERSR0Wqmu7LAocGIm52k-5XvHr0MmzMH6Z9hl054Tx5EruThO_nMaxqHAN7KuoOvE_daaXCGaVke8ls-VrHS_jzEwm5D_QzteucS2WPBhgVMXA9dtb3g"
+ },
+ "drow_ranger": {
+  "hero": "Drow Ranger",
+  "style": "frost",
+  "cls": "src-ls",
+  "label": "Eldwurm's Touch Loading Screen",
+  "src": "https://static.wikia.nocookie.net/dota2_gamepedia/images/2/2a/Eldwurm%27s_Touch_Loading_Screen_4x3.png/revision/latest/scale-to-width-down/600?cb=20141218185747"
+ },
+ "earth_spirit": {
+  "hero": "Earth Spirit",
+  "style": "cinema",
+  "cls": "src-ls",
+  "label": "Strength of the Demon Stone",
+  "src": "https://static.wikia.nocookie.net/dota2_gamepedia/images/9/98/Strength_of_the_Demon_Stone_4x3.png/revision/latest/scale-to-width-down/600?cb=20140526161550"
+ },
+ "earthshaker": {
+  "hero": "Earthshaker",
+  "style": "ink",
+  "cls": "src-ls",
+  "label": "Loading Screen of Deep Magma",
+  "src": "https://static.wikia.nocookie.net/dota2_gamepedia/images/8/8f/Loading_Screen_of_Deep_Magma_4x3.png/revision/latest/scale-to-width-down/600?cb=20140526035722"
+ },
+ "elder_titan": {
+  "hero": "Elder Titan",
+  "style": "cinema",
+  "cls": "src-ls",
+  "label": "Monument of Ruin Loading Screen",
+  "src": "https://community.fastly.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttydbPaERSR0Wqmu7LAocGIm52k-5XvHr0MmzMH6Z9hlh_d7L6VjkSRjOm4Lf8C1V-v-rZrB-H_yAQDbFlr1z5OM5GXjlzB504m_Qwt-pInPGbAEgCcFyQLUK4RLtl9a0Yej8p1uJvB6rpIM"
+ },
+ "ember_spirit": {
+  "hero": "Ember Spirit",
+  "style": "ember",
+  "cls": "src-ls",
+  "label": "Rekindled Ashes Loading Screen",
+  "src": "https://community.fastly.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttydbPaERSR0Wqmu7LAocGIm52k-5XvHr0MmzMH6Z9hln8Yz95F3rRBnOn4Xo-DFk4_2vbK1jJ8-ADXWVxOA46eQ8GHDmx0kktz6AnNqgdX-SbwUhXJJyRuIK4xi6xIezM-3k7wSPiJUFk3u89uMEzA"
+ },
+ "enchantress": {
+  "hero": "Enchantress",
+  "style": "clean",
+  "cls": "src-ls",
+  "label": "Song of the Solstice Loading Screen",
+  "src": "https://community.fastly.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttydbPaERSR0Wqmu7LAocGIm52k-5XvHr0MmzMH6Z9hl34ZX641fgfhL3oYX18C9e_eGRbqhsLfWsAmiRxed4t69sTnDqw0wk5WXcyomhd33COlV0DcdzQe9Z4Rfsx9zvZL7i71PfgoJA02yg2WlsPX1Y"
+ },
+ "enigma": {
+  "hero": "Enigma",
+  "style": "stencil",
+  "cls": "src-ls",
+  "label": "Twisted Maelstrom Loading Screen",
+  "src": "https://static.wikia.nocookie.net/dota2_gamepedia/images/4/48/Twisted_Maelstrom_Loading_Screen_4x3.png/revision/latest/scale-to-width-down/600?cb=20180908085008"
+ },
+ "faceless_void": {
+  "hero": "Faceless Void",
+  "style": "cinema",
+  "cls": "src-ls",
+  "label": "Valve/wiki art",
+  "src": "https://cdn.steamstatic.com/apps/dota2/images/dota_react/international2022/arcana/fv_keyart.jpg"
+ },
+ "grimstroke": {
+  "hero": "Grimstroke",
+  "style": "cinema",
+  "cls": "src-ls",
+  "label": "Valve/wiki art",
+  "src": "https://cdn.steamstatic.com/apps/dota2/images/dota_react/pastupdates/grimstroke_social.jpg"
+ },
+ "gyrocopter": {
+  "hero": "Gyrocopter",
+  "style": "stencil",
+  "cls": "src-ls",
+  "label": "Rainmaker Loading Screen",
+  "src": "https://static.wikia.nocookie.net/dota2_gamepedia/images/8/80/Rainmaker_Loading_Screen_4x3.png/revision/latest/scale-to-width-down/600?cb=20141011044857"
+ },
+ "hoodwink": {
+  "hero": "Hoodwink",
+  "style": "clean",
+  "cls": "src-ls",
+  "label": "Valve/wiki art",
+  "src": "https://static.wikia.nocookie.net/dota2_gamepedia/images/d/df/Hoodwink_Lore.png/revision/latest?cb=20210731120153"
+ },
+ "huskar": {
+  "hero": "Huskar",
+  "style": "stencil",
+  "cls": "src-ls",
+  "label": "Burning Trio",
+  "src": "https://static.wikia.nocookie.net/dota2_gamepedia/images/0/06/Burning_Trio_4x3.png/revision/latest/scale-to-width-down/600?cb=20140526161403"
+ },
+ "invoker": {
+  "hero": "Invoker",
+  "style": "cinema",
+  "cls": "src-ls",
+  "label": "Arsenal Magus Loading Screen",
+  "src": "https://static.wikia.nocookie.net/dota2_gamepedia/images/a/a3/Arsenal_Magus_Loading_Screen_4x3.png/revision/latest/scale-to-width-down/600?cb=20140526035337"
+ },
+ "wisp": {
+  "hero": "Io",
+  "style": "frost",
+  "cls": "src-ls",
+  "label": "Tethered Spirits",
+  "src": "https://static.wikia.nocookie.net/dota2_gamepedia/images/1/1f/Tethered_Spirits_4x3.png/revision/latest/scale-to-width-down/600?cb=20140526161353"
+ },
+ "jakiro": {
+  "hero": "Jakiro",
+  "style": "cinema",
+  "cls": "src-vert",
+  "label": "Valve portrait",
+  "src": "https://cdn.cloudflare.steamstatic.com/apps/dota2/images/heroes/jakiro_vert.jpg"
+ },
+ "juggernaut": {
+  "hero": "Juggernaut",
+  "style": "cinema",
+  "cls": "src-ls",
+  "label": "Balance of the Bladekeeper Loading Screen",
+  "src": "https://static.wikia.nocookie.net/dota2_gamepedia/images/d/db/Balance_of_the_Bladekeeper_Loading_Screen_4x3.png/revision/latest/scale-to-width-down/600?cb=20141218184925"
+ },
+ "keeper_of_the_light": {
+  "hero": "Keeper of the Light",
+  "style": "cinema",
+  "cls": "src-ls",
+  "label": "Galloping Light",
+  "src": "https://static.wikia.nocookie.net/dota2_gamepedia/images/c/c6/Galloping_Light_4x3.png/revision/latest/scale-to-width-down/600?cb=20140526161413"
+ },
+ "kez": {
+  "hero": "Kez",
+  "style": "clean",
+  "cls": "src-ls",
+  "label": "Valve/wiki art",
+  "src": "https://cdn.steamstatic.com/apps/dota2/images/dota_react/kez/kez_wallpaper_1_desktop.jpg"
+ },
+ "kunkka": {
+  "hero": "Kunkka",
+  "style": "stencil",
+  "cls": "src-ls",
+  "label": "Bestowments of the Divine Anchor Loading Screen",
+  "src": "https://static.wikia.nocookie.net/dota2_gamepedia/images/1/19/Bestowments_of_the_Divine_Anchor_Loading_Screen_4x3.png/revision/latest/scale-to-width-down/600?cb=20140731005645"
+ },
+ "largo": {
+  "hero": "Largo",
+  "style": "ink",
+  "cls": "src-ls",
+  "label": "Valve/wiki art",
+  "src": "https://cdn.steamstatic.com/apps/dota2/images/dota_react/largo/largo_wallpaper_1_desktop.jpg"
+ },
+ "legion_commander": {
+  "hero": "Legion Commander",
+  "style": "ember",
+  "cls": "src-ls",
+  "label": "Errant Soldier Loading Screen",
+  "src": "https://static.wikia.nocookie.net/dota2_gamepedia/images/8/82/Errant_Soldier_Loading_Screen_4x3.png/revision/latest/scale-to-width-down/600?cb=20141218185831"
+ },
+ "leshrac": {
+  "hero": "Leshrac",
+  "style": "cinema",
+  "cls": "src-ls",
+  "label": "Oath of the Afflicted Soul Loading Screen",
+  "src": "https://community.fastly.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttydbPaERSR0Wqmu7LAocGIm52k-5XvHr0MmzMH6Z9hl34JTL5lz0SQ_wnans8iNf5vype6d_JfWdQDfIwLgms7RvGXDixhsm52SEzoqpcSmTZ1d2CsB0QOReshHsm4WzNe38p1uJhMtFuLY"
+ },
+ "lich": {
+  "hero": "Lich",
+  "style": "clean",
+  "cls": "src-ls",
+  "label": "Ascendance of the Rime Lord Loading Screen",
+  "src": "https://community.fastly.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttydbPaERSR0Wqmu7LAocGIm52k-5XvHr0MmzMH6Z9hl5_YT81UvuTBjOkpny-R1X4POqYapqH-OQHGKVz6AhsuI5THuxkE1x5WWHzN6tdH-Wa1cjXpJ5FOYJukG_wdXuMeOw4AaIlcsbmlGFuZiZ"
+ },
+ "life_stealer": {
+  "hero": "Lifestealer",
+  "style": "clean",
+  "cls": "src-ls",
+  "label": "Compendium Bloody Ripper Loading Screen",
+  "src": "https://static.wikia.nocookie.net/dota2_gamepedia/images/6/65/Compendium_Bloody_Ripper_Loading_Screen_4x3.png/revision/latest/scale-to-width-down/600?cb=20160821181148"
+ },
+ "lina": {
+  "hero": "Lina",
+  "style": "clean",
+  "cls": "src-ls",
+  "label": "Arcana: Launch banner - Lina.jpg",
+  "src": "https://static.wikia.nocookie.net/dota2_gamepedia/images/9/91/Launch_banner_-_Lina.jpg/revision/latest/scale-to-width-down/600?cb=20110801130820"
+ },
+ "lion": {
+  "hero": "Lion",
+  "style": "stencil",
+  "cls": "src-ls",
+  "label": "Gruesome Embrace Loading Screen",
+  "src": "https://community.fastly.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttydbPaERSR0Wqmu7LAocGIm52k-5XvHr0MmzMH6Z9hl0-oT971fzfhjnl5rf8TEVtqWrMaZoJvPCVjaVx7ok5bBvSi_qxUol5z7Uy9f6dXOSPA4iXJt1E_lK7EfHrXV0vw"
+ },
+ "lone_druid": {
+  "hero": "Lone Druid",
+  "style": "stencil",
+  "cls": "src-ls",
+  "label": "The Wolf Hunter Loading Screen",
+  "src": "https://static.wikia.nocookie.net/dota2_gamepedia/images/f/fe/The_Wolf_Hunter_Loading_Screen_4x3.png/revision/latest/scale-to-width-down/600?cb=20140731005552"
+ },
+ "luna": {
+  "hero": "Luna",
+  "style": "stencil",
+  "cls": "src-ls",
+  "label": "Compendium Umbra Rider Loading Screen",
+  "src": "https://static.wikia.nocookie.net/dota2_gamepedia/images/e/e1/Compendium_Umbra_Rider_Loading_Screen_4x3.png/revision/latest/scale-to-width-down/600?cb=20160821182359"
+ },
+ "lycan": {
+  "hero": "Lycan",
+  "style": "stencil",
+  "cls": "src-ls",
+  "label": "Requiem for Red Wolf Clan Loading Screen",
+  "src": "https://community.fastly.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttydbPaERSR0Wqmu7LAocGIm52k-5XvHr0MmzMH6Z9hlK44Lm707oTRvOjZft6DBa5s2ie-o4caGRXmKRlLpz4bBoTXvqk0kj6mSHmdepdy6SaVVxApd0TORb4Ea8jJS5YPgRo0hX"
+ },
+ "magnataur": {
+  "hero": "Magnus",
+  "style": "stencil",
+  "cls": "src-ls",
+  "label": "Engulfing Spike Loading Screen",
+  "src": "https://static.wikia.nocookie.net/dota2_gamepedia/images/7/74/Engulfing_Spike_Loading_Screen_4x3.png/revision/latest/scale-to-width-down/600?cb=20141218185810"
+ },
+ "marci": {
+  "hero": "Marci",
+  "style": "stencil",
+  "cls": "src-ls",
+  "label": "Bloomjewel Brawler Loading Screen",
+  "src": "https://community.fastly.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttydbPaERSR0Wqmu7LAocGIm52k-5XvHr0MmzMH6Z9hl78ZD25lboTCKjzsS0wi9a_fGnJqA_JfKQWGLIw7ghs-RqS3nkxBt34TjWmdz9cijGaAUkXsZ5ROQOsRKm0oqw_IbJieA"
+ },
+ "mars": {
+  "hero": "Mars",
+  "style": "stencil",
+  "cls": "src-ls",
+  "label": "Valve/wiki art",
+  "src": "https://cdn.steamstatic.com/apps/dota2/images/dota_react/pastupdates/mars_social.jpg"
+ },
+ "medusa": {
+  "hero": "Medusa",
+  "style": "stencil",
+  "cls": "src-ls",
+  "label": "Eye of the Beholder Loading Screen",
+  "src": "https://static.wikia.nocookie.net/dota2_gamepedia/images/9/9e/Eye_of_the_Beholder_Loading_Screen_4x3.png/revision/latest/scale-to-width-down/600?cb=20160822125732"
+ },
+ "meepo": {
+  "hero": "Meepo",
+  "style": "stencil",
+  "cls": "src-ls",
+  "label": "Crystal Scavenger Loading Screen",
+  "src": "https://static.wikia.nocookie.net/dota2_gamepedia/images/e/e3/Crystal_Scavenger_Loading_Screen_4x3.png/revision/latest/scale-to-width-down/600?cb=20140705144142"
+ },
+ "mirana": {
+  "hero": "Mirana",
+  "style": "stencil",
+  "cls": "src-ls",
+  "label": "Snowstorm Huntress Loading Screen",
+  "src": "https://static.wikia.nocookie.net/dota2_gamepedia/images/8/87/Snowstorm_Huntress_Loading_Screen_4x3.png/revision/latest/scale-to-width-down/600?cb=20141218190721"
+ },
+ "monkey_king": {
+  "hero": "Monkey King",
+  "style": "cinema",
+  "cls": "src-ls",
+  "label": "The Havoc of Dragon Palace Loading Screen",
+  "src": "https://community.fastly.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttydbPaERSR0Wqmu7LAocGIm52k-5XvHr0MmzMH6Z9hlh_ILL4ljxTh7OkZDf-TBa6P2gV7RsLPGQC3SZ2dFzsfNWWyG2qhUmpTKGpYD_Hi_VP1F_VP0wFLtb4UX7y5yIYrug-VTZiI5CySyo2nkdvS5p4-gLUasg-KTSiV6TY7Q9s5UCLKqlSRjfURwR-Pc1I4UpOB8"
+ },
+ "morphling": {
+  "hero": "Morphling",
+  "style": "stencil",
+  "cls": "src-ls",
+  "label": "Darktrench Stalker Loading Screen",
+  "src": "https://community.fastly.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttydbPaERSR0Wqmu7LAocGIm52k-5XvHr0MmzMH6Z9hl09p7n-WboVxjjkpny-R1X_LyoafM4cKPAXTWSmLx36LhqFnvjwEl35WqDzt-gdXuSP1QnCZB0TOUMrFDmxflF0Xge"
+ },
+ "muerta": {
+  "hero": "Muerta",
+  "style": "stencil",
+  "cls": "src-ls",
+  "label": "Valve/wiki art",
+  "src": "https://cdn.steamstatic.com/apps/dota2/images/dota_react/muerta/wallpaper5.png"
+ },
+ "naga_siren": {
+  "hero": "Naga Siren",
+  "style": "stencil",
+  "cls": "src-ls",
+  "label": "Arms of the Captive Princess Loading Screen",
+  "src": "https://static.wikia.nocookie.net/dota2_gamepedia/images/2/2e/Arms_of_the_Captive_Princess_Loading_Screen_4x3.png/revision/latest/scale-to-width-down/600?cb=20160819200727"
+ },
+ "furion": {
+  "hero": "Nature's Prophet",
+  "style": "stencil",
+  "cls": "src-ls",
+  "label": "Primeval Prophet Loading Screen",
+  "src": "https://static.wikia.nocookie.net/dota2_gamepedia/images/8/85/Primeval_Prophet_Loading_Screen_4x3.png/revision/latest/scale-to-width-down/600?cb=20140705151917"
+ },
+ "necrolyte": {
+  "hero": "Necrophos",
+  "style": "stencil",
+  "cls": "src-ls",
+  "label": "Wrath of Ka Loading Screen",
+  "src": "https://static.wikia.nocookie.net/dota2_gamepedia/images/7/7b/Wrath_of_Ka_Loading_Screen_4x3.png/revision/latest/scale-to-width-down/600?cb=20141218191827"
+ },
+ "night_stalker": {
+  "hero": "Night Stalker",
+  "style": "cinema",
+  "cls": "src-ls",
+  "label": "Loading Screen of Unfettered Malevolence",
+  "src": "https://community.fastly.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttydbPaERSR0Wqmu7LAocGIm52k-5XvHr0MmzMH6Z9hlw4o741Vz-RBn_l5Ho6TFP7v6lbbZSJeaaAliV2OtyvuhuRz2ggRwruDiXpYP2IC_OMFE-D5R1F-VbsBjpwNPjMLi05VCMjNhDynj_iCpM7HlotusHVKEm8vfRjBaBb-NEprzGkA"
+ },
+ "nyx_assassin": {
+  "hero": "Nyx Assassin",
+  "style": "cinema",
+  "cls": "src-ls",
+  "label": "Deviant Metamorphosis Loading Screen",
+  "src": "https://static.wikia.nocookie.net/dota2_gamepedia/images/b/bc/Deviant_Metamorphosis_Loading_Screen_4x3.png/revision/latest/scale-to-width-down/600?cb=20160821193417"
+ },
+ "ogre_magi": {
+  "hero": "Ogre Magi",
+  "style": "stencil",
+  "cls": "src-ls",
+  "label": "Ancestral Luck Loading Screen",
+  "src": "https://static.wikia.nocookie.net/dota2_gamepedia/images/a/af/Ancestral_Luck_Loading_Screen_4x3.png/revision/latest/scale-to-width-down/600?cb=20140625010827"
+ },
+ "omniknight": {
+  "hero": "Omniknight",
+  "style": "cinema",
+  "cls": "src-ls",
+  "label": "Stalwart Soul Loading Screen",
+  "src": "https://static.wikia.nocookie.net/dota2_gamepedia/images/8/80/Stalwart_Soul_Loading_Screen_4x3.png/revision/latest/scale-to-width-down/600?cb=20141218190829"
+ },
+ "oracle": {
+  "hero": "Oracle",
+  "style": "cinema",
+  "cls": "src-ls",
+  "label": "Eye of the Fateweaver Loading Screen",
+  "src": "https://community.fastly.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttydbPaERSR0Wqmu7LAocGIm52k-5XvHr0MmzMH6Z9hl65ob35lzYVRX0oZDh6Sdk6fuqbKhoMs-fHSnIxe8k6LgxHCq2wBkm6j7Vyd-qd3OWZlAnDMN1TOIP5hK7m921Nb7k-UWA3MbudO4c"
+ },
+ "obsidian_destroyer": {
+  "hero": "Outworld Destroyer",
+  "style": "cinema",
+  "cls": "src-ls",
+  "label": "Herald of Measureless Ruin Loading Screen",
+  "src": "https://community.fastly.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttydbPaERSR0Wqmu7LAocGIm52k-5XvHr0MmzMH6Z9hl98ZX15l3YThvOk5Ph7jdJ6v6re7dSMuWaAFiczu9yue9ucDqwhxgivXOBn9qpI3vBaQcnCsAhQ-ULska7lIfgNOiz5QLWjYJEmy_2i3xMvXlp_a9cBhMORrDx"
+ },
+ "pangolier": {
+  "hero": "Pangolier",
+  "style": "stencil",
+  "cls": "src-ls",
+  "label": "Foxtail Libertine Loading Screen",
+  "src": "https://community.fastly.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttydbPaERSR0Wqmu7LAocGIm52k-5XvHr0MmzMH6Z9hl5-5Xw1V_oWSL9kYTkwiRU982iZ6VpKf6UQDDIl-gk6bloH3jizUkmsWyBmNmqJyrEaQR2XsB1R7YIuxHrlIXvP7z8p1uJWMz5Ho8"
+ },
+ "phantom_assassin": {
+  "hero": "Phantom Assassin",
+  "style": "cinema",
+  "cls": "src-ls",
+  "label": "Arcana: Manifold Paradox Concept 1.jpg",
+  "src": "https://static.wikia.nocookie.net/dota2_gamepedia/images/c/c7/Manifold_Paradox_Concept_1.jpg/revision/latest/scale-to-width-down/600?cb=20141205232455"
+ },
+ "phantom_lancer": {
+  "hero": "Phantom Lancer",
+  "style": "ember",
+  "cls": "src-ls",
+  "label": "Vengeance of the Sunwarrior Loading Screen",
+  "src": "https://static.wikia.nocookie.net/dota2_gamepedia/images/0/01/Vengeance_of_the_Sunwarrior_Loading_Screen_4x3.png/revision/latest/scale-to-width-down/600?cb=20140705143851"
+ },
+ "phoenix": {
+  "hero": "Phoenix",
+  "style": "stencil",
+  "cls": "src-ls",
+  "label": "Loading Screen of the Vermillion Crucible",
+  "src": "https://static.wikia.nocookie.net/dota2_gamepedia/images/7/79/Loading_Screen_of_the_Vermillion_Crucible_4x3.png/revision/latest/scale-to-width-down/600?cb=20170215234105"
+ },
+ "primal_beast": {
+  "hero": "Primal Beast",
+  "style": "cinema",
+  "cls": "src-ls",
+  "label": "The Abominable Snowbeast Loading Screen",
+  "src": "https://community.fastly.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttydbPaERSR0Wqmu7LAocGIm52k-5XvHr0MmzMH6Z9hlz5ojn_lDxVA6jzsSzwjJZofP8P_M1cPPCWjeVl7outrM4HnGyw0t3sm_Vw937dnqWPVIkC5EhRu8U8k7vowRLgYo"
+ },
+ "puck": {
+  "hero": "Puck",
+  "style": "cinema",
+  "cls": "src-ls",
+  "label": "Reminiscence of Dreams Loading Screen",
+  "src": "https://static.wikia.nocookie.net/dota2_gamepedia/images/6/68/Reminiscence_of_Dreams_Loading_Screen_4x3.png/revision/latest/scale-to-width-down/600?cb=20140705144433"
+ },
+ "pudge": {
+  "hero": "Pudge",
+  "style": "cinema",
+  "cls": "src-ls",
+  "label": "Murder of Crows Loading Screen",
+  "src": "https://static.wikia.nocookie.net/dota2_gamepedia/images/3/33/Murder_of_Crows_Loading_Screen_4x3.png/revision/latest/scale-to-width-down/600?cb=20140526161717"
+ },
+ "pugna": {
+  "hero": "Pugna",
+  "style": "cinema",
+  "cls": "src-ls",
+  "label": "Narcissistic Leech Loading Screen",
+  "src": "https://community.fastly.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttydbPaERSR0Wqmu7LAocGIm52k-5XvHr0MmzMH6Z9hl79ZX340r0SA7ll5Xf8Sde7PqRZKtsJPmdCViDwvxzte8nGXG2wEwi5WnSw9__eCiQPAQoWcMiQrIPshHrx9HvM-m34AWLjIMUzTK-0H1LQ-TltQ"
+ },
+ "queenofpain": {
+  "hero": "Queen of Pain",
+  "style": "cinema",
+  "cls": "src-ls",
+  "label": "Arcana: Eminence of Ristul Wallpaper 1.jpg",
+  "src": "https://static.wikia.nocookie.net/dota2_gamepedia/images/1/15/Eminence_of_Ristul_Wallpaper_1.jpg/revision/latest/scale-to-width-down/600?cb=20200612062938"
+ },
+ "razor": {
+  "hero": "Razor",
+  "style": "stencil",
+  "cls": "src-ls",
+  "label": "Valve/wiki art",
+  "src": "https://cdn.steamstatic.com/apps/dota2/images/dota_react/international2022/arcana/razor_wallpaper.jpg"
+ },
+ "riki": {
+  "hero": "Riki",
+  "style": "stencil",
+  "cls": "src-ls",
+  "label": "Covert Saboteur Loading Screen",
+  "src": "https://static.wikia.nocookie.net/dota2_gamepedia/images/b/b7/Covert_Saboteur_Loading_Screen_4x3.png/revision/latest/scale-to-width-down/600?cb=20160821183215"
+ },
+ "ringmaster": {
+  "hero": "Ringmaster",
+  "style": "stencil",
+  "cls": "src-ls",
+  "label": "Valve/wiki art",
+  "src": "https://cdn.steamstatic.com/apps/dota2/images/dota_react/international2024/ringmaster/thumb_ringmaster_thepuppet.jpg"
+ },
+ "rubick": {
+  "hero": "Rubick",
+  "style": "cinema",
+  "cls": "src-ls",
+  "label": "Arcana: The Magus Cypher Preview 10.jpg",
+  "src": "https://static.wikia.nocookie.net/dota2_gamepedia/images/3/37/The_Magus_Cypher_Preview_10.jpg/revision/latest/scale-to-width-down/600?cb=20181220002431"
+ },
+ "sand_king": {
+  "hero": "Sand King",
+  "style": "stencil",
+  "cls": "src-ls",
+  "label": "Elusive Destroyer Loading Screen",
+  "src": "https://static.wikia.nocookie.net/dota2_gamepedia/images/d/d3/Elusive_Destroyer_Loading_Screen_4x3.png/revision/latest/scale-to-width-down/600?cb=20160822105006"
+ },
+ "shadow_demon": {
+  "hero": "Shadow Demon",
+  "style": "cinema",
+  "cls": "src-ls",
+  "label": "Umbral Descent Loading Screen",
+  "src": "https://community.fastly.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttydbPaERSR0Wqmu7LAocGIm52k-5XvHr0MmzMH6Z9hlg-YXm61XYRRjinZPu6R1X4POqYapqM_OBC2Kej-ou47hvFnzmxh4hsGSDw47_dXvCagEgW8FwFuUDs0G9w9DmPu6xsQ3Ay9USwzQeTPE"
+ },
+ "nevermore": {
+  "hero": "Shadow Fiend",
+  "style": "cinema",
+  "cls": "src-ls",
+  "label": "Loading Screen of Eternal Harvest",
+  "src": "https://community.fastly.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttydbPaERSR0Wqmu7LAocGIm52k-5XvHr0MmzMH6Z9hlz8ZXm_1TYQhX4jJnw6SdJ7s2iZ6VpKf6UMXST0-tzvq87HH3gzE9z5TmHzN6odirGPVV1XsRwF7UOuhW4lILmP-_j5APeiItB02yg2QVcJgiH"
+ },
+ "shadow_shaman": {
+  "hero": "Shadow Shaman",
+  "style": "cinema",
+  "cls": "src-ls",
+  "label": "Dancer of the Spiteful Eye Loading Screen",
+  "src": "https://static.wikia.nocookie.net/dota2_gamepedia/images/7/74/Dancer_of_the_Spiteful_Eye_Loading_Screen_4x3.png/revision/latest/scale-to-width-down/600?cb=20160821191206"
+ },
+ "silencer": {
+  "hero": "Silencer",
+  "style": "stencil",
+  "cls": "src-ls",
+  "label": "Loading Screen of the Hazhadal Magebreaker",
+  "src": "https://community.fastly.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttydbPaERSR0Wqmu7LAocGIm52k-5XvHr0MmzMH6Z9hlh_ILL4lj9SRz1n5rf8CNc6vC8baVmJeKsBmaKye9yse1WQii0kB81tjyOn53GLSTGOl9-Xf0zFqVf506mxtDlYrvi4QPe3oMXm3isj3xN5io65O9RUfVwrqTQjgzDY7c85MUAJOHnE0qiGoZJ3A"
+ },
+ "skywrath_mage": {
+  "hero": "Skywrath Mage",
+  "style": "ink",
+  "cls": "src-ls",
+  "label": "Scions of the Sky Loading Screen",
+  "src": "https://static.wikia.nocookie.net/dota2_gamepedia/images/8/81/Scions_of_the_Sky_Loading_Screen_4x3.png/revision/latest/scale-to-width-down/600?cb=20140526162031"
+ },
+ "slardar": {
+  "hero": "Slardar",
+  "style": "cinema",
+  "cls": "src-ls",
+  "label": "The Andestian Sentinel Loading Screen",
+  "src": "https://community.fastly.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttydbPaERSR0Wqmu7LAocGIm52k-5XvHr0MmzMH6Z9hl49YD562bqQBPln6ns8iNf5vypV7duMvWWACnIxOshs-JoGi2xxUl16jvSyteqdHmWbwVxWZd4FOdbuhe9k4bvMOO3-UWA3LxNtd-O"
+ },
+ "slark": {
+  "hero": "Slark",
+  "style": "cinema",
+  "cls": "src-ls",
+  "label": "Dark Reef Escape Loading Screen",
+  "src": "https://static.wikia.nocookie.net/dota2_gamepedia/images/c/c1/Dark_Reef_Escape_Loading_Screen_4x3.png/revision/latest/scale-to-width-down/600?cb=20140705144231"
+ },
+ "snapfire": {
+  "hero": "Snapfire",
+  "style": "noir",
+  "cls": "src-ls",
+  "label": "Silver Squall Loading Screen",
+  "src": "https://community.fastly.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttydbPaERSR0Wqmu7LAocGIm52k-5XvHr0MmzMH6Z9hlm-obk7FD1RCLwiJfs_CxY5_eRYLFjNPWBC3SD_uJ5seVgQS6Mhh41tjiL1Nqsc3uTblV1ApV4FOBftka7w4GxN-3k5weLi4lAzyj62yxL6H1j4OgcEf1yEs9d4G8"
+ },
+ "sniper": {
+  "hero": "Sniper",
+  "style": "stencil",
+  "cls": "src-ls",
+  "label": "The Shooting Star Loading Screen",
+  "src": "https://community.fastly.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttydbPaERSR0Wqmu7LAocGIm52k-5XvHr0MmzMH6Z9hlx5oL151HmQhbOjZjp7SdJ0P6haaBkLveADXWVxOA45-M9GCvlkU0j6jzdmN-geXzFPQ8iDsR0RORe4US7xIK1Nb6w7gXZgpUFk3utZukefw"
+ },
+ "spectre": {
+  "hero": "Spectre",
+  "style": "stencil",
+  "cls": "src-ls",
+  "label": "Flowering Shade Loading Screen",
+  "src": "https://static.wikia.nocookie.net/dota2_gamepedia/images/3/37/Flowering_Shade_Loading_Screen_4x3.png/revision/latest/scale-to-width-down/600?cb=20160822133346"
+ },
+ "spirit_breaker": {
+  "hero": "Spirit Breaker",
+  "style": "stencil",
+  "cls": "src-ls",
+  "label": "Elemental Realms Loading Screen",
+  "src": "https://static.wikia.nocookie.net/dota2_gamepedia/images/2/2e/Elemental_Realms_Loading_Screen_4x3.png/revision/latest/scale-to-width-down/600?cb=20160822104740"
+ },
+ "storm_spirit": {
+  "hero": "Storm Spirit",
+  "style": "clean",
+  "cls": "src-ls",
+  "label": "Loading Screen of the Corridan Maestro",
+  "src": "https://community.fastly.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttydbPaERSR0Wqmu7LAocGIm52k-5XvHr0MmzMH6Z9hlh-5X571fzQCLlkYTt-CxP7s2iZ6VpKf6UMXST0-tzvq84GXG1xU1wsGvcyYmgcS-VbgYgW5d0QeILsEGwkt3hY-Lm5AeIjYkT02yg2eCtOtTH"
+ },
+ "sven": {
+  "hero": "Sven",
+  "style": "cinema",
+  "cls": "src-ls",
+  "label": "Cry of the Battlehawk Loading Screen",
+  "src": "https://static.wikia.nocookie.net/dota2_gamepedia/images/2/2c/Cry_of_the_Battlehawk_Loading_Screen_4x3.png/revision/latest/scale-to-width-down/600?cb=20160821185422"
+ },
+ "techies": {
+  "hero": "Techies",
+  "style": "stencil",
+  "cls": "src-ls",
+  "label": "Swine Sappers",
+  "src": "https://static.wikia.nocookie.net/dota2_gamepedia/images/0/07/Swine_Sappers_4x3.png/revision/latest/scale-to-width-down/600?cb=20140831203409"
+ },
+ "templar_assassin": {
+  "hero": "Templar Assassin",
+  "style": "clean",
+  "cls": "src-ls",
+  "label": "Loading Screen of the Onyx Lotus",
+  "src": "https://static.wikia.nocookie.net/dota2_gamepedia/images/0/0e/Loading_Screen_of_the_Onyx_Lotus_4x3.png/revision/latest/scale-to-width-down/600?cb=20150311101442"
+ },
+ "terrorblade": {
+  "hero": "Terrorblade",
+  "style": "cinema",
+  "cls": "src-ls",
+  "label": "Arcana: Fractal Horns of Inner Abysm announcement.jpg",
+  "src": "https://static.wikia.nocookie.net/dota2_gamepedia/images/2/25/Fractal_Horns_of_Inner_Abysm_announcement.jpg/revision/latest/scale-to-width-down/600?cb=20140207123835"
+ },
+ "tidehunter": {
+  "hero": "Tidehunter",
+  "style": "stencil",
+  "cls": "src-ls",
+  "label": "Deepweed Drowner Loading Screen",
+  "src": "https://static.wikia.nocookie.net/dota2_gamepedia/images/0/0c/Deepweed_Drowner_Loading_Screen_4x3.png/revision/latest/scale-to-width-down/600?cb=20140526161857"
+ },
+ "shredder": {
+  "hero": "Timbersaw",
+  "style": "stencil",
+  "cls": "src-ls",
+  "label": "Ascendant Timbersaw Loading Screen",
+  "src": "https://static.wikia.nocookie.net/dota2_gamepedia/images/4/47/Ascendant_Timbersaw_Loading_Screen_4x3.png/revision/latest/scale-to-width-down/600?cb=20160819204508"
+ },
+ "tinker": {
+  "hero": "Tinker",
+  "style": "stencil",
+  "cls": "src-vert",
+  "label": "Valve portrait",
+  "src": "https://cdn.cloudflare.steamstatic.com/apps/dota2/images/heroes/tinker_vert.jpg"
+ },
+ "tiny": {
+  "hero": "Tiny",
+  "style": "clean",
+  "cls": "src-ls",
+  "label": "Clash of Heroes",
+  "src": "https://static.wikia.nocookie.net/dota2_gamepedia/images/2/2b/Clash_of_Heroes_4x3.png/revision/latest/scale-to-width-down/600?cb=20140526161231"
+ },
+ "treant": {
+  "hero": "Treant Protector",
+  "style": "stencil",
+  "cls": "src-ls",
+  "label": "Emberbark Loading Screen",
+  "src": "https://static.wikia.nocookie.net/dota2_gamepedia/images/2/21/Emberbark_Loading_Screen_4x3.png/revision/latest/scale-to-width-down/600?cb=20160822105224"
+ },
+ "troll_warlord": {
+  "hero": "Troll Warlord",
+  "style": "cinema",
+  "cls": "src-ls",
+  "label": "Conspicuous Culprit Loading Screen",
+  "src": "https://community.fastly.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttydbPaERSR0Wqmu7LAocGIm52k-5XvHr0MmzMH6Z9hlm5JX95F61EU-goZvv6ipa-PmRZaV_IeWXC3WvzeF3tOhnSBaglg8itjPLnNz4diqUOwFxApRwQrRZ4BS4xNbuMurh41Hd2Y4WzCz-iS5AvC9p5vFCD_Q2J0HShw"
+ },
+ "tusk": {
+  "hero": "Tusk",
+  "style": "stencil",
+  "cls": "src-ls",
+  "label": "Barrier Rogue Loading Screen",
+  "src": "https://static.wikia.nocookie.net/dota2_gamepedia/images/9/92/Barrier_Rogue_Loading_Screen_4x3.png/revision/latest/scale-to-width-down/600?cb=20160821153036"
+ },
+ "abyssal_underlord": {
+  "hero": "Underlord",
+  "style": "cinema",
+  "cls": "src-ls",
+  "label": "Loading Screen of the Abyssal Scourge",
+  "src": "https://community.fastly.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttydbPaERSR0Wqmu7LAocGIm52k-5XvHr0MmzMH6Z9hl09p7n-WbzWA_wkILf_CBC_OGRfL1_If6HMWufwOp_vuZ6TDu2kBNp4WrcnN2udS6QaVR0C5t2TeIN5hXqxtexYum0tVaL2tpBxH2qhnhM7DErvbj_TmlqKw"
+ },
+ "undying": {
+  "hero": "Undying",
+  "style": "stencil",
+  "cls": "src-ls",
+  "label": "Dirgesworn Dynasty Loading Screen",
+  "src": "https://community.fastly.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttydbPaERSR0Wqmu7LAocGIm52k-5XvHr0MmzMH6Z9hlw-ILz82boRyLwnI_z7iNX0OGvZbF_IfmsAmiRxed4t_JqXSy2m1NysmiHntepJS6SPQUmC8AlQOZYtkTultXhNe_n4w3XiYwTn3r3335O8G81tN_VHyo6"
+ },
+ "ursa": {
+  "hero": "Ursa",
+  "style": "stencil",
+  "cls": "src-ls",
+  "label": "Ursa Cryogenic Embrace",
+  "src": "https://static.wikia.nocookie.net/dota2_gamepedia/images/a/a7/Ursa_Cryogenic_Embrace_4x3.png/revision/latest/scale-to-width-down/600?cb=20140526162128"
+ },
+ "vengefulspirit": {
+  "hero": "Vengeful Spirit",
+  "style": "stencil",
+  "cls": "src-ls",
+  "label": "Valve/wiki art",
+  "src": "https://cdn.steamstatic.com/apps/dota2/images/dota_react/crownfall/vs_alternate_style.png"
+ },
+ "venomancer": {
+  "hero": "Venomancer",
+  "style": "stencil",
+  "cls": "src-ls",
+  "label": "Acid Hydra Loading Screen",
+  "src": "https://static.wikia.nocookie.net/dota2_gamepedia/images/9/9b/Acid_Hydra_Loading_Screen_4x3.png/revision/latest/scale-to-width-down/600?cb=20141218184744"
+ },
+ "viper": {
+  "hero": "Viper",
+  "style": "cinema",
+  "cls": "src-ls",
+  "label": "Advance of the Siege-Drake Loading Screen",
+  "src": "https://community.fastly.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttydbPaERSR0Wqmu7LAocGIm52k-5XvHr0MmzMH6Z9hl3-I7z4k3YVgTjk6ns8iNf5vype6d_JfWdQGTGkut0s-VoHS3mxxwj4G6Gztz7dX6Vbw4kDJV5Q7YIskbpltbiNOr8p1uJPXlcAhI"
+ },
+ "visage": {
+  "hero": "Visage",
+  "style": "cinema",
+  "cls": "src-ls",
+  "label": "Unblinking Eternity Loading Screen",
+  "src": "https://community.fastly.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttydbPaERSR0Wqmu7LAocGIm52k-5XvHr0MmzMH6Z9hlw7YLL5V_YSRL9i4Xf8TEVuPb-bfZseKWQWT_BwO0v5Lk8Siu1lk8jsGrSy9qsJHKWbg4jDJB0TflK7EcFHujkIA"
+ },
+ "void_spirit": {
+  "hero": "Void Spirit",
+  "style": "noir",
+  "cls": "src-vert",
+  "label": "Valve portrait",
+  "src": "https://cdn.cloudflare.steamstatic.com/apps/dota2/images/heroes/void_spirit_vert.jpg"
+ },
+ "warlock": {
+  "hero": "Warlock",
+  "style": "stencil",
+  "cls": "src-ls",
+  "label": "The Gatekeeper Loading Screen",
+  "src": "https://community.fastly.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttydbPaERSR0Wqmu7LAocGIm52k-5XvHr0MmzMH6Z9hlh8ZHx5E3YEyL2n4Ll9ide__e8V6hiIfSaAGCv0u1kteRnASzgk0gktWmDyo6sI33Ebg8jA8Z5TbVYtUW-kIC1Muvm4wbbiI1GmSXgznQeEHZOqRE"
+ },
+ "weaver": {
+  "hero": "Weaver",
+  "style": "stencil",
+  "cls": "src-ls",
+  "label": "Dimension Ripper Loading Screen",
+  "src": "https://community.fastly.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttydbPaERSR0Wqmu7LAocGIm52k-5XvHr0MmzMH6Z9hlm5JX95F61EU-goZLp8CdV_PuhZpt_KeCDC3WvzeF3tOhnSDqwhxgivXPVmIn4JX3DPQV0AsRwEeALtxC4wdDhN-vgslaM39hCyyv43yxP7i8-_a9cBhzrCHDi"
+ },
+ "windrunner": {
+  "hero": "Windranger",
+  "style": "clean",
+  "cls": "src-ls",
+  "label": "Arcana: Compass of the Rising Gale Preview 10.png",
+  "src": "https://static.wikia.nocookie.net/dota2_gamepedia/images/7/7b/Compass_of_the_Rising_Gale_Preview_10.png/revision/latest/scale-to-width-down/600?cb=20200528152522"
+ },
+ "winter_wyvern": {
+  "hero": "Winter Wyvern",
+  "style": "cinema",
+  "cls": "src-ls",
+  "label": "Aurora's Pyre Loading Screen",
+  "src": "https://community.fastly.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttydbPaERSR0Wqmu7LAocGIm52k-5XvHr0MmzMH6Z9hlz5ojn_mbzSRLjkKns7mwJ7PP7OKZsdvSVXGLBw7shsbJsF32xwR935G-Ezt-rJS6fbFcnD8YlW6dU5SWy7PtW"
+ },
+ "witch_doctor": {
+  "hero": "Witch Doctor",
+  "style": "stencil",
+  "cls": "src-ls",
+  "label": "Loading Screen of the Arkturan Talon",
+  "src": "https://community.fastly.steamstatic.com/economy/image/i0CoZ81Ui0m-9KwlBY1L_18myuGuq1wfhWSaZgMttydbPaERSR0Wqmu7LAocGIm52k-5XvHr0MmzMH6Z9hlj8ZX541XuThPOlIPq6B1U6c26YKFSM_-GGm-v1-tkvehlRia9qhcyuSi6lYnGNSPCAUV_T9YoKrtV40ThzIOkZKi3slvAjd5HmSn32CIc7Sw-5LwBBfJz_qWDiFnFZ-ds4sMKcfbyGE-PWB8OvrciGt7HXlu-tQ"
+ },
+ "skeleton_king": {
+  "hero": "Wraith King",
+  "style": "stencil",
+  "cls": "src-ls",
+  "label": "Arcana: The One True King Bundle Preview 10.jpg",
+  "src": "https://static.wikia.nocookie.net/dota2_gamepedia/images/e/e2/The_One_True_King_Bundle_Preview_10.jpg/revision/latest/scale-to-width-down/600?cb=20200528131402"
+ },
+ "zuus": {
+  "hero": "Zeus",
+  "style": "stencil",
+  "cls": "src-ls",
+  "label": "Arcana: Tempest Helm Splash.jpg",
+  "src": "https://static.wikia.nocookie.net/dota2_gamepedia/images/4/4f/Tempest_Helm_Splash.jpg/revision/latest/scale-to-width-down/600?cb=20151217015824"
+ }
+}

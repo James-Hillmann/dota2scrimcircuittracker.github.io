@@ -65,6 +65,20 @@ export async function saveFantasy(league, week, picks, name) {
   });
 }
 
+// Player cards: each player's own choices for their Fantasy card, id "<account>", written only
+// through that account's Steam session. hero: a hero id or null (their most played); pos: the role
+// they play now, 1–5, or null (their most played position). A Map account -> { hero, pos }.
+const cardColl = collection(getFirestore(fantasyApp), "scrimLeague", "data", "cards");
+export async function listCards() {
+  const snap = await getDocs(query(collection(db, "scrimLeague", "data", "cards"), limit(5000)));
+  return new Map(snap.docs.map((d) => [d.data().account, { hero: d.data().hero ?? null, pos: d.data().pos ?? null }]));
+}
+export async function saveCard({ hero = null, pos = null }) {
+  const account = await steamAccount();
+  if (account == null) throw new Error("Sign in with Steam first.");
+  await setDoc(doc(cardColl, String(account)), { v: 1, account, hero, pos, uid: fantasyAuth.currentUser.uid, updatedAt: serverTimestamp() });
+}
+
 // Review-form draft → the stored document shape the rules validate.
 // Private = results only: heroes, players and stats are never sent anywhere.
 // seriesId: the PlayOn series an unticketed AD2L game fills (only that collection allows it).

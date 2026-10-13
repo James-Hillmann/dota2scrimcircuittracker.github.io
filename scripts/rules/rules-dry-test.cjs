@@ -36,6 +36,9 @@ const FAN_PATH = "/databases/(default)/documents/scrimLeague/data/fantasy/ad2l_2
 const STEAM = { uid: "steam:173365627", token: { steam: 173365627 } };
 const fantasy = (extra = {}) => ({ v: 1, league: "ad2l", week: "2026-10-12", account: 173365627, picks: [75379546, 192871338, 66653545, 349392031, 239724237], name: "Rules Test", uid: "steam:173365627", updatedAt: NOW, ...extra });
 const fanReq = (data, auth = STEAM, path = FAN_PATH) => ({ auth, method: "create", path, time: NOW, resource: { data } });
+const CARD_PATH = "/databases/(default)/documents/scrimLeague/data/cards/173365627";
+const card = (extra = {}) => ({ v: 1, account: 173365627, hero: 87, pos: 4, uid: "steam:173365627", updatedAt: NOW, ...extra });
+const cardReq = (data, auth = STEAM, path = CARD_PATH) => ({ auth, method: "create", path, time: NOW, resource: { data } });
 const FIX_ID = "AbCdEfGhIjKlMnOpQrSt";
 const FIX_PATH = `/databases/(default)/documents/scrimLeague/data/scrim_fixtures/${FIX_ID}`;
 const fixture = (extra = {}) => ({ v: 1, team_a: "Rules Test A", team_b: "Rules Test B", start: "2026-09-26T02:00:00Z", best_of: 2, uid: "u1", createdAt: NOW, ...extra });
@@ -200,6 +203,15 @@ const cases = [
   ["fantasy: unknown league", fanReq(fantasy({ league: "scrim" }), STEAM, FAN_PATH.replace("ad2l", "scrim")), "DENY"],
   ["fantasy: stale updatedAt", fanReq(fantasy({ updatedAt: "2026-01-01T00:00:00Z" })), "DENY"],
   ["fantasy: extra field", fanReq(fantasy({ score: 999 })), "DENY"],
+  ["card: own, valid", cardReq(card()), "ALLOW"],
+  ["card: back to auto (nulls)", cardReq(card({ hero: null, pos: null })), "ALLOW"],
+  ["card: someone else's card", cardReq(card({ account: 1 }), STEAM, CARD_PATH.replace("173365627", "1")), "DENY"],
+  ["card: id not the signed-in account", cardReq(card(), STEAM, CARD_PATH.replace("173365627", "1")), "DENY"],
+  ["card: anonymous sign-in", cardReq(card({ uid: "u1" }), { uid: "u1" }), "DENY"],
+  ["card: pos 6", cardReq(card({ pos: 6 })), "DENY"],
+  ["card: hero as a name", cardReq(card({ hero: "Disruptor" })), "DENY"],
+  ["card: stale updatedAt", cardReq(card({ updatedAt: "2026-01-01T00:00:00Z" })), "DENY"],
+  ["card: extra field", cardReq(card({ tier: "S" })), "DENY"],
   ["bracket: extra field", brReq(bracket({ admin: true })), "DENY"],
   ["bracket: empty name", brReq(bracket({ name: "" })), "DENY"],
   ["prediction: id for another uid", { ...predReq(pred()), path: PRED_PATH.replace("_u1", "_u2") }, "DENY"],

@@ -38,7 +38,7 @@ const METRIC_FMT = {
   gpm: (v) => `${Math.round(v)}`, xpm: (v) => `${Math.round(v)}`, nw: kNum,
   lane: (v) => `${Math.round(v)}%`,
   stuns: (v) => `${v.toFixed(1)}s/m`, // seconds per minute
-  vision: (v) => `${v.toFixed(1)}% of map`, vispct: (v) => `${v.toFixed(1)}% of map`,
+  vision: (v) => `${v.toFixed(1)}% of map`, vispct: (v) => `${v.toFixed(2)}% of map`,
   dewards: (v) => `${v.toFixed(1)}/10m`, uptime: (v) => `${Math.round(v)} s/min`, stacks: (v) => `${v.toFixed(1)} a game`, deaths: (v) => `${v.toFixed(1)}/10m`,
   heal: (v) => `${Math.round(v)}/min`,
   lanewin: (v) => `${v >= 0 ? "+" : "−"}${kNum(Math.abs(v))}`,
