@@ -20,7 +20,9 @@ test("asAd2l finds both division teams and each player's account", () => {
   assert.equal(g.team_a_id, real.team_a_id);
   assert.equal(g.team_b_id, real.team_b_id);
   assert.equal(g.team_a, real.team_a);
-  const matched = g.players.filter((p, i) => String(p.account_id) === String(real.players[i].account_id));
+  // player_key, not account_id: a player on a second account (Laxus^) is credited to his
+  // roster account by the sync, and a screenshot can't tell which account was used.
+  const matched = g.players.filter((p, i) => p.player_key === real.players[i].player_key);
   assert.equal(matched.length, 10);
   assert.deepEqual(g.players.map((p) => !!p.standin), real.players.map((p) => !!p.standin));
 });

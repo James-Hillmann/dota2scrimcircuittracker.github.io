@@ -19,7 +19,7 @@ function board(bands, chip, open, isOpen) {
     const all = open.has(tier), cut = all ? items : items.filter((x, i) => i < SHOWN || isOpen(x)), more = items.length - cut.length;
     return `<div class="tier-band t-${tier}">
       <div class="tier-letter">${tier}</div>
-      <div class="tier-chips">${cut.length ? cut.map(chip).join("") : `<div class="tier-empty">—</div>`}
+      <div class="tier-chips">${cut.length ? cut.map(chip).join("") : `<div class="tier-empty">No heroes in ${tier} yet</div>`}
         ${more > 0 ? `<button type="button" class="hchip-more" data-tier="${tier}">+${more} more</button>` : all && items.length > SHOWN ? `<button type="button" class="hchip-more" data-tier="${tier}">Show fewer</button>` : ""}</div>
     </div>`;
   }).join("")}</div>`;

@@ -18,6 +18,7 @@ import { statRows, heroRanks, statRanksHtml, heroRanksHtml, pubSection, pubPrepH
 import { tierRef, tierBreakdown } from "../parts/tiers.js";
 import { compareHtml, wireCompare } from "../parts/compare.js";
 import { radarSvg, roleScores } from "../parts/radar.js";
+import { tagContext, gameTags, tagsHtml, tagCells } from "../lib/gametags.js";
 
 // ---------- Player page ----------
 
@@ -44,7 +45,7 @@ export async function renderPlayer(src, key) {
   let matches;
   try { matches = await src.load(); if (src.ad2l) await src.data(); } catch (e) { app.innerHTML = `${pageHead(src.kicker, "Player")}${errorBox(e)}`; return; }
   const h = playerHistory(matches, key);
-  const back = `<div class="kicker" style="margin-bottom:16px"><a href="${src.ad2l ? `${src.root}/players` : "#/players"}">← All players</a></div>`;
+  const back = `<div class="kicker" style="margin-bottom:16px"><a href="${src.root}/players">← All players</a></div>`;
   if (!h) { app.innerHTML = `${back}<div class="panel empty"><strong>No games found for this player</strong>Private scrims don't include players.</div>`; return; }
   const s = h.summary;
 
@@ -100,11 +101,14 @@ export async function renderPlayer(src, key) {
           ${bestCard("Best KDA", h.best.kda, `${h.best.kda.p.kills}/${h.best.kda.p.deaths}/${h.best.kda.p.assists}`, cards.length + 1)}
           ${bestCard("Top GPM", h.best.gpm, fmt(h.best.gpm.p.gpm), cards.length + 2)}
         </div>
-        <div id="stat-ranks-box" data-key="${esc(key)}">${statRanksHtml(src, key, rows, null)}</div>`],
+        <div id="stat-ranks-box" data-key="${esc(key)}">${statRanksHtml(src, key, rows, null)}</div>
+        <h2 id="game-analysis">Game analysis${info("game_analysis")}</h2>
+        <div id="game-box" data-key="${esc(key)}">${gameAnalysisHtml(src, "player", h.games, 0, gameRated)}</div>`],
       ["compare", compareHtml(key)],
       ["heroes", `<div id="hero-ranks-box" data-key="${esc(key)}">${heroRanksHtml(src, key, h, ratings, null)}</div>
         ${draftSlotHtml(draftSlotRecord(matches, byPlayer(key)), src, s.name, rateOf(h.games, gameRated))}
-        ${src.ad2l ? pubSection(src, key) + pubPrepHtml(src, key, h.games) + `<div id="alltime-box" data-key="${esc(key)}"></div>` : ""}`],
+        ${src.ad2l ? `<details class="how pubs-fold"><summary>Pubs and other leagues</summary>
+          ${pubSection(src, key)}${pubPrepHtml(src, key, h.games)}<div id="alltime-box" data-key="${esc(key)}"></div></details>` : ""}`],
       ["combat", combatTabHtml(src, matches, byPlayer(key), s.name)],
       ["lanes", lanesPageHtml(src, matches, byPlayer(key), laneCuts_, { name: s.name })],
       ["items", playerItemsHtml(src, matches, h.games)],
@@ -113,9 +117,7 @@ export async function renderPlayer(src, key) {
         ["deaths", "Deaths", "player_deaths", playerDeathsHtml(matches, byPlayer(key), { name: s.name })],
         ["towers", "Towers", "player_towers", towerSummaryHtml(matches, byPlayer(key), { name: s.name })],
       ])],
-      ["games", `<h2 id="game-analysis">Game analysis${info("game_analysis")}</h2>
-        <div id="game-box" data-key="${esc(key)}">${gameAnalysisHtml(src, "player", h.games, 0, gameRated)}</div>
-        <h2>Every game</h2>
+      ["games", `<h2>Every game</h2><p class="table-note">Analyze opens a game in depth on the Stats tab.</p>
         <div id="t"></div>
 `],
   ]));
@@ -124,7 +126,7 @@ export async function renderPlayer(src, key) {
   // tabs on a single row (the tabs wrap under it on narrow screens).
   app.innerHTML = `
     <header class="page-head pp-head reveal">
-      <div class="kicker" style="--i:0">${crumbs(src, ["Players", src.ad2l ? `${src.root}/players` : "#/players"], s.name)}</div>
+      <div class="kicker" style="--i:0">${crumbs(src, ["Players", `${src.root}/players`], s.name)}</div>
       <div class="pp-row" style="--i:1">
         <h1><span class="h1-name">${esc(s.name)}</span>${tierOf ? `<button type="button" class="tier-badge t-${tierOf.tier}" id="tier-open" aria-haspopup="dialog"
           aria-label="${tierOf.tier} tier, rating ${tierOf.rating}. Open the breakdown" title="${tierOf.tier} tier · ${tierOf.rating} rating · click for the breakdown">
@@ -138,7 +140,7 @@ export async function renderPlayer(src, key) {
       <div class="tm-head">
         <span class="tier-detail-letter">${tierOf.tier}</span>
         <div class="tm-title"><h3 id="tier-modal-title">${esc(s.name)} · tier rating${info("tier")}</h3>
-          <small>${tierOf.role === "core" ? "Core" : "Support"} · ${tierOf.games} games · ${tierOf.wins}–${tierOf.games - tierOf.wins} · <a href="${src.ad2l ? `${src.root}/players` : "#/players"}">full method on the Players page</a></small></div>
+          <small>${tierOf.role === "core" ? "Core" : "Support"} · ${tierOf.games} games · ${tierOf.wins}–${tierOf.games - tierOf.wins} · <a href="${src.root}/players">full method on the Players page</a></small></div>
         <button type="button" class="tm-close" aria-label="Close">×</button>
       </div>
       <div class="tm-body">${tierBreakdown(src, tierOf)}</div>
@@ -175,6 +177,7 @@ export async function renderPlayer(src, key) {
     ["date", "Date", (v, r) => `${when(new Date(v))} <button type="button" class="ga-go" data-analyze="${r.gi}" title="Analyze this game">Analyze</button>`, "l"],
     ["hero", "Hero", (v) => `<span class="hero-cell">${portrait(v)}${heroLink(src, v)}</span>`, "l"],
     ["won", "Result", (v) => `<span class="res ${v ? "w" : "l"}">${v ? "Win" : "Loss"}</span>`],
+    ["tags", "Tags", (v, r) => tagsHtml(r.tag_list), "l"],
     ["vs", "Opponent", (v, r) => teamLink(src, v, r.vs_id), "l"],
     ["kills", "K"], ["deaths", "D"], ["assists", "A"],
     ["net_worth", "Net worth", fmt, "", "gold"], ["gpm", "GPM"], ["xpm", "XPM"],
@@ -183,6 +186,7 @@ export async function renderPlayer(src, key) {
     ...(s.map_games ? [["obs", "Obs"], ["sen", "Sentries"], ["dewards", "Dewards"], ["stacks", "Stacks"]] : []),
     ["link", "", (v) => `<a href="${v}" title="Open game">→</a>`],
   ], h.games.map((g, gi) => ({
+    ...tagCells(gameTags(g.m, tagContext(matches), g.p.team)),
     gi, obs: g.p.obs_placed ?? null, sen: g.p.sen_placed ?? null, stacks: g.p.camps_stacked ?? null, fb: fbRole(g.m, g.p),
     dewards: g.p.obs_killed == null ? null : g.p.obs_killed + g.p.sen_killed,
     date: g.m.createdAt ? +g.m.createdAt : 0, hero: g.p.hero, won: g.won ? 1 : 0, vs: vsOf(g).name, vs_id: vsOf(g).id ?? null,

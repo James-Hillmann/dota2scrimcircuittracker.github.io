@@ -390,7 +390,7 @@ async function saveDraft() {
     }
     const res = await submitMatch(upload.check.match, { isPrivate: ad2l ? false : upload.isPrivate, league: upload.league, seriesId: upload.seriesId });
     if (res.duplicateOf) {
-      upload.message = { kind: "warn", text: "This game is already in the league.", link: ad2l ? `${SOURCES[upload.league].root}/game/${res.duplicateOf}` : `#/match/${res.duplicateOf}` };
+      upload.message = { kind: "warn", text: "This game is already in the league.", link: ad2l ? `${SOURCES[upload.league].root}/game/${res.duplicateOf}` : `#/scrims/match/${res.duplicateOf}` };
       renderUpload();
       return;
     }
@@ -400,7 +400,7 @@ async function saveDraft() {
     if (upload.quick) upload.isPrivate = false;
     Object.assign(upload, { images: [], draft: null, check: null, notes: [], names: [], standins: new Set(), message: null, seriesId: null, quick: false });
     if (ad2l) { const root = SOURCES[upload.league].root; await divUploaded(upload.league, true); location.hash = `${root}/game/${res.id}`; }
-    else { await allMatches(true); location.hash = fromFixture ? "#/predict" : `#/match/${res.id}`; }
+    else { await allMatches(true); location.hash = fromFixture ? "#/scrims/predict" : `#/scrims/match/${res.id}`; }
   } catch (e) {
     upload.message = { kind: "err", text: `Couldn't save: ${e.message}` };
     renderUpload();
@@ -420,7 +420,7 @@ export function endEdit() {
   if (upload.editing) Object.assign(upload, { editing: null, draft: null, check: null, isPrivate: false, quick: false, seriesId: null, message: null });
 }
 export async function renderEdit(id, league) {
-  const back = isDiv(league) ? `${SOURCES[league].root}/game/${id}` : `#/match/${id}`;
+  const back = isDiv(league) ? `${SOURCES[league].root}/game/${id}` : `#/scrims/match/${id}`;
   app.innerHTML = `<div class="panel empty">Loading…</div>`;
   let m;
   try { m = await getMatch(id, league); } catch (e) { app.innerHTML = errorBox(e); return; }

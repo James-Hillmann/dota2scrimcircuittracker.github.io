@@ -5,10 +5,11 @@ import { info } from "../lib/glossary.js";
 import { clock } from "../lib/items.js";
 import { laneCuts, laneBoard, LANE_GROUPS, playerLane, isJungler } from "../lib/lanes.js";
 import { hasCombat, bestStreakOf, streakName, pausesOf } from "../lib/combat.js";
-import { gameMvp, esc, playerLink, fmt, heroLink, signedK, teamLink, dur, portrait, draftStrip, app, pageHead, shortDate, when, kg } from "../core.js";
+import { gameMvp, esc, playerLink, fmt, heroLink, signedK, teamLink, dur, portrait, draftStrip, app, pageHead, shortDate, when, kg, subtabsMoved, sideBar } from "../core.js";
 import { fbOf, hitText } from "../parts/combat.js";
 import { bestLaner, loading, errorBox, weekOfFn } from "../parts/lanes.js";
 import { upNextHtml } from "./standings.js";
+import { tagContext, gameTags, tagsHtml } from "../lib/gametags.js";
 
 function weekHighlights(games, src, league = games) {
   const all = games.flatMap((m) => m.players.map((p) => ({ p, m })));
@@ -39,13 +40,13 @@ function weekHighlights(games, src, league = games) {
   ];
 }
 
-function gamePanel(m, src, label, cuts = null) {
+function gamePanel(m, src, label, cuts = null, tagCtx = null) {
   if (m.private) {
     return `<article class="game-panel">
       <header class="gp-head">
         <span class="gp-label">${label}</span>
         <span class="gp-result"><b class="${m.winner === "a" ? "w" : ""}">${teamLink(src, m.team_a, m.team_a_id)}</b> <span class="gp-score">${m.score_a}–${m.score_b}</span> <b class="${m.winner === "b" ? "w" : ""}">${teamLink(src, m.team_b, m.team_b_id)}</b></span>
-        <span class="gp-meta">${dur(m.duration_sec)} · <span class="priv">Private</span> · result only</span>
+        <span class="gp-meta">${dur(m.duration_sec)} · <span class="priv">Private</span> · result only${tagsHtml(gameTags(m, tagCtx))}</span>
       </header>
     </article>`;
   }
@@ -67,7 +68,7 @@ function gamePanel(m, src, label, cuts = null) {
     <header class="gp-head">
       <span class="gp-label">${label}</span>
       <span class="gp-result"><b class="${m.winner === "a" ? "w" : ""}">${teamLink(src, m.team_a, m.team_a_id)}</b> <span class="gp-score">${m.score_a}–${m.score_b}</span> <b class="${m.winner === "b" ? "w" : ""}">${teamLink(src, m.team_b, m.team_b_id)}</b></span>
-      <span class="gp-meta">${dur(m.duration_sec)} · ${esc(m.winner === "a" ? m.team_a : m.team_b)} win${fbOf(m) ? ` · first blood ${clock(fbOf(m).t)} ${esc(m.players[fbOf(m).i].name)}` : ""} · <a href="${src.link(m)}">Full stats →</a></span>
+      <span class="gp-meta">${dur(m.duration_sec)} · ${esc(m.winner === "a" ? m.team_a : m.team_b)} win${fbOf(m) ? ` · first blood ${clock(fbOf(m).t)} ${esc(m.players[fbOf(m).i].name)}` : ""} · <a href="${src.link(m)}">Full stats →</a>${tagsHtml(gameTags(m, tagCtx))}</span>
     </header>
     ${draftStrip(m, src, "top")}
     <div class="lineups">
@@ -92,6 +93,7 @@ export async function renderWeek(src, back = 0) {
   const nextBlock = next ? `<h2 id="up-next">Up next</h2>${next}` : "";
   const weekOf = weekOfFn(ad2l);
   const cuts = src.ad2l ? laneCuts(games.filter(hasDetails)) : null;
+  const tagCtx = tagContext(games);
   const weeks = [...new Set(games.map(weekOf))].sort((a, b) => b - a);
   if (!weeks.length) {
     app.innerHTML = `${pageHead(src.kicker, "Content")}${nextBlock}<div class="panel empty"><strong>No games yet</strong>${src.empty}</div>`;
@@ -101,17 +103,17 @@ export async function renderWeek(src, back = 0) {
   const start = new Date(weeks[back]);
   const end = new Date(start); end.setDate(end.getDate() + 6);
   const inWeek = games.filter((m) => weekOf(m) === weeks[back]).sort((a, b) => a.createdAt - b.createdAt);
-  const base = src.ad2l ? `${src.root}/week` : "#/week";
+  const base = `${src.root}/content`;
   const navBtn = (to, label, on) => on ? `<a class="week-btn" href="${base}/${to}">${label}</a>` : `<span class="week-btn off">${label}</span>`;
-  // Every week with games, oldest first. Numbered from the first week, so a week with no
-  // games shows up as a skipped number.
+  // Every week with games, newest first (the latest on the left, week 1 at the end). Numbered
+  // from the first week, so a week with no games shows up as a skipped number.
   const WEEK_MS = 7 * 864e5;
   const first = weeks[weeks.length - 1];
   const counts = new Map();
   for (const m of games) { const w = weekOf(m); counts.set(w, (counts.get(w) ?? 0) + 1); }
   const picker = `<nav class="week-pick" aria-label="Weeks">
     <div class="week-pick-label">Week</div>
-    <div class="week-chips">${weeks.map((w, i) => ({ w, i })).reverse().map(({ w, i }) => {
+    <div class="week-chips">${weeks.map((w, i) => {
       const n = Math.round((w - first) / WEEK_MS) + 1, c = counts.get(w);
       return `<a class="week-chip${i === back ? " on" : ""}" href="${base}/${i}" ${i === back ? 'aria-current="page"' : ""}
         title="Week of ${shortDate(new Date(w))} · ${c} game${c === 1 ? "" : "s"}">
@@ -126,25 +128,29 @@ export async function renderWeek(src, back = 0) {
     const bySeries = new Map();
     for (const m of inWeek) (bySeries.get(m.series_id) ?? bySeries.set(m.series_id, []).get(m.series_id)).push(m);
     const tname = Object.fromEntries(ad2l.teams.map((t) => [t.id, t.name]));
+    // All divisions: each series chip wears its division's menu colour, named in the sub line.
+    const tteam = src.all ? new Map(ad2l.teams.map((t) => [t.id, t])) : null;
     items = [...bySeries.entries()].map(([sid, gs]) => {
       const s = ad2l.series.find((x) => x.id === sid);
       const head = s
         ? `<span>${teamLink(src, tname[s.home], s.home)}</span> <span class="series-score">${s.home_score ?? "?"}–${s.away_score ?? "?"}</span> <span>${teamLink(src, tname[s.away], s.away)}</span>`
         : `${esc(gs[0].team_a)} vs ${esc(gs[0].team_b)}`;
       const [sa, sb] = s ? [s.home_score, s.away_score] : [null, null];
+      const home = tteam?.get(s?.home ?? gs[0].team_a_id);
       return {
+        lg: home?.league ?? null,
         a: s ? tname[s.home] ?? gs[0].team_a : gs[0].team_a, b: s ? tname[s.away] ?? gs[0].team_b : gs[0].team_b, sa, sb,
         win: sa == null || sb == null || sa === sb ? null : sa > sb ? "a" : "b",
-        sub: `${gs.length} game${gs.length === 1 ? "" : "s"}`,
-        html: `<h2 class="series-head">${head}</h2>${gs.map((m, j) => gamePanel(m, src, `Game ${j + 1}`, cuts)).join("")}`,
+        sub: `${home ? `${esc(home.division)} · ` : ""}${gs.length} game${gs.length === 1 ? "" : "s"}`,
+        html: `<h2 class="series-head">${head}</h2>${gs.map((m, j) => gamePanel(m, src, `Game ${j + 1}`, cuts, tagCtx)).join("")}`,
       };
     });
   } else {
-    items = inWeek.map((m) => ({ a: m.team_a, b: m.team_b, sa: m.score_a, sb: m.score_b, win: m.winner, sub: when(m.createdAt), html: gamePanel(m, src, when(m.createdAt), cuts) }));
+    items = inWeek.map((m) => ({ a: m.team_a, b: m.team_b, sa: m.score_a, sb: m.score_b, win: m.winner, sub: when(m.createdAt), html: gamePanel(m, src, when(m.createdAt), cuts, tagCtx) }));
   }
   const noun = src.ad2l ? "series" : "game";
   const tabs = items.map((it, i) => `<button type="button" role="tab" id="sp-tab-${i}" aria-controls="sp-panel-${i}"
-      aria-selected="${i === 0}" tabindex="${i === 0 ? 0 : -1}" style="--i:${Math.min(i, 12)}">
+      aria-selected="${i === 0}" tabindex="${i === 0 ? 0 : -1}" style="--i:${Math.min(i, 12)}"${it.lg ? ` data-lg="${it.lg}"` : ""}>
       <span class="sp-team${it.win === "a" ? " w" : ""}" title="${esc(it.a)}">${esc(it.a)}</span><span class="sp-score${it.win === "a" ? " w" : ""}">${it.sa ?? "?"}</span>
       <span class="sp-team${it.win === "b" ? " w" : ""}" title="${esc(it.b)}">${esc(it.b)}</span><span class="sp-score${it.win === "b" ? " w" : ""}">${it.sb ?? "?"}</span>
       <span class="sp-sub">${it.sub}</span>
@@ -208,13 +214,14 @@ export async function renderWeek(src, back = 0) {
       ${pageHead(src.kicker, "Content", `Week of ${shortDate(start)} – ${shortDate(end)} · ${inWeek.length} game${inWeek.length === 1 ? "" : "s"}${src.ad2l ? " · drafts in pick/ban order" : ""}`)}
       ${picker}
     </div>
-    <div class="week-nav">${navBtn(back + 1, "← Earlier week", back < weeks.length - 1)}${navBtn(back - 1, "Later week →", back > 0)}</div>
+    <div class="week-nav">${navBtn(back - 1, "← Later week", back > 0)}${navBtn(back + 1, "Earlier week →", back < weeks.length - 1)}</div>
     <h2>${src.ad2l ? "Series" : "Games"} <span class="h-note">${items.length} this week · pick one</span></h2>
     ${body}
     ${back === 0 ? nextBlock : ""}
     ${hl.length ? `<h2>Highlights</h2>
     <div class="cards reveal">${hl.map(([k, v, s, hero, tip], i) => `<div class="card hl" style="--i:${i}">${hero ? portrait(hero, "card-hero") : ""}<div class="k">${k}${info(tip)}</div><div class="v">${v}</div><div class="s">${s}</div></div>`).join("")}</div>` : ""}`;
   wireSeriesTabs();
+  if (subtabsMoved()) sideBar([{ label: "Weeks", el: app.querySelector(".week-pick") }], () => `Week ${app.querySelector(".week-chip.on .wn")?.textContent ?? ""}`);
 }
 
 // Weekly page: one series panel at a time. Arrow keys move between tabs; the "Next series"

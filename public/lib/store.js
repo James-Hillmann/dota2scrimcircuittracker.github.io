@@ -3,7 +3,7 @@
 // anonymously; reading needs no sign-in. The anonymous session persists in this browser,
 // which is what lets an uploader delete their own scrim later.
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
-import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+import { getAuth, signInAnonymously, signInWithCustomToken, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 import {
   getFirestore, collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, query, where, orderBy, limit, serverTimestamp, Timestamp, writeBatch,
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
@@ -29,6 +29,40 @@ const authReady = new Promise((resolve) => { const off = onAuthStateChanged(auth
 export async function currentUid() {
   await authReady;
   return auth.currentUser?.uid ?? null;
+}
+
+// Fantasy sign-in with Steam (workers/steam-auth): a second Firebase app with its own session,
+// so signing in leaves the anonymous one above (which owns this browser's uploads) alone.
+// The Worker sends the visitor back with #fantasy-token=<custom token> (app.js picks it up).
+const fantasyApp = initializeApp(FIREBASE_CONFIG, "fantasy");
+const fantasyAuth = getAuth(fantasyApp);
+const fantasyReady = new Promise((resolve) => { const off = onAuthStateChanged(fantasyAuth, () => { off(); resolve(); }); });
+export const steamLoginUrl = (ret = location.href) => `https://steam-auth.ad2lstats.workers.dev/login?return=${encodeURIComponent(ret)}`;
+const steamOf = async (user) => (user ? (await user.getIdTokenResult()).claims.steam ?? null : null);
+// The signed-in Dota account id (a number), or null.
+export async function steamAccount() {
+  await fantasyReady;
+  return steamOf(fantasyAuth.currentUser);
+}
+export async function steamSignIn(token) {
+  return steamOf((await signInWithCustomToken(fantasyAuth, token)).user);
+}
+export const steamSignOut = () => signOut(fantasyAuth);
+
+// Fantasy entries (lib/fantasy.js): one per person per league per week, id
+// "<league>_<week>_<account>", written through the Steam session so the rules can tie it to the
+// account. updatedAt is the server's clock; scoring ignores entries saved after the week's lock.
+const fantasyColl = collection(getFirestore(fantasyApp), "scrimLeague", "data", "fantasy");
+export async function listFantasy(league) {
+  const snap = await getDocs(query(collection(db, "scrimLeague", "data", "fantasy"), where("league", "==", league), limit(5000)));
+  return snap.docs.map((d) => ({ id: d.id, ...d.data(), updatedAt: d.data().updatedAt?.toDate?.() ?? null }));
+}
+export async function saveFantasy(league, week, picks, name) {
+  const account = await steamAccount();
+  if (account == null) throw new Error("Sign in with Steam first.");
+  await setDoc(doc(fantasyColl, `${league}_${week}_${account}`), {
+    v: 1, league, week, account, picks, name: name.trim().slice(0, 24), uid: fantasyAuth.currentUser.uid, updatedAt: serverTimestamp(),
+  });
 }
 
 // Review-form draft → the stored document shape the rules validate.

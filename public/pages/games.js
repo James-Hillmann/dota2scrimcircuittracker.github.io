@@ -1,5 +1,5 @@
 // Scrim standings (the ledger) and the game page.
-import { withDerived, hasDetails, playerKey, hasMapStats } from "../lib/stats.js";
+import { withDerived, hasDetails, playerKey } from "../lib/stats.js";
 import { gameRatings, tierList, rankLabel, METRICS, SURVIVAL } from "../lib/tiers.js";
 import { heroImg } from "../lib/hero-meta.js";
 import { standingsRows } from "../lib/teams.js";
@@ -18,6 +18,7 @@ import { info } from "../lib/glossary.js";
 import { SEASON } from "../lib/divisions.js";
 import { clock } from "../lib/items.js";
 import { firstBloodOf } from "../lib/combat.js";
+import { tagContext, gameTags, tagsHtml } from "../lib/gametags.js";
 import { wireStreakCharts, buildOrderHtml } from "../lib/combat-charts.js";
 import { app, pageHead, teamLink, dur, when, sortableTable, pct, scrimNames, divData, editUnlocked, missingGames, seriesOptions, unlockEdit, divUploaded, lockEdit, allMatches, esc, crumbs, floorOf, gameMvp, shortDate, portrait, playerLink, kg, fmt, heroLink, mapCard, playerTabs, draftStrip, wirePlayerTabs, wireMapCards } from "../core.js";
 import { gameCombatHtml, detailsFor } from "../parts/combat.js";
@@ -26,33 +27,38 @@ import { gameItemsHtml } from "../parts/items.js";
 import { loading, errorBox, laneCutsOf, gameLanesHtml } from "../parts/lanes.js";
 import { tierRef } from "../parts/tiers.js";
 import { route } from "../app.js";
+import { pageTabs, SCRIM_TEAMS_TABS } from "../lib/pagetabs.js";
+import { teamGridHtml } from "./teams.js";
 
 // ---------- Matches ----------
 
+// The scrims' Teams page (#/scrims/), like a division's: Table (standings built from the
+// games, since scrims have no official table) | Matches | Teams (the team cards).
 export async function renderMatches(src) {
-  // Scrims have no official table, so the matches page leads with standings built from the games.
-  const title = src.ad2l ? "Games" : "Standings";
+  const title = "Teams";
   app.innerHTML = loading(src.kicker, title);
   let data;
   try { data = await src.load(); } catch (e) { app.innerHTML = `${pageHead(src.kicker, title)}${errorBox(e)}`; return; }
-  const unt = data.filter((m) => m.unticketed).length;
-  const count = `${data.length} ${data.length === 1 ? "game" : "games"} on record${src.ad2l ? ` · ${data.length - unt} ticketed (from replays)${unt ? `, ${unt} unticketed (uploaded)` : ""} · <a href="${src.root}/upload">Upload an unticketed game</a>` : ""}`;
-  app.innerHTML = `
-    ${pageHead(src.kicker, title, data.length ? count : "")}
-    ${src.key === "scrim" && data.length ? `<div id="standings" class="reveal"></div>
-      <p class="table-note">Ranked by game wins, then fewest losses. Private scrims count. <b>Kill ±</b> = average kill score
-        difference per game. <b>Form</b> = last five games, oldest first.</p>
-      <h2>Matches</h2>` : ""}
-    ${data.length ? `<div class="fixtures reveal">${data.map((m, i) => `
+  const count = `${data.length} ${data.length === 1 ? "game" : "games"} on record`;
+  const fixtures = data.length ? `<div class="fixtures reveal">${data.map((m, i) => `
       <a class="fixture win-${m.winner}" href="${src.link(m)}" style="--i:${Math.min(i, 12)}">
         <div class="fx-team a ${m.winner === "a" ? "" : "lost"}">${teamLink(src, m.team_a, m.team_a_id, true)}${m.winner === "a" ? "<small>Victory</small>" : ""}</div>
         <div class="fx-score">
           <div class="n">${m.score_a}<i>/</i>${m.score_b}</div>
-          <div class="meta">${dur(m.duration_sec)} · ${when(m.createdAt)}${m.private ? ' · <span class="priv">Private</span>' : ""}${m.unticketed ? ' · <span class="priv">Unticketed</span>' : ""}</div>
+          <div class="meta">${dur(m.duration_sec)} · ${when(m.createdAt)}${m.private ? ' · <span class="priv">Private</span>' : ""}${m.unticketed ? ' · <span class="priv">Unticketed</span>' : ""}${tagsHtml(gameTags(m, tagContext(data)))}</div>
         </div>
         <div class="fx-team b ${m.winner === "b" ? "" : "lost"}">${teamLink(src, m.team_b, m.team_b_id, true)}${m.winner === "b" ? "<small>Victory</small>" : ""}</div>
       </a>`).join("")}</div>`
-    : `<div class="panel empty"><strong>No games yet</strong>${src.empty}</div>`}`;
+    : `<div class="panel empty"><strong>No games yet</strong>${src.empty}</div>`;
+  const tabs = playerTabs(pageTabs(SCRIM_TEAMS_TABS, src, [
+    ["table", data.length ? `<div id="standings" class="reveal"></div>
+      <p class="table-note">Ranked by game wins, then fewest losses. Private scrims count. <b>Kill ±</b> = average kill score
+        difference per game. <b>Form</b> = last five games, oldest first.</p>` : `<div class="panel empty"><strong>No games yet</strong>${src.empty}</div>`],
+    ["matches", { label: data.length ? `Matches · ${data.length}` : "Matches", html: fixtures }],
+    ["teams", data.length ? teamGridHtml(src, data, null) : ""],
+  ]), { store: "standingsTab", label: "Teams sections", remember: false });
+  app.innerHTML = `${pageHead(src.kicker, title, data.length ? count : "", tabs.bar)}${tabs.panels}`;
+  wirePlayerTabs();
   const el = document.getElementById("standings");
   if (!el) return;
   const signed = (x) => (x == null ? "—" : `${x > 0 ? "+" : x < 0 ? "−" : ""}${Math.abs(x).toFixed(1)}`);
@@ -120,7 +126,7 @@ export async function renderMatch(id, src) {
       };
     }
     const ed = document.getElementById("edit");
-    if (ed) ed.onclick = () => { location.hash = m.unticketed ? `${src.root}/edit/${m.id}` : `#/edit/${m.id}`; };
+    if (ed) ed.onclick = () => { location.hash = `${src.root}/edit/${m.id}`; };
     const lock = document.getElementById("edit-lock");
     if (lock) lock.onclick = (e) => { e.preventDefault(); lockEdit(); route(); };
     const b = document.getElementById("del");
@@ -132,7 +138,7 @@ export async function renderMatch(id, src) {
       try {
         await deleteMatch(m.id, m.unticketed ? src.key : "scrim");
         if (m.unticketed) { await divUploaded(src.key, true); location.hash = src.base; }
-        else { await allMatches(true); location.hash = "#/scrims"; }
+        else { await allMatches(true); location.hash = "#/scrims/"; }
       } catch (e) {
         b.disabled = false;
         b.textContent = `Delete this ${noun}`;
@@ -148,6 +154,7 @@ export async function renderMatch(id, src) {
       <div class="n">${t === "a" ? m.score_a : m.score_b}</div></div>`;
     app.innerHTML = `
       <div class="kicker" style="margin-bottom:16px">${crumbs(src, ["Standings", src.base], `${m.team_a} vs ${m.team_b}`)}</div>
+      <h1 class="sr-only">${esc(m.team_a)} vs ${esc(m.team_b)}</h1>
       <section class="banner">${side("a")}${side("b")}
         <div class="banner-meta">${esc(m.game_mode || "Match")} · <b>${dur(m.duration_sec)}</b></div></section>
       <div class="panel empty"><strong>Private scrim</strong>Only the result was posted: no heroes, players or stats.<br>
@@ -326,7 +333,7 @@ export async function renderMatch(id, src) {
       <ol class="gm-ratings reveal">${rated.map(line).join("")}</ol>`;
   }
 
-  // Hero chart, under the draft: the gold lead with items and teamfights, or toggle to every
+  // Graphs tab (second, after Scoreboard): the gold lead with items and teamfights, or toggle to every
   // player's net worth or gold earned (net worth by default; games synced before networth_t
   // was kept only have gold earned). Both choices are remembered.
   let heroHtml = "", worthChart = null;
@@ -353,8 +360,9 @@ export async function renderMatch(id, src) {
       <div class="gm-worth">${worthChart(series)}</div>`;
     // Layers on the items & fights chart (items, hero deaths, Roshan/Tormentor, towers),
     // each a checkbox; what's hidden is remembered.
-    let show = {};
-    try { show = JSON.parse(localStorage.getItem("gameLayers") ?? "{}") ?? {}; } catch {}
+    // First visit: items, fights, Roshan/Tormentor and first blood; the busier layers wait for a tick.
+    let show = { xp: false, deaths: false, towers: false, buybacks: false };
+    try { show = { ...show, ...(JSON.parse(localStorage.getItem("gameLayers") ?? "{}") ?? {}) }; } catch {}
     // About 1.2 screen pixels per chart unit, so the icons don't blow up on a wide screen.
     const chartWidth = () => Math.min(1800, (app.clientWidth - 30) / 1.2);
     const fightsChart = (layers) => itemLeadHtml(m, { id: `item-lead-${m.id}`, show: layers, width: chartWidth() });
@@ -401,29 +409,31 @@ export async function renderMatch(id, src) {
        <a href="https://www.dotabuff.com/matches/${m.match_id}" target="_blank" rel="noopener">Dotabuff</a>`
     : `Uploaded ${when(m.createdAt)}. Wrong? ${mine ? "You can edit or delete it below." : "Anyone with the league password can edit or remove it below."}`;
 
+  const lanesHtml = gameLanesHtml(m, src, laneCuts_);
   const tabs = playerTabs([
     ["board", "Scoreboard", scoreHtml],
+    ["graphs", "Graphs", heroHtml],
     // The draft model's read of this draft: filled when the tab first opens (parts/cmdraft.js).
     ["draft", "Draft", ad2l && !m.unticketed && m.draft?.some((s) => s.pick) && m.players?.length === 10 ? `<div id="cm-box" data-game="${esc(m.id)}"><div class="panel empty">Reading the draft…</div></div>` : ""],
     ["ratings", "Ratings", ratingsHtml],
-    ["lanes", "Laning", gameLanesHtml(m, src, laneCuts_) && `${fb ? `<p class="table-note keep wm-intro fb-note"><span class="fb-tag">FB</span> First blood at <b>${clock(fb.t)}</b>: ${playerLink(src, fbP)} (${esc(fbP.hero)})${fb.victim != null ? ` killed ${playerLink(src, m.players[fb.victim])} (${esc(m.players[fb.victim].hero)})` : ""}${fb.t < 0 ? ", before the horn" : ""}.</p>` : ""}${gameLanesHtml(m, src, laneCuts_)}`],
-    ["farm", "Farm &amp; vision", mapTableHtml(m, src) + replayTableHtml(m, src)],
-    ["combat", "Combat", gameCombatHtml(m, src)],
+    ["lanes", "Laning", (lanesHtml && `${fb ? `<p class="table-note keep wm-intro lane-fb-note"><span class="fb-tag">FB</span> First blood at <b>${clock(fb.t)}</b>: ${playerLink(src, fbP)} (${esc(fbP.hero)})${fb.victim != null ? ` killed ${playerLink(src, m.players[fb.victim])} (${esc(m.players[fb.victim].hero)})` : ""}${fb.t < 0 ? ", before the horn" : ""}.</p>` : ""}${lanesHtml}`) + laneEffTableHtml(m, src, !!lanesHtml)],
+    ["resources", "Resources", resourcesTableHtml(m, src)],
+    ["combat", "Combat", gameCombatHtml(m, src) + survivalTableHtml(m, src)],
     ["items", "Items", gameItemsHtml(m, src) && `${gameItemsHtml(m, src)}<div id="bo-box" data-game="${esc(m.id)}"></div>`],
-    ["map", "Map", mapHtml],
+    ["map", "Map", mapTableHtml(m, src) + mapHtml],
   ], { store: "gameTab", label: "Game sections" });
 
   app.innerHTML = `
-    <div class="kicker gm-back">${crumbs(src, ad2l ? ["Content", src.base] : ["Standings", src.base], `${m.team_a} vs ${m.team_b}`)}${ad2l && !m.unticketed ? `<span class="gm-ext"><a href="https://www.opendota.com/matches/${m.match_id}" target="_blank" rel="noopener">OpenDota</a><a href="https://www.dotabuff.com/matches/${m.match_id}" target="_blank" rel="noopener">Dotabuff</a></span>` : ""}</div>
+    <div class="kicker gm-back">${crumbs(src, ["Content", src.base], `${m.team_a} vs ${m.team_b}`)}${ad2l && !m.unticketed ? `<span class="gm-ext"><a href="https://www.opendota.com/matches/${m.match_id}" target="_blank" rel="noopener">OpenDota</a><a href="https://www.dotabuff.com/matches/${m.match_id}" target="_blank" rel="noopener">Dotabuff</a></span>` : ""}</div>
+    <h1 class="sr-only">${esc(m.team_a)} vs ${esc(m.team_b)}</h1>
     <section class="banner compact">
       ${plate("a")}${plate("b")}
-      <div class="banner-meta">${esc(m.game_mode || "Match")} · <b>${dur(m.duration_sec)}</b>${m.createdAt ? ` · ${shortDate(m.createdAt)}` : ""}</div>
+      <div class="banner-meta">${esc(m.game_mode || "Match")} · <b>${dur(m.duration_sec)}</b>${m.createdAt ? ` · ${shortDate(m.createdAt)}` : ""}${tagsHtml(gameTags(m, all.length ? tagContext(all) : null))}</div>
     </section>
     ${seriesHtml}
     ${CASTS_BOX}
     ${factsHtml}
     ${m.draft?.length ? `<div class="gm-draft"><h3 class="gm-h3">Draft</h3>${draftStrip(m, src)}</div>` : ""}
-    ${heroHtml}
     ${tabs.bar.replace('class="pp-tabs"', 'class="pp-tabs gm-tabs"')}
     ${tabs.panels}
     <p class="table-note">${footer}</p>${deleteBtn}`;
@@ -521,7 +531,7 @@ async function wireCasts(game, league) {
   box.innerHTML = `<span class="gm-series-k">Casts</span>
     ${list.map((c) => `<span class="gm-cast"><a href="${esc(c.url)}" target="_blank" rel="noopener nofollow ugc">
         <small>${esc(castSite(c.url))}</small>${esc(c.caster)}</a><button type="button" class="gm-cast-x" data-cast="${esc(c.id)}" data-mine="${c.uid === uid ? 1 : ""}" title="Remove this cast" aria-label="Remove ${esc(c.caster)}'s cast">×</button></span>`).join("")}
-    ${full ? "" : `<details class="gm-cast-add"${list.length ? "" : " open"}><summary>${list.length ? "Add a cast" : "No casts yet · add one"}</summary>
+    ${full ? "" : `<details class="gm-cast-add"><summary>${list.length ? "+ Add a cast" : "No casts yet · + add one"}</summary>
       <form class="row" id="cast-form">
         <input name="url" type="text" inputmode="url" placeholder="Link (YouTube, Twitch…)" maxlength="300" required autocomplete="off">
         <input name="caster" type="text" placeholder="Caster name(s)" maxlength="40" required value="${esc(name)}">
@@ -554,25 +564,6 @@ async function wireCasts(game, league) {
   }));
 }
 
-// Replay extras per player (parsed replays only): fighting, laning and survival numbers.
-function replayTableHtml(m, src) {
-  const cols = [["stuns", "Stuns", (v) => `${v.toFixed(1)}s`], ["dmg_taken", "Dmg taken", fmt], ["tower_damage", "Building dmg", fmt],
-    ["lane_eff", "Lane eff.", (v) => `${v}%`], ["xp10", "XP @10'", fmt], ["time_dead", "Time dead", dur, true], ["smoke_used", "Smokes"], ["dust_used", "Dust"]]
-    .filter(([k]) => m.players.every((p) => p[k] != null));
-  if (!cols.length) return "";
-  const best = Object.fromEntries(cols.map(([k, , , low]) => [k, (low ? Math.min : Math.max)(...m.players.map((p) => p[k]))]));
-  const row = (p) => `<tr class="team-${p.team}"><td class="l">${playerLink(src, p)}</td><td class="l">${heroLink(src, p.hero)}</td>
-    ${cols.map(([k, , f, low]) => `<td class="${p[k] === best[k] && (low || best[k] > 0) ? "best" : ""}">${(f ?? String)(p[k])}</td>`).join("")}</tr>`;
-  const head = `<th scope="col" class="l">Player</th><th scope="col" class="l">Hero</th>${cols.map(([k, l]) => `<th scope="col">${l}${info(k)}</th>`).join("")}`;
-  const side = (t) => `<tr class="sep ${t}"><td colspan="${cols.length + 2}">${t === "a" ? teamLink(src, m.team_a, m.team_a_id) : teamLink(src, m.team_b, m.team_b_id)}</td></tr>${t === "b" ? `<tr class="head-repeat">${head}</tr>` : ""}${m.players.filter((p) => p.team === t).map(row).join("")}`;
-  return `<h2>Fighting &amp; laning</h2>
-    <div class="table-wrap"><table>
-      <thead><tr>${head}</tr></thead>
-      <tbody>${side("a")}${side("b")}</tbody></table></div>
-`;
-}
-
-// Map play per player (parsed replays only): creeps, stacks, wards, dewards, objectives.
 // Game page: each team's observer vision at each minute, % of the map outside its own base
 // (worked out on the real map at sync time, scripts/sync/vision.js). "" for games without it.
 function visionChart(m) {
@@ -586,28 +577,44 @@ function visionChart(m) {
     caption: `Share of the map outside its own base that each team's observer wards showed, by minute. Trees, cliffs and high ground block sight. Game average: ${esc(m.team_a)} ${avg("a").toFixed(1)}%, ${esc(m.team_b)} ${avg("b").toFixed(1)}%. Hover for values.` });
 }
 
-function mapTableHtml(m, src) {
-  if (!m.players.every(hasMapStats)) return "";
-  const vision = m.players.every((p) => p.new_vision != null);
-  const cols = [["lane_kills", "Lane creeps"], ["neutral_kills", "Neutrals"], ["ancient_kills", "Ancients"], ["camps_stacked", "Stacks"],
-    ["obs_placed", "Obs"], ...(vision ? [["new_vision", "New vision"]] : []), ["sen_placed", "Sentries"], ["dewards", "Dewards"], ["roshan_kills", "Roshan"], ["tormentor_kills", "Tormentor"]];
-  const val = (p, k) => (k === "dewards" ? p.obs_killed + p.sen_killed : p[k]);
-  // New vision is a share of the map with decimals; the rest are counts.
-  const show = (k, v) => (k === "new_vision" ? `${v.toFixed(1)}%` : v);
-  const best = Object.fromEntries(cols.map(([k]) => [k, Math.max(...m.players.map((p) => val(p, k)))]));
+// Per-player replay numbers (parsed replays only), one table per tab: Resources (farm), Map
+// (vision and objectives), Combat (stuns, damage taken, time dead) and Laning (lane efficiency,
+// XP at 10'). cols: [key, label, format?, lower is better?]; a column shows when every player has
+// it. totals: a team total row under each side.
+const statOf = (p, k) => (k === "dewards" ? (p.obs_killed == null ? null : p.obs_killed + p.sen_killed) : p[k]);
+function playerStatTable(m, src, cols, { title, tip = null, totals = false, above = "" } = {}) {
+  cols = cols.filter(([k]) => m.players.every((p) => statOf(p, k) != null));
+  if (!cols.length) return "";
+  const show = (v, f) => (f ?? String)(v);
+  const best = Object.fromEntries(cols.map(([k, , , low]) => [k, (low ? Math.min : Math.max)(...m.players.map((p) => statOf(p, k)))]));
   const row = (p) => `<tr class="team-${p.team}"><td class="l">${playerLink(src, p)}</td><td class="l">${heroLink(src, p.hero)}</td>
-    ${cols.map(([k]) => `<td class="${val(p, k) === best[k] && best[k] > 0 ? "best" : ""}">${show(k, val(p, k))}</td>`).join("")}</tr>`;
-  const total = (t) => `<tr class="total team-${t}"><td class="l" colspan="2">Team total</td>${cols.map(([k]) => `<td>${show(k, m.players.filter((p) => p.team === t).reduce((s, p) => s + val(p, k), 0))}</td>`).join("")}</tr>`;
-  const objs = (m.objectives ?? []).filter((o) => o.type === "roshan" || o.type === "tormentor").sort((a, b) => a.time - b.time);
+    ${cols.map(([k, , f, low]) => `<td class="${statOf(p, k) === best[k] && (low || best[k] > 0) ? "best" : ""}">${show(statOf(p, k), f)}</td>`).join("")}</tr>`;
+  const total = (t) => (totals ? `<tr class="total team-${t}"><td class="l" colspan="2">Team total</td>${cols.map(([k, , f]) => `<td>${show(m.players.filter((p) => p.team === t).reduce((a, p) => a + statOf(p, k), 0), f)}</td>`).join("")}</tr>` : "");
   const head = `<th scope="col" class="l">Player</th><th scope="col" class="l">Hero</th>${cols.map(([k, l]) => `<th scope="col">${l}${info(k)}</th>`).join("")}`;
-  return `<h2>Map &amp; objectives${info("map_objectives")}</h2>
-    ${objs.length ? `<div class="obj-strip">${objs.map((o) => `<span class="obj-chip s-${o.side}"><b>${o.type === "roshan" ? "Roshan" : "Tormentor"}</b> ${clock(o.time)} · ${esc(o.side === "a" ? m.team_a : m.team_b)}</span>`).join("")}</div>` : ""}
+  const side = (t) => `<tr class="sep ${t}"><td colspan="${cols.length + 2}">${t === "a" ? teamLink(src, m.team_a, m.team_a_id) : teamLink(src, m.team_b, m.team_b_id)}</td></tr>${t === "b" ? `<tr class="head-repeat">${head}</tr>` : ""}${m.players.filter((p) => p.team === t).map(row).join("")}${total(t)}`;
+  return `<h2>${title}${tip ? info(tip) : ""}</h2>${above}
     <div class="table-wrap"><table>
       <thead><tr>${head}</tr></thead>
-      <tbody>
-        <tr class="sep a"><td colspan="${cols.length + 2}">${teamLink(src, m.team_a, m.team_a_id)}</td></tr>${m.players.filter((p) => p.team === "a").map(row).join("")}${total("a")}
-        <tr class="sep b"><td colspan="${cols.length + 2}">${teamLink(src, m.team_b, m.team_b_id)}</td></tr>
-        <tr class="head-repeat">${head}</tr>${m.players.filter((p) => p.team === "b").map(row).join("")}${total("b")}
-      </tbody></table></div>
+      <tbody>${side("a")}${side("b")}</tbody></table></div>
 `;
 }
+// Resources tab: farm (gold and XP sources to come).
+const resourcesTableHtml = (m, src) => playerStatTable(m, src,
+  [["lane_kills", "Lane creeps"], ["neutral_kills", "Neutrals"], ["ancient_kills", "Ancients"], ["camps_stacked", "Stacks"]],
+  { title: "Farm", totals: true });
+// Map tab, on top: vision, smokes, objectives and building damage, under the Roshan/Tormentor
+// timeline. New vision is a share of the map with decimals; the rest are counts.
+function mapTableHtml(m, src) {
+  const objs = (m.objectives ?? []).filter((o) => o.type === "roshan" || o.type === "tormentor").sort((a, b) => a.time - b.time);
+  return playerStatTable(m, src, [["obs_placed", "Obs"], ["new_vision", "New vision", (v) => `${v.toFixed(1)}%`], ["sen_placed", "Sentries"],
+    ["dewards", "Dewards"], ["smoke_used", "Smokes"], ["dust_used", "Dust"], ["roshan_kills", "Roshan"], ["tormentor_kills", "Tormentor"],
+    ["tower_damage", "Building dmg", fmt]], { title: "Vision &amp; objectives", tip: "map_objectives", totals: true,
+    above: objs.length ? `<div class="obj-strip">${objs.map((o) => `<span class="obj-chip s-${o.side}"><b>${o.type === "roshan" ? "Roshan" : "Tormentor"}</b> ${clock(o.time)} · ${esc(o.side === "a" ? m.team_a : m.team_b)}</span>`).join("")}</div>` : "" });
+}
+// Combat tab, at the bottom: control and survival.
+const survivalTableHtml = (m, src) => playerStatTable(m, src,
+  [["stuns", "Stuns", (v) => `${v.toFixed(1)}s`], ["dmg_taken", "Dmg taken", fmt], ["time_dead", "Time dead", dur, true]],
+  { title: "Stuns, damage taken, time dead" });
+// Laning tab, at the bottom. The lane table above already has lane efficiency when it shows.
+const laneEffTableHtml = (m, src, lanes) => playerStatTable(m, src, [...(lanes ? [] : [["lane_eff", "Lane eff.", (v) => `${v}%`]]), ["xp10", "XP @10'", fmt]],
+  { title: lanes ? "XP at 10 minutes" : "Lane efficiency" });

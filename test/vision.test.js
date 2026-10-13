@@ -103,6 +103,32 @@ test("a team's new vision adds up to its average coverage", () => {
   assert.ok(Math.abs(total - mean) < 0.05, `${total} vs ${mean}`);
 });
 
+test("ward_vision: ground a standing tower sees earns nothing; once it falls, it does", () => {
+  // Radiant's mid tier 1 moved onto the centre tile, the ward right on top of it. Day only (a
+  // 5-minute game), so the tower sees 1900, past the ward's 1600.
+  const map = { ...flatMap(), def: { towers: { a: { t1_mid: [0, 0] }, b: {} } } };
+  const d = match(300, { 0: [ward(128, 128, 0, null, 1)] });
+  const standing = visionFields(map, d, []);
+  assert.ok(standing.new_vision[0] > 0);
+  assert.equal(standing.ward_vision[0], 0);
+  // The tower falls at 1:00: the ward gets the last 4 minutes, as new vision counts it.
+  const fell = visionFields(map, d, [{ side: "a", b: "t1_mid", time: 60 }]);
+  assert.ok(Math.abs(fell.ward_vision[0] - standing.new_vision[0] * 0.8) < 0.02, `${fell.ward_vision[0]}`);
+  // An enemy tower doesn't take a team's ground.
+  const enemy = visionFields({ ...flatMap(), def: { towers: { a: {}, b: { t1_mid: [0, 0] } } } }, d, []);
+  assert.equal(enemy.ward_vision[0], enemy.new_vision[0]);
+  // Without building data there's no ward_vision.
+  assert.equal(visionFields(map, d).ward_vision[0], null);
+});
+
+test("ward_vision: at night a tier 1 sees 800, so the ward gets the ring beyond it", () => {
+  const map = { ...flatMap(), def: { towers: { a: { t1_mid: [0, 0] }, b: {} } } };
+  // Placed at 5:00 (night), up to 6:00.
+  const v = visionFields(map, match(360, { 0: [ward(128, 128, 300, null, 1)] }), []);
+  const ring = fov(map, MID).length - fov(map, MID, 800).length;
+  assert.equal(v.ward_vision[0], Math.round(((ring * 60) / 360 / map.area.a) * 100 * 100) / 100);
+});
+
 test("unparsed games (no ward logs) get nothing", () => {
   assert.equal(visionFields(flatMap(), { duration: 600, players: [{ player_slot: 0, isRadiant: true }] }), null);
   assert.equal(visionFields(null, match(600, {})), null);

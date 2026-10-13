@@ -122,9 +122,13 @@ function perGameOf(played, field) {
 export function playerLeaderboard(matches) {
   const rows = new Map();
   for (const m of matches) {
+    // Position: the replay's, else the net worth rank on a full team (as the tier list does).
+    const byNw = { a: [], b: [] };
+    for (const p of m.players) byNw[p.team]?.push(p);
+    for (const t of Object.values(byNw)) t.sort((x, y) => y.net_worth - x.net_worth);
     for (const p of m.players) {
       const key = playerKey(p);
-      const r = rows.get(key) ?? { key, account_id: p.account_id ?? null, name: p.name, teams: {}, games: 0, wins: 0, kills: 0, deaths: 0, assists: 0, gold: 0, xp: 0, minutes: 0, damage: 0, net_worth: 0, kp: [], heroes: new Set(), played: [] };
+      const r = rows.get(key) ?? { key, account_id: p.account_id ?? null, name: p.name, teams: {}, pos: {}, games: 0, wins: 0, kills: 0, deaths: 0, assists: 0, gold: 0, xp: 0, minutes: 0, damage: 0, net_worth: 0, kp: [], heroes: new Set(), played: [] };
       // Count roster games and stand-in games per team separately.
       if (p.team_name) {
         const t = (r.teams[p.team_name] ??= { roster: 0, standin: 0 });
@@ -139,6 +143,8 @@ export function playerLeaderboard(matches) {
       r.damage += p.hero_damage; r.net_worth += p.net_worth;
       if (teamScore) r.kp.push((p.kills + p.assists) / teamScore);
       r.heroes.add(p.hero);
+      const pos = p.position ?? (byNw[p.team]?.length === 5 ? byNw[p.team].indexOf(p) + 1 : null);
+      if (pos) r.pos[pos] = (r.pos[pos] ?? 0) + 1;
       r.played.push(p);
       rows.set(key, r);
     }
@@ -159,6 +165,8 @@ export function playerLeaderboard(matches) {
     name: r.name,
     ...teamOf(r),
     games: r.games,
+    // The position played most (ties: the lower number), null if none is known.
+    main_pos: Number(Object.entries(r.pos).sort((a, b) => b[1] - a[1] || a[0] - b[0])[0]?.[0]) || null,
     wins: r.wins,
     win_rate: r.wins / r.games,
     kills: r.kills, deaths: r.deaths, assists: r.assists, minutes: r.minutes,

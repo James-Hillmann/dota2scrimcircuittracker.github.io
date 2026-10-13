@@ -281,23 +281,40 @@ async function postWebhook(url, body, tries = 3) {
   if (!r.ok) throw new Error(`Discord webhook ${r.status}: ${clip(await r.text(), 300)}`);
   return r.json(); // ?wait=true: the message, whose id `done` uses to delete it
 }
-// The digest: every open ticket, three embeds a message (Discord caps a message at 10 embeds and
-// 6000 characters; ticket embeds are capped well under 2000).
-const digestBodies = (open) => {
-  const embeds = open.map((t) => ticketEmbed(t, false));
-  const out = [];
-  for (let i = 0; i < embeds.length; i += 3) out.push({
-    content: i ? "" : `Site feedback: **${open.length}** open ticket${open.length === 1 ? "" : "s"}\n${FOOTER("FB-XXXXXX")}`,
-    embeds: embeds.slice(i, i + 3), allowed_mentions: { parse: [] },
+// The digest: one line per open ticket, linking to its own post rather than repeating it, so a
+// ticket's text only ever appears once in the channel. Lines are packed under Discord's
+// 2000-character message cap.
+const digestBodies = (open, posts = {}, where = null) => {
+  const lines = open.map((t) => {
+    const msg = posts[t.id];
+    const link = msg && where ? ` · [see post](https://discord.com/channels/${where.guild}/${where.channel}/${msg})` : "";
+    return `• **${t.id}** from ${clip(esc(t.from ?? "anonymous"), 80)} · ${t.notes.length} note${t.notes.length === 1 ? "" : "s"} · sent ${pacific(t.sent)}${link}`;
   });
-  return out;
+  const out = [];
+  let content = `Site feedback: **${open.length}** open ticket${open.length === 1 ? "" : "s"}\n${FOOTER("FB-XXXXXX")}`;
+  for (const line of lines) {
+    if (content.length + line.length + 1 > 1900) { out.push(content); content = line; }
+    else content += `\n${line}`;
+  }
+  out.push(content);
+  return out.map((c) => ({ content: c, allowed_mentions: { parse: [] } }));
 };
+// The webhook's server and channel, for message links. GET on a webhook URL needs no other auth.
+async function webhookWhere(hook) {
+  try {
+    const r = await fetch(hook);
+    const w = r.ok ? await r.json() : null;
+    return w?.guild_id && w?.channel_id ? { guild: w.guild_id, channel: w.channel_id } : null;
+  } catch { return null; }
+}
 // Each digest replaces the last one, so closed tickets don't linger in old digests. Returns how
 // many tickets it lists.
 async function postDigest(hook, s, open) {
   for (const id of s.digestPosts) await deleteWebhookMessage(hook, id);
   s.digestPosts = []; writeState(s);
-  for (const body of digestBodies(open)) {
+  if (!open.length) return 0;
+  const where = await webhookWhere(hook);
+  for (const body of digestBodies(open, s.posts, where)) {
     const msg = await postWebhook(hook, body);
     if (msg?.id) { s.digestPosts.push(msg.id); writeState(s); }
   }

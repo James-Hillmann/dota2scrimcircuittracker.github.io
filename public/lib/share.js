@@ -6,16 +6,17 @@
 
 import { DIVISIONS, slugOf } from "./divisions.js";
 
-// / (and /ad2l/) is the league picker, scrim standings are /scrims/, Champion is /champion/.
-// /all/ (every division together) has only its list tabs: no Predict, Upload, team or game pages.
-const TABS = "week|players|heroes|predict|upload";
+// / (and /ad2l/) is the league picker, the scrims are /scrims/ (Teams) and /scrims/<tab>/,
+// Champion is /champion/. /all/ (every division together) has only its list tabs: no Predict,
+// Upload, team or game pages. The scrims' old /week/, /teams/… are forwards (share-pages.js).
+const TABS = "content|week|players|heroes|predict|upload";
 const DIV_TABS = `${TABS}|drafter`; // the Drafter is AD2L only: scrims have no draft
 // Division addresses (lib/divisions.js). A division played in sub-divisions (Heroic/Aegis) also
 // has /<slug>/<view>/ (a, b), with the same tabs but no team or game pages of its own.
 const LEAGUES = DIVISIONS.map(slugOf).join("|");
 const VIEWED = DIVISIONS.filter((d) => d.views).map(slugOf).join("|") || "(?!)";
 const VIEWS = [...new Set(DIVISIONS.flatMap((d) => d.views ?? []))].join("") || "a";
-const SHAREABLE = new RegExp(`^(?:(?:${TABS}|teams|scrims)|ad2l|all(?:/(?:week|players|heroes))?|(?:${LEAGUES}|(?:${VIEWED})/[${VIEWS}])(?:/(?:${DIV_TABS}))?|(?:${LEAGUES})/(?:teams|game)/\\d+)?$`);
+const SHAREABLE = new RegExp(`^(?:scrims(?:/(?:${TABS}))?|ad2l|all(?:/(?:content|week|players|heroes))?|(?:${LEAGUES}|(?:${VIEWED})/[${VIEWS}])(?:/(?:${DIV_TABS}))?|(?:${LEAGUES})/(?:teams|game)/\\d+)?$`);
 
 // "#/heroic/b/week" -> "/heroic/b/week/"; null when the route has no preview page.
 export function sharePath(hash) {

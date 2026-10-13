@@ -113,27 +113,28 @@ export function wireCompare(src, key, players, tier, play = null) {
         ${others.length && contested ? `<div class="cmp-lead" title="Rows where this player has the best number"><b>${lead[i]}</b> / ${contested} best</div>` : ""}</th>`).join("");
     const full = others.length >= MAX_OTHERS;
     // Each player's card under the radar: name, tier, record and how many rows they lead.
-    const keyCard = ({ lb, tp }, i) => `<div class="cmp-key cmp-c${i + 1}"><b>${esc(lb.name)}</b>
+    const keyCard = ({ k, lb, tp }, i) => `<div class="cmp-key cmp-c${i + 1}"><b>${esc(lb.name)}</b>${i ? `<button type="button" class="cmp-x cmp-key-x" data-drop="${esc(k)}" aria-label="Remove ${esc(lb.name)}" title="Remove from the comparison">×</button>` : ""}
         <span>${tp?.tier ? `<span class="rc-tier t-${tp.tier}">${tp.tier}</span> ${tp.rating}` : "Unrated"}</span>
         <small>${lb.wins}–${lb.games - lb.wins}${contested ? ` · ${lead[i]} / ${contested} best` : ""}</small></div>`;
-    const chart = others.length && shared.length >= 3
+    // On its own (nobody picked yet) the player's own profile and charts still show.
+    const chart = shared.length >= 3
       ? `<h2>Tier profile</h2><figure class="cmp-fig">${radarSvg(cols.map(({ lb }, i) => ({ name: lb.name, cls: `cmp-c${i + 1}`, scores: scores[i] })), shared)}
-          <figcaption>${cols.map(keyCard).join("")}<small class="cmp-cap">The tier stats they all share, each 0–100 against their own position</small></figcaption></figure>`
+          <figcaption>${cols.map(keyCard).join("")}<small class="cmp-cap">${others.length ? "The tier stats they all share" : "Tier stats"}, each 0–100 against their own position</small></figcaption></figure>`
       : others.length ? `<h2>At a glance</h2><div class="cmp-keys">${cols.map(keyCard).join("")}</div>` : "";
     box.innerHTML = `<div class="cmp-pick">
         <label for="cmp-in">Compare with</label>
         <input id="cmp-in" type="text" list="cmp-list" autocomplete="off" placeholder="${full ? `Up to ${MAX_OTHERS} players` : "Type a player's name"}"${full ? " disabled" : ""}>
         <datalist id="cmp-list">${[...label].filter(([, k]) => !others.includes(k)).map(([l]) => `<option value="${esc(l)}"></option>`).join("")}</datalist>
-        ${others.length ? "" : `<span class="cmp-hint">Pick up to ${MAX_OTHERS} players to line up against ${esc(byKey.get(key).name)}.</span>`}
+        ${others.length ? `<button type="button" class="cmp-clear">Clear all</button>` : `<span class="cmp-hint">Pick up to ${MAX_OTHERS} players to line up against ${esc(byKey.get(key).name)}.</span>`}
       </div>
       ${chart}
-      ${others.length && play ? overTimeHtml(cols) : ""}
-      ${others.length ? "<h2>Head to head</h2>" : ""}<div class="cmp-wrap"><table class="cmp-table">
+      ${play ? overTimeHtml(cols) : ""}
+      <h2>${others.length ? "Head to head" : "Stats"}</h2><div class="cmp-wrap"><table class="cmp-table">
         <thead><tr><th scope="col" class="l"></th>${head}</tr></thead>
         <tbody>${body}</tbody>
       </table></div>
-      ${others.length && play ? wardsHtml(cols) + deathsHtml(cols) : ""}`;
-    if (others.length && play) wirePlay(box);
+      ${play ? wardsHtml(cols) + deathsHtml(cols) : ""}`;
+    if (play) wirePlay(box);
     const input = box.querySelector("#cmp-in");
     const add = () => {
       const k = label.get(input.value.trim());
@@ -145,6 +146,8 @@ export function wireCompare(src, key, players, tier, play = null) {
     input.addEventListener("change", add);
     input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); add(); } });
     box.querySelectorAll(".cmp-x").forEach((b) => (b.onclick = () => { others = others.filter((k) => k !== b.dataset.drop); save(); draw(); }));
+    const clear = box.querySelector(".cmp-clear");
+    if (clear) clear.onclick = () => { others = []; save(); draw(); box.querySelector("#cmp-in")?.focus(); };
   };
   draw();
 }

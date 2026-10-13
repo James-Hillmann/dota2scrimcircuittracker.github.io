@@ -9,6 +9,11 @@ const byId = new Map(HERO_META.map(([id, n, s]) => [id, { id, name: n, slug: s }
 export const heroById = (id) => byId.get(id) ?? null;
 const attrByName = new Map(HERO_META.map(([, n, , a]) => [n.toLowerCase(), a]));
 export const heroAttr = (name) => attrByName.get(String(name ?? "").toLowerCase()) ?? null;
+// Valve's portrait art (235×272), for full-card backgrounds.
+export function heroVert(name) {
+  const slug = byName.get(String(name ?? "").toLowerCase());
+  return slug ? `https://cdn.cloudflare.steamstatic.com/apps/dota2/images/heroes/${slug}_vert.jpg` : null;
+}
 export function heroImg(name) {
   const slug = byName.get(String(name ?? "").toLowerCase());
   return slug ? CDN + slug + ".png" : null;

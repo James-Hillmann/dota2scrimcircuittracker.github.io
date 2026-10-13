@@ -8,6 +8,10 @@
 //     only gets credit for ground no earlier teammate ward still standing already showed, so
 //     stacking wards on one spot or warding your own base earns nothing. A team's five add up
 //     to its line on the vision chart, averaged over the game.
+//   ward_vision (per player, when the game's building falls are known): the same, but ground
+//     one of the team's standing towers already sees earns nothing either (tower sight shrinks
+//     at night). Warding beside your own tier 1 adds little; once it falls, the spot is worth
+//     more. The playoff tier model's "Vision %".
 //   vision (per game): { a, b } each team's observer coverage at each minute, as the same %.
 //
 // The map is the patch's dump from leamare/dota-map-coordinates (a custom game that records
@@ -119,7 +123,7 @@ export function buildMap(png, def) {
     }
     area[t] = sum;
   }
-  return { n, elev, tree, walk, fow, counted, area, fovCache: new Map() };
+  return { n, elev, tree, walk, fow, counted, area, def, fovCache: new Map() };
 }
 
 // The map a game was played on, by its start time (the patch's dump from its release on).
@@ -194,8 +198,9 @@ export function fov(map, at, range = OBS_RANGE) {
 // ---------- per game ----------
 
 // d: an OpenDota match. Returns { vision: { a, b }, new_vision: [one per player, in
-// player_slot order] }, or null if the replay isn't parsed (no ward logs).
-export function visionFields(map, d) {
+// player_slot order] }, or null if the replay isn't parsed (no ward logs). buildings: the
+// game's fall events (lib/towermap.js buildingsFrom) to add ward_vision too; needs map.def.
+export function visionFields(map, d, buildings = null) {
   if (!map || !d.players?.some((p) => Array.isArray(p.obs_log))) return null;
   const dur = d.duration, players = [...d.players].sort((x, y) => x.player_slot - y.player_slot);
   const wards = [];
@@ -212,8 +217,11 @@ export function visionFields(map, d) {
 
   // Between two placements or expiries the live wards don't change, so each stretch is
   // scored once and weighted by its length.
-  const cuts = [...new Set([0, dur, ...wards.flatMap((w) => [w.from, w.to])])].sort((x, y) => x - y);
-  const credit = new Float64Array(players.length), minutes = Math.floor(dur / 60) + 1;
+  // With towers, a tower falling or day turning to night changes what they see, so those cut too.
+  const towers = buildings && map.def?.towers ? buildings : null;
+  const extra = towers ? [...towers.map((b) => b.time), ...Array.from({ length: Math.ceil(dur / 300) }, (_, k) => k * 300)] : [];
+  const cuts = [...new Set([0, dur, ...wards.flatMap((w) => [w.from, w.to]), ...extra.filter((s) => s > 0 && s < dur)])].sort((x, y) => x - y);
+  const credit = new Float64Array(players.length), creditTw = new Float64Array(players.length), minutes = Math.floor(dur / 60) + 1;
   const lit = { a: new Float64Array(minutes), b: new Float64Array(minutes) };
   const stamp = new Int32Array(map.n * map.n);
   let mark = 0;
@@ -230,6 +238,22 @@ export function visionFields(map, d) {
         credit[w.slot] += fresh * len;
         seen += fresh;
       }
+      // Again with the team's standing towers' ground taken first.
+      if (towers) {
+        mark++;
+        const night = isNight(t0);
+        for (const tw of towersUp(map.def, towers, t0)) {
+          if (tw.side !== team) continue;
+          const tile = tileAtWorld(map, tw.x, tw.y);
+          if (tile != null) for (const i of fov(map, tile, TOWER_RANGE[tw.tier][night ? 1 : 0])) stamp[i] = mark;
+        }
+        for (const w of wards) {
+          if (w.team !== team || w.from > t0 || w.to < t1) continue;
+          let fresh = 0;
+          for (const i of w.tiles) if (counted[i] && stamp[i] !== mark) { stamp[i] = mark; fresh++; }
+          creditTw[w.slot] += fresh * len;
+        }
+      }
       // Spread the stretch over the minutes it spans.
       for (let m = Math.floor(t0 / 60); m < minutes && m * 60 < t1; m++) {
         const overlap = Math.min(t1, (m + 1) * 60) - Math.max(t0, m * 60);
@@ -245,6 +269,7 @@ export function visionFields(map, d) {
   return {
     vision: { a: series("a"), b: series("b") },
     new_vision: players.map((p, slot) => (Array.isArray(p.obs_log) ? pct((credit[slot] / dur / map.area[p.isRadiant ? "a" : "b"]) * 100, 2) : null)),
+    ward_vision: players.map((p, slot) => (towers && Array.isArray(p.obs_log) ? pct((creditTw[slot] / dur / map.area[p.isRadiant ? "a" : "b"]) * 100, 2) : null)),
   };
 }
 

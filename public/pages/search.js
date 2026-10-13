@@ -8,7 +8,7 @@ import { HEROES } from "../lib/heroes.js";
 import { INFO } from "../lib/glossary.js";
 import { fold, searchIndex } from "../lib/search.js";
 import { siteSearch, sitelinks, leagueHref, withAt } from "../lib/sitesearch.js";
-import { STANDINGS_TABS, PLAYERS_PAGE_TABS, HEROES_PAGE_TABS, PREDICT_TABS, DRAFTER_MODES, tabList } from "../lib/pagetabs.js";
+import { STANDINGS_TABS, SCRIM_TEAMS_TABS, PLAYERS_PAGE_TABS, HEROES_PAGE_TABS, PREDICT_TABS, DRAFTER_MODES, tabList } from "../lib/pagetabs.js";
 import { loadSearch } from "../parts/searchindex.js";
 import { KINDS, parseTable, tableParams, tableState } from "../lib/tables.js";
 import { drawTable, builderHtml, wireBuilder, TABLE_LEAGUES, leagueLabel as tableLeague } from "../parts/tables.js";
@@ -19,7 +19,7 @@ const SCOPE = { league: "League", teams: "All teams", players: "All players", he
 const ALL_OF = { teams: "team", players: "player", heroes: "hero" };
 const KIND = { team: "Team", player: "Player", hero: "Hero" };
 const LEAGUES = [...Object.keys(DIVISIONS), "scrim"];
-const rootOf = (k) => (k === "scrim" ? "#" : SOURCES[k].root);
+const rootOf = (k) => SOURCES[k].root;
 const leagueName = (k) => (k === "scrim" ? "Scrims" : DIVISIONS[k]?.short ?? k);
 const snippet = (t) => INFO[t.key] ?? t.text ?? "";
 const lgChip = (e) => (e.league && e.leagueLabel ? `<span class="lg-chip" data-lg="${e.league}">${esc(e.leagueLabel)}</span>` : "");
@@ -29,7 +29,7 @@ export async function renderSearch(src) {
   const q = (p.get("q") ?? "").trim(), exact = p.get("exact") === "1";
   const here = src.all ? null : src.ad2l ? src.key.replace(/_[a-z]$/, "") : "scrim";
   const st = { type: p.get("type") ?? "all", league: p.get("in") ?? "all" };
-  const root = src.ad2l ? src.root : "#";
+  const root = src.root;
   const link = (o) => `${root}/search?${new URLSearchParams(o)}`;
   // The table builder: its state (&table=team|player|hero&cols=…) and scope (&league=, else this one).
   let tst = parseTable(p);
@@ -166,7 +166,7 @@ export async function renderSearch(src) {
         <div class="sr-links">${sitelinks(e).map(([l, h]) => `<a href="${h}">${esc(l)}</a>`).join("")}</div></div>`;
     const pageHtml = (pg) => {
       // Standings and Predict only have tabs on AD2L.
-      const named = { standings: src.ad2l && STANDINGS_TABS, players: PLAYERS_PAGE_TABS, heroes: HEROES_PAGE_TABS, predict: src.ad2l && PREDICT_TABS, drafter: DRAFTER_MODES };
+      const named = { standings: src.ad2l ? STANDINGS_TABS : SCRIM_TEAMS_TABS, players: PLAYERS_PAGE_TABS, heroes: HEROES_PAGE_TABS, predict: src.ad2l && PREDICT_TABS, drafter: DRAFTER_MODES };
       const tabs = typeof pg.tabs === "string" ? (named[pg.tabs] ? tabList(named[pg.tabs], src) : []) : pg.tabs ?? [];
       return `<div class="sr-name"><a class="sr-hit" href="${leagueHref(root, { path: pg.path })}"><span class="sh-kind">Page</span><b>${esc(pg.title)}</b></a>
         ${tabs.length ? `<div class="sr-links">${tabs.map(([id, l]) => `<a href="${leagueHref(root, { path: pg.path, tab: id })}">${esc(l)}</a>`).join("")}</div>` : ""}</div>`;

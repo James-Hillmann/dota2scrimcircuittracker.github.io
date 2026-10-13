@@ -327,13 +327,14 @@ export async function renderPredict(src) {
   const boardTab = `
     <h2>Leaderboard</h2>
     ${boardHtml ? `${boardHtml}<p class="table-note">Points = correct calls / series called.${showBracket ? " Bracket = bracket matches whose winner you picked, from a bracket saved before the playoffs started; Total ranks the board." : ""} Columns on the right are this week's picks. <b>Click a name</b> for their pick history and bracket.</p>` : `<div class="panel empty">No picks yet.</div>`}
-    ${boardHtml ? `<section class="pb-view" id="pb-view" aria-live="polite"><p class="muted">Loading…</p></section>` : ""}
+    ${boardHtml ? `<details class="how pb-fold" id="pb-fold"><summary id="pb-sum">Your picks</summary><section class="pb-view" id="pb-view" aria-live="polite"><p class="muted">Loading…</p></section></details>` : ""}
     ${past ? `<details class="how"><summary>Past weeks</summary>${past}<p class="table-note">Model: its pick that week, using only earlier results. Crowd: the most-picked call and how many made it. Picks made after a series started don't count.</p></details>` : ""}`;
   const tabs = playerTabs(pageTabs(PREDICT_TABS, src, [
     ["calls", callsHtml],
     ["board", boardTab],
     ["bracket", `<section class="po" id="po-bracket"></section>`],
     ["odds", `<section class="po" id="po-odds"><div class="panel empty">Working out every outcome…</div></section>`],
+    ["fantasy", `<section class="ft" id="ft-host"><div class="panel empty">Loading…</div></section>`],
   ]), { store: "predictTab", label: "Predict sections" });
   app.innerHTML = `${pageHead(kicker, "Predictions", "", tabs.bar)}
     ${nameBarHtml(name)}
@@ -428,14 +429,17 @@ export async function renderPredict(src) {
         <h3 class="pb-view-h pb-view-h2">${whose} bracket${row.model || !hasBracket ? "" : ` <span class="muted">· ${calls.size} upcoming series called</span>`}</h3>
         ${hasBracket ? `<div class="pb-host"></div>` : `<p class="muted">${esc(row.name)} hasn't made a bracket yet.</p>`}`;
       if (hasBracket) mountPlayoffs(view.querySelector(".pb-host"), src, full, fullRatings, calls, { watch: { name: row.name, model: !!row.model, picks: row.model ? null : savedBrackets.get(k) ?? {} } });
-      if (scroll) view.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      // Folded under "Your picks ▾" until a name is clicked, so the board stays short.
+      const fold = document.getElementById("pb-fold");
+      document.getElementById("pb-sum").innerHTML = k === myKey ? "Your picks" : `${whose} picks`;
+      if (scroll) { fold.open = true; view.scrollIntoView({ block: "nearest", behavior: "smooth" }); }
     };
     app.querySelectorAll(".pb-who").forEach((b) => b.onclick = () => show(b.dataset.who, true));
     // Last week's names (and "Your full pick history") open the Leaderboard on that person.
     app.querySelectorAll("[data-history]").forEach((b) => b.onclick = () => {
       app.querySelector('.pp-tabs [data-tab="board"]')?.click();
       if (b.dataset.history) show(b.dataset.history, true);
-      else view.scrollIntoView({ block: "start", behavior: "smooth" });
+      else { document.getElementById("pb-fold").open = true; view.scrollIntoView({ block: "start", behavior: "smooth" }); }
     });
     // Open on you if you're on the board, else the first person with a saved bracket, else the leader.
     const first = myKey && board.has(myKey) ? myKey : boardRows.find(([k, r]) => !r.model && savedBrackets.has(k))?.[0] ?? boardRows.find(([, r]) => !r.model)?.[0];
@@ -450,6 +454,17 @@ export async function renderPredict(src) {
   };
   new MutationObserver(mountOdds).observe(oddsPanel, { attributes: true, attributeFilter: ["hidden"] });
   mountOdds();
+  // Fantasy (pages/fantasy.js) loads when its tab is first shown.
+  const ftHost = document.getElementById("ft-host"), ftPanel = ftHost.closest("[role=tabpanel]");
+  const nameBar = app.querySelector(".pred-name");
+  const mountFt = () => {
+    nameBar.style.display = ftPanel.hidden ? "" : "none"; // Fantasy has its own name and sign-in
+    if (ftPanel.hidden || ftHost.dataset.done) return;
+    ftHost.dataset.done = "1";
+    import("./fantasy.js").then((m) => m.mountFantasy(ftHost, src)).catch((e) => { ftHost.innerHTML = errorBox(e); });
+  };
+  new MutationObserver(mountFt).observe(ftPanel, { attributes: true, attributeFilter: ["hidden"] });
+  mountFt();
 }
 
 // ---------- Predictions (scrims) ----------
@@ -473,7 +488,7 @@ const boOptions = (sel) => [1, 2, 3].map((n) => `<option value="${n}" ${n === se
 function uploadFor(f, quick) {
   upload.fixture = { id: f.id, team_a: f.team_a, team_b: f.team_b, start: f.start, best_of: f.best_of, game: f.games.length + 1 };
   upload.fixtureQuick = quick;
-  location.hash = "#/upload";
+  location.hash = "#/scrims/upload";
 }
 
 export async function renderScrimPredict() {
@@ -525,7 +540,7 @@ export async function renderScrimPredict() {
       <div class="fx-actions">
         <button type="button" class="${locked ? "primary" : ""}" data-up="shots">Upload game ${f.games.length + 1}</button>
         <button type="button" data-up="quick">Private result</button>
-        ${f.games.map((m, j) => `<a class="fx-game" href="#/match/${m.id}">Game ${j + 1}</a>`).join("")}
+        ${f.games.map((m, j) => `<a class="fx-game" href="#/scrims/match/${m.id}">Game ${j + 1}</a>`).join("")}
         <span class="fx-manage">
           <button type="button" class="linkish" data-fx="move">Change time</button>
           <button type="button" class="linkish" data-fx="delete">Delete</button>
@@ -557,7 +572,7 @@ export async function renderScrimPredict() {
     const tick = (pick) => (pick ? `${esc(outcomeLabel(f, pick))} ${pick === f.outcome ? '<b class="s-a">✓</b>' : '<b class="s-b">✗</b>'}` : '<span class="muted">—</span>');
     return `<tr><td class="l">${esc(f.start.toLocaleDateString(undefined, { month: "short", day: "numeric" }))}</td>
       <td class="l">${teamLink(SOURCES.scrim, f.team_a)} vs ${teamLink(SOURCES.scrim, f.team_b)}</td>
-      <td>${f.home_wins}–${f.away_wins} ${f.games.map((g, j) => `<a href="#/match/${g.id}" title="Game ${j + 1}">G${j + 1}</a>`).join(" ")}</td>
+      <td>${f.home_wins}–${f.away_wins} ${f.games.map((g, j) => `<a href="#/scrims/match/${g.id}" title="Game ${j + 1}">G${j + 1}</a>`).join(" ")}</td>
       <td class="l">${m ? tick(m.pick) : "—"}</td>
       <td class="l">${c?.n ? `${tick(crowdPick)} <span class="muted">${c.n}</span>` : '<span class="muted">—</span>'}</td>
       ${myKey ? `<td class="l">${me ? tick(me.pick) : '<span class="muted">—</span>'}</td>` : ""}</tr>`;

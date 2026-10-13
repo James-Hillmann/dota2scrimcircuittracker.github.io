@@ -1,7 +1,8 @@
-// Write a link-preview page for every shareable route (see public/lib/share.js) into a
-// built copy of public/: /heroic/week/index.html etc. Each has that page's own title,
-// description and colour for Discord and other link previews, then forwards to the #/
-// route. AD2L descriptions are built from the synced data, so they're as fresh as the
+// Write a page for every shareable route (see public/lib/share.js) into a built copy of
+// public/: /heroic/week/index.html etc. Each is the app (index.html) with that page's own
+// title, description, canonical and colour, for search engines and link previews; old
+// /ad2l/... addresses forward to their /champion/... page, and the scrims' old /week/, /teams/…
+// to /scrims/... . AD2L descriptions are built from the synced data, so they're as fresh as the
 // last sync. Scrim games live in Firestore, so scrim pages get fixed descriptions.
 // Usage: node scripts/deploy/share-pages.js <site dir>   (the deploy runs it on a copy of public/)
 import { mkdir, readFile, writeFile } from "node:fs/promises";
@@ -26,14 +27,18 @@ const page = (p, title, description, color, image = "site") => {
 };
 
 // ---------- Scrim League ----------
-const scrim = (tab, title, d) => page(tab, `${title} · Scrim League`, d, COLOR.scrim, "scrim");
-scrim("scrims", "Standings", "Every scrim team ranked by game wins, with win %, kill difference, form and streak.");
-scrim("week", "Weekly recap", "This week's scrims: every game, drafts in pick/ban order, player of the week and the standout games.");
-scrim("teams", "Teams", "Every scrim team: record, roster, series history and the heroes they play.");
+// Under /scrims/ like a division. Teams (/scrims/) holds the table, the matches and the team grid.
+const scrim = (tab, title, d) => page(tab ? `scrims/${tab}` : "scrims", `${title} · Scrim League`, d, COLOR.scrim, "scrim");
+scrim("", "Teams", "Every scrim team ranked by game wins, with win %, kill difference, form and streak, then every match and team.");
+scrim("content", "Weekly recap", "This week's scrims: every game, drafts in pick/ban order, player of the week and the standout games.");
 scrim("players", "Players", "Scrim leaderboards and the tier list: KDA, GPM, damage, win rate and more.");
 scrim("heroes", "Heroes", "Every hero picked in scrims: pick and ban rates, win rates and who plays them.");
 scrim("predict", "Predictions", "Pick the winners of upcoming scrims and see how the model's picks have done.");
 scrim("upload", "Upload a scrim", "Paste Dota 2 post-game screenshots and the stats are read for you.");
+// The scrim pages used to sit at the top (/week/, /teams/…): those addresses forward, and so
+// does /scrims/week/ (Content's old address).
+for (const [old, now] of [["week", "scrims/content"], ["scrims/week", "scrims/content"], ["teams", "scrims"], ["players", "scrims/players"], ["heroes", "scrims/heroes"], ["predict", "scrims/predict"], ["upload", "scrims/upload"]])
+  pages.push({ ...pages.find((x) => x.p === now), p: old, canonical: now });
 
 // ---------- AD2L ----------
 function standings(d) {
@@ -65,9 +70,11 @@ function league(root, key, name, d, view, { brief = false } = {}) {
   // Latest week: games in the 7 days up to the newest one.
   const newest = Math.max(0, ...d.games.map((g) => g.start_time));
   const recent = d.games.filter((g) => g.start_time > newest - 7 * 86400);
-  page(`${root}/week`, `Weekly recap · ${label}`, recent.length
+  page(`${root}/content`, `Weekly recap · ${label}`, recent.length
     ? `${plural(recent.length, "game")} through ${day(newest)}: drafts in pick/ban order, player of the week and the standout games.`
     : "Every week's games, drafts and highlights.", color, key);
+  // Content's old address forwards, so links shared before the move still open it.
+  pages.push({ ...pages.at(-1), p: `${root}/week`, canonical: `${root}/content` });
 
   const players = new Set(d.games.flatMap((g) => g.players.map((p) => p.player_key)));
   page(`${root}/players`, `Players · ${label}`, `Leaderboards and tier list for ${plural(players.size, "player")}: KDA, GPM, damage, win rate, pubs.`, color, key);
@@ -117,8 +124,33 @@ for (const pg of pages.filter((x) => x.p.startsWith("champion/")))
 league("all", "all", `AD2L ${SEASON.name} All Divisions`, { teams: every.flatMap((d) => d.teams), series: every.flatMap((d) => d.series), games: every.flatMap((d) => d.games) }, null, { brief: true });
 
 // ---------- write ----------
-for (const { p, title, description, color, image, route, canonical = p } of pages) {
-  const url = `${SITE}/${canonical}/`;
+// A page at its own address is the app itself (index.html) with that page's head: search
+// engines drop everything after "#", so a forward to /#/... would read as the home page, and
+// the app routes from the path anyway (core.js here()). Old /ad2l/... and scrim addresses forward.
+const app = await readFile(path.join(OUT, "index.html"), "utf8");
+const swap = (html, re, value) => {
+  if (!re.test(html)) throw new Error(`index.html has no ${re}: update share-pages.js`);
+  return html.replace(re, value);
+};
+const appPage = ({ title, description, color, image, url }) => [
+  [/<title>[^<]*<\/title>/, `<title>${esc(title)}</title>`],
+  [/<meta name="description" content="[^"]*">/, `<meta name="description" content="${esc(description)}">`],
+  [/<meta name="theme-color" content="[^"]*">/, `<meta name="theme-color" content="${color}">`],
+  [/<meta property="og:title" content="[^"]*">/, `<meta property="og:title" content="${esc(title)}">`],
+  [/<meta property="og:description" content="[^"]*">/, `<meta property="og:description" content="${esc(description)}">`],
+  [/<meta property="og:url" content="[^"]*">/, `<meta property="og:url" content="${url}">`],
+  [/<meta property="og:image" content="[^"]*">/, `<meta property="og:image" content="${SITE}/img/og/${image}.png">`],
+  [/<meta property="og:image:alt" content="[^"]*">/, `<meta property="og:image:alt" content="${esc(title)}">`],
+  [/<link rel="canonical" href="[^"]*">/, `<link rel="canonical" href="${url}">`],
+].reduce((html, [re, v]) => swap(html, re, v), app);
+
+for (const { p, title, description, color, image, route, canonical } of pages) {
+  const url = `${SITE}/${canonical ?? p}/`;
+  if (!canonical) {
+    await mkdir(path.join(OUT, p), { recursive: true });
+    await writeFile(path.join(OUT, p, "index.html"), appPage({ title, description, color, image, url }));
+    continue;
+  }
   const html = `<!doctype html>
 <html lang="en">
 <head>
@@ -149,7 +181,7 @@ for (const { p, title, description, color, image, route, canonical = p } of page
 console.log(`wrote ${pages.length} preview pages into ${path.relative(process.cwd(), OUT) || "."}`);
 
 // sitemap.xml (named in public/robots.txt): the home page and every preview page's own
-// address; the old /ad2l/... forwards are left out (their canonical is the /champion/ page).
+// address; the old /ad2l/... and scrim forwards are left out (their canonical is the new page).
 const urls = [`${SITE}/`, ...pages.filter((x) => !x.canonical).map(({ p }) => `${SITE}/${p}/`)];
 await writeFile(path.join(OUT, "sitemap.xml"), `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">

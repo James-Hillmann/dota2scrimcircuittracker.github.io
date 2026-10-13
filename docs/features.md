@@ -8,9 +8,13 @@ and change it: [maintaining.md](maintaining.md).
 - **Home page** — `/` (also `/ad2l/`) is a league picker: Scrim League and every AD2L division,
   in the menu's order and colours.
 - **Scrim League** — our scrims: paste two post-game screenshots, the stats are read in your
-  browser (Tesseract OCR, no AI, no API keys), you check them, and the game is saved. Scrim
-  standings (`/scrims/`) rank every team by game wins (then fewest losses), with win %, average
-  kill difference, last-five form and streak, above the match list. Private scrims count.
+  browser (Tesseract OCR, no AI, no API keys), you check them, and the game is saved. Every scrim
+  page lives under `/scrims/` (`/scrims/week/`, `/scrims/players/`, `/scrims/teams/<team>`…),
+  like a division's; the old `/week/`, `/teams/`, `/#/match/…` addresses forward. The nav
+  matches AD2L's: Teams | Content | Players | Heroes | Predict | Upload. **Teams** (`/scrims/`)
+  opens on **Table**: every team by game wins (then fewest losses), with win %, average kill
+  difference, last-five form and streak; **Matches** lists every game; **Teams** shows the team
+  cards. Private scrims count.
 - **AD2L S48 divisions** — Explorer, Voyager, Challenger, Warrior, Conqueror, Champion and
   Heroic/Aegis (the list lives in `public/lib/divisions.js`). Each has standings, every ticketed
   game with full stats, players, heroes, teams, predictions and unticketed uploads, pulled from
@@ -51,8 +55,8 @@ and change it: [maintaining.md](maintaining.md).
   card on **All teams / All players / All heroes** with the table already drawn (League and the
   single Team / Player / Hero pickers stay a click away), with the rest of the results below.
   Every table search builds has **Edit this table** (it in the builder) and **Build my own
-  table**; the second also sits next to the filters and in the settings cog (**Table builder**,
-  for the league being viewed). The builder (`&table=team|player|hero`) has rows (teams,
+  table**; the second also sits next to the filters and as the table icon next to the search
+  box in the top bar (for the league being viewed). The builder (`&table=team|player|hero`) has rows (teams,
   players, heroes), league (**All AD2L**, a division, Heroic A or B, Scrims), period (whole
   season or the last 2, 4 or 8 weeks), a player table's team, minimum games (values from fewer
   games show greyed and sort last), presets, column sets saved in this browser, and columns in
@@ -79,12 +83,18 @@ and change it: [maintaining.md](maintaining.md).
   `docs/superpowers/specs/2026-09-30-feedback-design.md`.
 - **Footer** — where the data comes from and, on an AD2L page, when that division last synced;
   the tour and the Discord invite.
-- **Settings** (cog) — dark, grey or light theme, colour-blind mode, and the **time machine**
+- **Settings** (cog) — dark, grey or light theme, colour-blind mode, My team, and the **time machine**
   (pick weeks: standings, the Players and Heroes tabs, and team, player and hero pages are
   recomputed over just those weeks; a short pick lowers the 3-game floor to the weeks picked).
 - **Nav dropdowns** — hovering a nav tab (or Arrow Down on it) opens a short list: Teams lists
   the team names, Content the weeks, and Players, Heroes, Predict (AD2L) and Drafter their page's
   own tabs (from `public/lib/pagetabs.js`).
+- **Phone nav** — Teams, Content, Players and Heroes, then **More ▾** (Predict, Drafter, Upload),
+  on one line with no sideways scroll. More opens on a tap. The league name drops the season and
+  shortens ("Champion", "All", "Heroic" with an "A" badge) so it fits beside the header buttons.
+- **Opening tab** — a league's Teams page always opens on Table, and a team page on Overview,
+  except when the team picker on a team page switches straight to another team (it keeps the tab).
+  A `?tab=` link still wins. Player, hero, game and Predict pages remember the last tab.
 - **Page tabs on the title line** — Teams, Players, Heroes and Predict show their tabs to the
   right of the title, like team, player and hero pages.
 - **No explainer notes** — grey notes, intro lines, map notes and "How it works" sections are
@@ -114,9 +124,15 @@ and change it: [maintaining.md](maintaining.md).
   form, team GPM, damage, vision, objectives, sides, first blood, fights) and three best games
   (biggest win, fastest win, biggest comeback or most kills), then **Team ranks**: the team's
   place on each stat (the five players added up, a game) in its division and across all seven
-  leagues, coloured like Stat ranks. On
-  the Series tab, every drafted series shows each game's full pick/ban draft under its row.
-  **Hero grid for Dota** (Heroes tab, linked from the overview): three columns, as in a matchup:
+  leagues, coloured like Stat ranks. Then Most played beside the Roster box, game length and
+  head to head (recent results are on the Series tab and the Form card). On the Series tab,
+  every drafted series shows each game's full pick/ban draft under its row.
+  Tabs: Overview | Roster | Series (Games for scrims) | Heroes | **Draft** | Outcomes | Laning |
+  **Resources** | Map. Heroes: the hero pool. Draft: the hero grid on top, then side and pick
+  order, draft by phase, and the draft model's read of each series' drafts. Resources: the gold
+  block (average lead curve, gold at 10' and 20', record ahead and behind at 10', 20' and 30',
+  comebacks and throws). Map: strengths and weak spots, objectives, vision, and the maps.
+  **Hero grid for Dota** (top of the Draft tab, linked from the overview): three columns, as in a matchup:
   the enemy (this team) left, bans middle, you right. "You" is **My team**, set beside the grid or
   under the settings cog (the same setting, `core.js` myTeam, kept in localStorage; either one
   updates the other and open grids). Templates: by position, by player (the five with the most
@@ -157,6 +173,8 @@ and change it: [maintaining.md](maintaining.md).
 
 ## Content (was Weekly)
 
+The week strip runs newest first: the latest week on the left, week 1 at the end. On All
+divisions each series chip wears its division's menu colour and names it.
 One week at a time, in this order: the week's series (or games) first, then (AD2L, latest
 week) **Up next**: the series still to play, each with the model's odds as on Predict (it used
 to be a Teams tab), then highlights (player of the week, biggest damage, best KDA, top GPM, most
@@ -180,6 +198,7 @@ One tab per section (Laning and Medal vs rating are AD2L only):
   A breakdown has a × in its top-right corner, and its stat table sorts by Stat, 0–100 or Points
   (the order holds for every breakdown while the page is open).
 - **Stat leaders** — top and bottom 3 on any stat, with "1st overall" badges across every division.
+  A role filter (cores, supports or one position) ranks players by the position they play most.
 - **Laning** — laning ranked by position (safe, mid, off, supports; 3+ lanes), with best-laner
   cards for the latest week and the season.
 - **Medal vs rating** — a scatter of PlayOn medal against tier rating, with who plays furthest
@@ -240,11 +259,14 @@ to the stat points and each multiplier shows the points it adds or removes.
 
 Click any player name: record, KDA, GPM, damage, kill participation, tier (with the full
 breakdown), best games, stat ranks in the league and overall, hero pool (W–L per hero) and every
-game they played (sortable). Tabs: Stats, Heroes, Combat, Laning, Items, Map, Games. Also: the
-average gold curve against the division's core and support averages, record by the team's pick
-number (1st … last pick) with a flag for a big last-pick gap, a game analysis (one game against
-their usual), pub practice (league record on heroes played in pubs the week before, against the
-rest) and recent pubs.
+game they played (sortable). Tabs: Stats, Compare, Heroes, Combat, Laning, Items, Map, Games.
+Also: the average gold curve against the division's core and support averages, record
+by the team's pick number (1st … last pick) with a flag for a big last-pick gap. Games is the
+list; game analysis (one game against their usual) sits at the bottom of Stats, and a row's
+Analyze opens it on that game. On
+Heroes, the hero pool and by draft pick stay open; recent pubs, pub practice (league record on
+heroes played in pubs the week before, against the rest) and all-time pubs and esports fold
+under one closed **Pubs and other leagues ▾**.
 
 ## Heroes tab and hero pages
 
@@ -273,22 +295,34 @@ The Heroes tab has three sub-tabs (`?tab=tiers|players|table`):
 - **Hero pages** — record, pick and ban rates, average draft slot (AD2L), the same by phase,
   record by pick number, best team and player on it, biggest games, a teams table (picks, W–L,
   win % on the hero, who played it, bans for and against), a players table, Matchups (record
-  with and against every hero), neutral items held at the end, Skill build, Items, Combat,
-  Laning, Map, and every game it was in.
+  with and against every hero), Combat, Laning, **Items & skills** (core items, neutral items
+  held at the end, skill build; the talent tree will go here), Map, Games (every game it was in)
+  and Analysis (one game in depth; a row's Analyze opens it).
 
 ## Game pages
 
+- **Game tags** (`lib/gametags.js`) — chips on the game page banner and on every game list
+  (Content, scrim matches, team series rows, player and hero Every game tables, with a sortable
+  Tags column). **Stomp**: the winner led by 20k+ and the loser was never ahead at any minute
+  (17% of S48 games). **Comeback** / **Throw**: a 5k+ lead lost (the same rule as the team page);
+  from a team's, player's or hero's side the loser's game reads Throw, elsewhere Comeback.
+  **Rampage**, else **Ultra kill**: anyone got one (hover for who). **Long** / **Short game**:
+  the league's longest and shortest tenth (needs 10+ games). Stomp, Comeback and Throw need the
+  gold graph and multi-kills the parsed replay, so screenshot uploads get only length tags.
 - **Scoreboard** with standouts (damage per net worth, kill participation, damage share), MVP,
   FB / "died first" tags, and links to OpenDota and Dotabuff (ticketed games).
 - **Casts** — a strip under the score on every game page: anyone pastes a link (YouTube, Twitch,
   any https page) and the caster's name, and it's there for everyone. Whoever added a cast can
   remove it from that browser; anyone else needs the league password. Up to 20 per game.
-- **Gold graphs** (AD2L) — gold lead minute by minute with each side's biggest lead marked, XP
+- **Layout** — banner, series strip, casts, key facts and the draft strip, then the tabs (about
+  800px down on a laptop): Scoreboard | Graphs | Draft | Ratings | Laning | Resources | Combat |
+  Items | Map.
+- **Graphs** tab (AD2L): gold lead minute by minute with each side's biggest lead marked, XP
   lead, and every player's gold (OpenDota's parsed-replay gold: total gold earned, like
   OpenDota's own graph). "Items & fights": the gold lead with every teamfight (sized by deaths,
   coloured by who lost fewer) and each team's core items on one clock. Roshan, Tormentor and
   first blood are marked on the chart.
-- **Draft**, **Ratings**, **Laning**, **Farm & vision**, **Combat**, **Items**, **Map** tabs, below.
+- **Draft**, **Ratings**, **Laning**, **Resources**, **Combat**, **Items**, **Map** tabs, below.
 - **Draft** (AD2L games with a Captains Mode draft) — the draft model's read of the draft (see
   "Draft model" below), with each player read only from games before this one: each team's
   chance to win before the draft and after every step (a chart), and a row per step with where
@@ -307,10 +341,13 @@ The Heroes tab has three sub-tabs (`?tab=tiers|players|table`):
   hero pages get a Laning tab (record, averages, by lane, every lane with who they laned with and
   against). Team pages get one too: each lane's won–even–lost record with who played it, then
   every game lane by lane (heroes on both sides, verdict, lead). Lane score = average lead ÷ the
-  won cut-off, padded with 2 even lanes.
-- **Map & objectives** (AD2L, parsed replays) — lane / neutral / ancient creep kills, camps
-  stacked, observers and sentries placed, dewards, Roshan and Tormentor last hits, and a timeline
-  of who took each Roshan and Tormentor.
+  won cut-off, padded with 2 even lanes. The game's Laning tab ends with each player's XP at 10'.
+- **Resources** (AD2L, parsed replays) — lane / neutral / ancient creep kills and camps stacked
+  per player, with team totals (gold and XP sources to come).
+- **Vision & objectives** (top of the game's Map tab, parsed replays) — a timeline of who took
+  each Roshan and Tormentor, then per player observers, new vision, sentries, dewards, smokes,
+  dust, Roshan and Tormentor last hits and building damage, with team totals. The Combat tab
+  ends with each player's stuns, damage taken and time dead.
 - **Combat** (AD2L, parsed replays) — a kill-streak chart (each run of kills without dying climbs
   a step per kill and drops at the death that ended it, with the hero and the announcer's name at
   each 3+ streak and who ended it; toggles for the streak lines and each kind of multi-kill), then
@@ -360,8 +397,11 @@ The Heroes tab has three sub-tabs (`?tab=tiers|players|table`):
   trees, walkable ground and blockers; line of sight follows devilesk's vision simulator: higher
   ground blocks sight from below, a tree blocks a viewer below its top). Each team's observer
   coverage at each minute as % of the walkable map outside its own base (a Vision view on the
-  hero chart); per player, `new_vision` = the share of their wards' ground they were first on
-  the team to light (a column in Farm & vision, and the support "New vision" tier metric). The
+  Graphs tab); per player, `new_vision` = the share of their wards' ground they were first on
+  the team to light (a column in the Map tab's Vision & objectives, and the support "New vision" tier metric);
+  `ward_vision` = the same, less ground the team's standing towers saw (tower sight shrinks at
+  night; a fallen tower sees nothing) — the playoff model's "Vision %", which replaced its new
+  vision and ward uptime (pos 4: 11, pos 5: 22, their points added). The
   Vision map has two modes. Moment: a time slider and play button showing each team's lit ground
   and the observers up, with overlays for Towers (standing then, with their sight), Sentries
   (1050 true-sight rings) and Night (night is 5:00–10:00, 15:00–20:00…; towers drop from 1900 to
@@ -499,7 +539,8 @@ shrunk-resolution problem above, not a finding problem.
   its own link (`?tab=calls|board|bracket|odds`, Back works, the last one remembered): **Predictions**
   (this week's cards, then **Latest results**: the last played night's series with the model's,
   the crowd's and your call, that night's top scorers, the model's and your score; a name opens
-  their history), **Leaderboard** (standings, each row with last week's right/called and how its % moved since, past weeks; click a name for their pick history —
+  their history), **Leaderboard** (standings, each row with last week's right/called and how its % moved since, past weeks; the pick history and bracket fold under a closed **Your picks ▾**
+  (another name's picks when you're not on the board), so the board stays short; click a name to open it on their pick history —
   every counting call, newest night first, with the result, a ✓/✗ and each night's score; the
   model's is its replayed calls plus this week's — then the bracket and
   final table their series calls lead to, read-only; only series calls are saved, so their
@@ -571,3 +612,46 @@ shrunk-resolution problem above, not a finding problem.
   scrim when it's between the same two teams and was uploaded from 2 hours before the start to 3
   days after. Odds come from a rating per team fitted to every scrim result, pulled toward even. A Bo3
   card also shows the model's score and each score's chance (picks are still just the winner).
+
+## Fantasy (AD2L divisions)
+
+Predict's **Fantasy** tab (`<league>/predict?tab=fantasy`; `pages/fantasy.js`, loaded when the
+tab first opens; rules and scoring in `lib/fantasy.js`). One game per division; Heroic A/B views
+play the whole Heroic/Aegis game. Predict's "Your name" bar hides on this tab (Fantasy has its own).
+
+- **Sign in with Steam** — **Sign in** in the top bar (left of the settings cog) or on the tab.
+  Signed in, the top bar shows your Steam avatar (from OpenDota's public profile, kept a day);
+  it opens your player page in the first league whose roster has you (the one you're viewing
+  first), else the Fantasy tab (`parts/me.js`). Sign out is on the Fantasy tab. The sign-in
+  sends you to Steam's own page; the Worker
+  (`workers/steam-auth`, https://steam-auth.ad2lstats.workers.dev) checks Steam's reply and returns
+  a Firebase sign-in for `steam:<account id>`. It runs on its own Firebase session, so the
+  anonymous one that owns this browser's uploads is untouched. Only the Steam ID is shared.
+- **Each week** — five picks, one per position (Pos 1 Carry … Pos 5 Hard support), from rostered
+  players of teams with a series that week (no byes, no stand-ins); never yourself, teammates
+  fine. A lineup bar (one tab per position, showing its pick) sits over a deck of player cards
+  for the open position: tier and rating (playoff model), top hero's portrait art filling the card
+  (`heroVert`, Valve's `_vert.jpg`; wide image if missing), printed as a worn stencil to match the
+  display type (posterize filter `#ft-paint` in pages/fantasy.js, speckle mask `img/grit.png` from
+  `scripts/gen/gen-grit.js`), three most-played
+  heroes with games, and games, win %, average K/D/A and GPM in the league. Cards of players whose
+  most-played position is that slot come first, best rated first; the rest fold under "Everyone
+  else". Picking a card moves on to the next empty slot; picking it again clears it; a player
+  picked elsewhere shows "In pos N", and picking them moves them. Picks can be
+  changed until the week's first series starts (weeks run Monday to Monday UTC). The database
+  stamps each save with server time; a save after the lock never counts.
+- **Announced series** — series the admins announce before PlayOn posts them
+  (`lib/divisions.js` ANNOUNCED) count as that week's series, so the week opens on time; PlayOn's
+  own series replace them when the sync brings them, and their games count by teams and week.
+  S48 week 8 tiebreakers (Thu Oct 15, start assumed at the usual league night): Challenger
+  Castaway Baes v Get Ganked Challenger 2 (Bo3, 4th seed), Champion WIMCC v SWM.Twinks (Bo3, 8th
+  seed), Heroic Josh A. Suicidal Thoughts v A femboy + 4 Mejicanos (Bo1), the winner v Team
+  Awesome (Bo1, 8th seed). The other divisions have no tiebreakers, so no week opens there.
+- **Scoring** — each game a pick plays that week is scored on the playoff tier model
+  (`lib/tiers.js` NEXT) as if they'd played the slot's position (`gameScoreAt`), and the best two
+  count (a Bo3: best two of three). A pick who doesn't play scores 0.
+- **Leaderboard** — the season so far, from the first week anyone entered: total points, weeks
+  played, last week; open a name for each week's picks and points. Your latest locked week shows
+  above it pick by pick, dropped games struck through.
+- Local preview only: `?fantasy_now=<unix seconds>` sets the clock, to see an open week out of
+  season.

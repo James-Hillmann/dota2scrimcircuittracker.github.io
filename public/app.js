@@ -5,7 +5,7 @@ import { countVisit } from "./lib/visits.js";
 import { searchIndex } from "./lib/search.js";
 import { loadSearch } from "./parts/searchindex.js";
 import { DIVISIONS as DIVISION_LIST, slugOf, fullName, divisionCss, SEASON, playoffs } from "./lib/divisions.js";
-import { esc, DIVISIONS, SOURCES, TM_KEY, timeSel, gameWeeker, seriesWeek, shortDate, divLite, allMatches, addressOf, routedAt, setRoutedAt, navigate, goToSection, showTab, app, tabInUrl, here, bySlug, timeSrc, allLoad, gameLeague, divUploaded, setTitle, myTeam, setMyTeam, myTeamOptions, teamFromOption } from "./core.js";
+import { esc, DIVISIONS, SOURCES, TM_KEY, timeSel, gameWeeker, seriesWeek, shortDate, divLite, allMatches, addressOf, routedAt, setRoutedAt, navigate, goToSection, showTab, app, tabInUrl, here, bySlug, timeSrc, allLoad, gameLeague, divUploaded, setTitle, myTeam, setMyTeam, myTeamOptions, teamFromOption, pageHead } from "./core.js";
 import { weekOfFn } from "./parts/lanes.js";
 import { tabList, PLAYERS_PAGE_TABS, HEROES_PAGE_TABS, PREDICT_TABS, DRAFTER_MODES } from "./lib/pagetabs.js";
 import { renderMatch, renderMatches } from "./pages/games.js";
@@ -16,6 +16,7 @@ import { renderPlayers } from "./pages/players.js";
 import { renderStandings } from "./pages/standings.js";
 import { renderTeams } from "./pages/teams.js";
 import { renderWeek } from "./pages/week.js";
+import { mountMe } from "./parts/me.js";
 
 // Upload (and editing an upload) and Predictions load on first visit.
 const uploadPage = () => import("./pages/upload.js");
@@ -59,10 +60,9 @@ const setSettings = (open) => {
 };
 settingsBtn.onclick = (e) => { e.stopPropagation(); setSettings(settingsPop.hidden); };
 document.addEventListener("click", (e) => { if (!e.target.closest(".settings")) setSettings(false); });
-// The table builder (pages/search.js &table=), in the league being viewed: closes the menu on the way.
-const settingsTables = document.getElementById("settings-tables");
-settingsTables.addEventListener("click", () => setSettings(false));
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") setSettings(false); });
+// The table builder (pages/search.js &table=): a button next to the search, in the league being viewed.
+const tableBtn = document.getElementById("table-btn");
 // My team (core.js myTeam): the list loads the first time the menu opens.
 const myTeamSel = document.getElementById("my-team");
 const fillMyTeam = async () => { myTeamSel.innerHTML = await myTeamOptions(); };
@@ -75,6 +75,13 @@ cbBox.checked = document.documentElement.classList.contains("cb");
 cbBox.onchange = () => {
   document.documentElement.classList.toggle("cb", cbBox.checked);
   try { localStorage.setItem("colorblind", cbBox.checked ? "1" : "0"); } catch { /* not remembered */ }
+};
+// Move subtabs (core.js tabRail): page tabs in a column down the left. Redraws the page.
+const railBox = document.getElementById("rail-mode");
+try { railBox.checked = localStorage.getItem("moveSubtabs") === "1"; } catch { /* storage blocked */ }
+railBox.onchange = () => {
+  try { localStorage.setItem("moveSubtabs", railBox.checked ? "1" : "0"); } catch { /* not remembered */ }
+  route();
 };
 // Theme: dark (no class), html.grey or html.light in style.css. The browser bar follows the page colour.
 const THEME_BAR = { dark: "#0c0b0a", grey: "#2b2d31", light: "#efe9df" };
@@ -204,7 +211,7 @@ const mark = (name, q) => {
   return i < 0 || !q.trim() ? esc(name) : `${esc(name.slice(0, i))}<mark>${esc(name.slice(i, i + q.trim().length))}</mark>${esc(name.slice(i + q.trim().length))}`;
 };
 // The results page for a query, in the league being viewed (scrims and the hub use #/search).
-const resultsHref = (q) => `${navSrc?.ad2l ? navSrc.root : "#"}/search?${new URLSearchParams({ q: q.trim() })}`;
+const resultsHref = (q) => `${navSrc?.root ?? SOURCES.scrim.root}/search?${new URLSearchParams({ q: q.trim() })}`;
 async function showSearch() {
   const q = searchIn.value;
   if (!q.trim()) { searchHits = []; setSearch(false); return; }
@@ -293,28 +300,31 @@ function focusPage() {
 const byName = (a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
 // Each returns { items: [{ name, sub, href, group }] }.
 async function teamMenu(src) {
-  if (!src.ad2l) return { items: listTeams(await allMatches()).map((t) => ({ name: t.name, href: `#/teams/${t.slug}` })).sort(byName) };
+  if (!src.ad2l) return { items: listTeams(await allMatches()).map((t) => ({ name: t.name, href: `${src.root}/teams/${t.slug}` })).sort(byName) };
   const d = await src.data();
   const items = d.teams.map((t) => ({ name: t.name, href: `${src.root}/teams/${t.id}`, group: src.all ? t.division : null }))
     .sort((a, b) => (a.group ?? "").localeCompare(b.group ?? "") || byName(a, b));
   return { items };
 }
 // A page's own tabs (Players, Heroes, Predict, Drafter).
-const pageMenu = (list, path) => async (src) => ({ items: tabList(list, src).map(([id, label]) => ({ name: label, href: `${src.ad2l ? src.root : "#"}/${path}?tab=${id}` })) });
+const pageMenu = (list, path) => async (src) => ({ items: tabList(list, src).map(([id, label]) => ({ name: label, href: `${src.root}/${path}?tab=${id}` })) });
 const playerMenu = pageMenu(PLAYERS_PAGE_TABS, "players");
 const heroMenu = pageMenu(HEROES_PAGE_TABS, "heroes");
 async function weekMenu(src) {
   const games = await src.load(), weekOf = weekOfFn(src.ad2l ? await src.data() : null);
   const weeks = [...new Set(games.map(weekOf))].sort((a, b) => b - a);
-  const first = weeks.at(-1), base = src.ad2l ? `${src.root}/week` : "#/week";
+  const first = weeks.at(-1), base = `${src.root}/content`;
   const items = weeks.map((w, i) => {
     const n = games.filter((m) => weekOf(m) === w).length;
     return { name: `Week ${Math.round((w - first) / (7 * 864e5)) + 1}`, href: `${base}/${i}`, sub: `${shortDate(new Date(w))} · ${n} game${n === 1 ? "" : "s"}` };
   });
   return { items };
 }
-const NAV_MENUS = { standings: teamMenu, teams: teamMenu, players: playerMenu, heroes: heroMenu, week: weekMenu,
-  predict: pageMenu(PREDICT_TABS, "predict"), drafter: pageMenu(DRAFTER_MODES, "drafter") };
+// Phones: the tabs after the first four (Predict, Drafter, Upload) fold under "More ▾".
+const NAV_SHOWN = 4;
+const moreMenu = async (src) => ({ items: src.nav.slice(NAV_SHOWN).map(([href, , label]) => ({ name: label, href })) });
+const NAV_MENUS = { standings: teamMenu, players: playerMenu, heroes: heroMenu, week: weekMenu,
+  predict: pageMenu(PREDICT_TABS, "predict"), drafter: pageMenu(DRAFTER_MODES, "drafter"), more: moreMenu };
 // Scrim Predict has no tabs, so no dropdown.
 const hasMenu = (key, src) => !!NAV_MENUS[key] && !(key === "predict" && !src.ad2l);
 let navSrc = null;
@@ -325,7 +335,7 @@ function closeNavMenus(except = null) {
     if (it === except) continue;
     it.classList.remove("open");
     it.querySelector(".nav-drop").hidden = true;
-    it.querySelector(":scope > a").setAttribute("aria-expanded", "false");
+    it.querySelector(":scope > :is(a, button)").setAttribute("aria-expanded", "false");
   }
 }
 async function openNavMenu(it) {
@@ -333,7 +343,7 @@ async function openNavMenu(it) {
   if (it.classList.contains("open")) return;
   const drop = it.querySelector(".nav-drop"), src = navSrc;
   it.classList.add("open");
-  it.querySelector(":scope > a").setAttribute("aria-expanded", "true");
+  it.querySelector(":scope > :is(a, button)").setAttribute("aria-expanded", "true");
   drop.hidden = false;
   fitNavDrop(drop);
   if (drop.dataset.built) return;
@@ -378,11 +388,17 @@ function fitNavDrop(drop) {
   });
   nav.addEventListener("mouseleave", () => { if (canHover.matches) later(() => closeNavMenus(), 200); });
   nav.addEventListener("focusout", (e) => { if (!navItemOf(e.relatedTarget)) closeNavMenus(); });
-  nav.addEventListener("click", (e) => { if (e.target.closest(".nav-drop a")) { clearTimeout(timer); closeNavMenus(); } });
+  nav.addEventListener("click", (e) => {
+    if (e.target.closest(".nav-drop a")) { clearTimeout(timer); closeNavMenus(); return; }
+    // More ▾ (phones) opens on a tap, since there's no hover.
+    const more = e.target.closest(".nav-more > button");
+    if (more) { const it = more.parentElement; if (it.classList.contains("open")) closeNavMenus(); else openNavMenu(it); }
+  });
+  document.addEventListener("click", (e) => { if (!e.target.closest("#nav")) closeNavMenus(); });
   nav.addEventListener("keydown", async (e) => {
     const it = navItemOf(e.target);
     if (!it) return;
-    const tabLink = it.querySelector(":scope > a"), drop = it.querySelector(".nav-drop");
+    const tabLink = it.querySelector(":scope > :is(a, button)"), drop = it.querySelector(".nav-drop");
     const items = () => [...drop.querySelectorAll(".nd-item")];
     if (e.key === "Escape") { closeNavMenus(); tabLink.focus(); return; }
     if (e.target === tabLink) {
@@ -397,13 +413,13 @@ function fitNavDrop(drop) {
   });
 }
 
-// The home page (#/, and #/ad2l): pick a league. Scrim standings live at #/scrims; Champion's
+// The home page (#/, and #/ad2l): pick a league. The scrims live at #/scrims/; Champion's
 // pages moved from #/ad2l/... to #/champion/... (route() forwards old links). Same order as
 // the menu: the scrims, then AD2L lowest division first.
 function renderHub() {
   const order = [...leagueMenu.querySelectorAll("a")].map((a) => a.dataset.league).filter((k) => k !== "all");
   const link = (key) => key === "scrim"
-    ? `<a href="#/scrims" data-league="scrim" class="hub-scrim"><b>Scrim League</b><span>Our scrims</span></a>`
+    ? `<a href="#/scrims/" data-league="scrim" class="hub-scrim"><b>Scrim League</b><span>Our scrims</span></a>`
     : `<a href="${SOURCES[key].root}/" data-league="${key}"><b>${esc(DIVISIONS[key].short)}</b><span>AD2L ${SEASON.name}</span></a>`;
   app.innerHTML = `<section class="hub">
     <div class="kicker">Dota 2 · Scrims and AD2L ${SEASON.long}</div>
@@ -413,15 +429,30 @@ function renderHub() {
   </section>`;
 }
 
+// Scrim pages before they moved under #/scrims/ (#/week, #/teams/x, #/match/id…): forwarded.
+const OLD_SCRIM = /^#\/(?=(?:week|teams|players|player|heroes|hero|predict|upload|match|matches|edit|search|tiers)(?:[/?]|$))/;
 export function route() {
   setMenu(false);
   let h = here();
   if (/^#\/ad2l\/./.test(h)) h = h.replace(/^#\/ad2l/, SOURCES.ad2l.root); // old Champion links
-  // Show this page's /path/ form (replaceState: no reload, no new history entry).
+  h = h.replace(OLD_SCRIM, "#/scrims/");
+  // A query typed inside the route (#/scrims/search?q=…) moves to the address's own query, where
+  // pages read it (?q=, ?tab=…).
+  const [bare, inRoute = ""] = h.split("?");
+  h = bare;
+  const query = new URLSearchParams(location.search);
+  for (const [k, v] of new URLSearchParams(inRoute)) query.set(k, v);
+  const qs = query.toString() ? `?${query}` : "";
+  // Show this page's /path/ form (replaceState: no reload, no new history entry). A query goes
+  // before the "#", or it would read as part of the route.
   const want = addressOf(h);
-  if (location.pathname + location.hash !== want) history.replaceState(history.state, "", want + location.search);
+  if (inRoute || location.pathname + location.hash !== want) {
+    const [path, hash] = want.split("#");
+    history.replaceState(history.state, "", path + qs + (hash != null ? `#${hash}` : ""));
+  }
   setRoutedAt(location.href);
   if (h === "#/" || /^#\/ad2l\/?$/.test(h)) return routeHub();
+  if (h === "#/privacy") return routePrivacy();
   // #/<division>/..., or #/<division>/<view>/... for a sub-division.
   const [, slug, view] = /^#\/([a-z0-9]+)(?:\/([a-z])(?=\/|$))?/.exec(h) ?? [];
   const key = bySlug[slug];
@@ -432,7 +463,10 @@ export function route() {
   const leagueTitle = src.all ? `AD2L ${SEASON.name} · All Divisions` : isAd2l ? `AD2L ${src.division}${divLabel ? ` · ${divLabel}` : ""}` : "Scrim League";
   // In the playoffs (lib/divisions.js SEASON.phase) every AD2L league gets a stamp over its name.
   const stamp = playoffs && isAd2l ? `<span class="po-stamp" aria-label="Playoffs">Playoffs</span>` : "";
-  document.getElementById("league-name").innerHTML = (src.all ? "AD2L<b>All Divisions</b>" : isAd2l ? `AD2L<b>${src.division}</b>${divLabel ? `<em class="div-badge">${src.view ? `Div ${src.view.toUpperCase()}` : DIVISIONS[src.key].views.join(" + ").toUpperCase()}</em>` : ""}` : "Scrim<b>League</b>") + stamp;
+  // Phones hide the season and shorten "All Divisions" and "Heroic/Aegis" (.bw-season, .bw-long),
+  // so the name fits beside the header's buttons.
+  const shortName = (n) => n.replace(/^([^/]+)(\/.+)$/, '$1<span class="bw-long">$2</span>');
+  document.getElementById("league-name").innerHTML = (src.all ? `AD2L<b><span class="bw-season">${SEASON.name} </span>All<span class="bw-long"> Divisions</span></b>` : isAd2l ? `AD2L<b><span class="bw-season">${SEASON.name} </span>${shortName(esc(DIVISIONS[src.key].short))}</b>${divLabel ? `<em class="div-badge">${src.view ? `<span class="bw-long">Div </span>${src.view.toUpperCase()}` : DIVISIONS[src.key].views.join("+").toUpperCase()}</em>` : ""}` : "Scrim<b>League</b>") + stamp;
   leagueMenu.querySelectorAll("a").forEach((a) => a.classList.toggle("current", a.dataset.league === src.key));
 
   // Pages that read through the time machine; `tm` marks them so its bar shows.
@@ -459,7 +493,8 @@ export function route() {
       const slug = decodeURIComponent(h.slice(r.length).split("/")[2] ?? "");
       section = "standings"; tm = true; page = slug ? () => renderTeams(t, slug) : () => renderStandings(t);
     }
-    else if (h.startsWith(`${r}/week`)) { section = "week"; page = () => renderWeek(src, Number(h.slice(r.length).split("/")[2] ?? 0) || 0); }
+    // Content lives at /content; /week (its old address) still opens it.
+    else if (h.startsWith(`${r}/content`) || h.startsWith(`${r}/week`)) { section = "week"; page = () => renderWeek(src, Number(h.slice(r.length).split("/")[2] ?? 0) || 0); }
     else if (h.startsWith(`${r}/tiers`)) { section = "players"; tm = true; page = () => renderPlayers(t); }
     else if (h.startsWith(`${r}/player/`)) { section = "players"; tm = true; page = () => renderPlayer(t, decodeURIComponent(h.slice(`${r}/player/`.length))); }
     else if (h.startsWith(`${r}/players`)) { section = "players"; tm = true; page = () => renderPlayers(t); }
@@ -472,12 +507,15 @@ export function route() {
     else if (new RegExp(`^${r}/edit/[0-9a-f]{32}$`).test(h)) { section = "week"; page = async () => (await uploadPage()).renderEdit(h.slice(`${r}/edit/`.length), src.key); }
     else if (h.startsWith(`${r}/upload`)) { section = "upload"; page = async () => { const { endEdit, upload, checkDraft, renderUpload } = await uploadPage(); endEdit(); upload.league = src.key; await src.data().catch(() => null); await divUploaded(src.key); if (upload.draft) upload.check = checkDraft(upload.draft); return renderUpload(); }; }
     else if (h.startsWith(`${r}/search`)) { section = "search"; page = async () => (await searchPage()).renderSearch(src); }
-    else { section = "standings"; tm = true; page = () => renderStandings(t); }
+    else if (/^(\/(standings|matches|crosstable|race)?)?\/?$/.test(h.slice(r.length))) { section = "standings"; tm = true; page = () => renderStandings(t); }
+    else page = () => renderNotFound(src);
   } else {
-    const matchId = /^#\/match\/([0-9a-f]{32})$/.exec(h)?.[1];
-    if (matchId) { section = "matches"; page = () => renderMatch(matchId, src); }
-    else if (/^#\/edit\/[0-9a-f]{32}$/.test(h)) { section = "matches"; page = async () => (await uploadPage()).renderEdit(h.slice("#/edit/".length), "scrim"); }
-    else if (h.startsWith("#/upload")) {
+    // The scrims: #/scrims/<page>, the same pages as a division's.
+    const p = h.slice(r.length);
+    const matchId = /^\/match\/([0-9a-f]{32})$/.exec(p)?.[1];
+    if (matchId) { section = "week"; page = () => renderMatch(matchId, src); }
+    else if (/^\/edit\/[0-9a-f]{32}$/.test(p)) { section = "week"; page = async () => (await uploadPage()).renderEdit(p.slice("/edit/".length), "scrim"); }
+    else if (p.startsWith("/upload")) {
       section = "upload";
       page = async () => {
         const { endEdit, upload, checkDraft, renderUpload, startPrivate } = await uploadPage();
@@ -488,30 +526,41 @@ export function route() {
         return renderUpload();
       };
     }
-    else if (h.startsWith("#/predict")) { section = "predict"; page = async () => (await predictPage()).renderScrimPredict(); }
-    else if (h.startsWith("#/teams")) { section = "teams"; tm = true; page = () => renderTeams(t, decodeURIComponent(h.split("/")[2] ?? "")); }
-    else if (h.startsWith("#/week")) { section = "week"; page = () => renderWeek(src, Number(h.split("/")[2] ?? 0) || 0); }
-    else if (h.startsWith("#/tiers")) { section = "players"; tm = true; page = () => renderPlayers(t); }
-    else if (h.startsWith("#/player/")) { section = "players"; tm = true; page = () => renderPlayer(t, decodeURIComponent(h.slice("#/player/".length))); }
-    else if (h.startsWith("#/players")) { section = "players"; tm = true; page = () => renderPlayers(t); }
-    else if (h.startsWith("#/hero/")) { section = "heroes"; tm = true; page = () => renderHero(t, h.slice("#/hero/".length)); }
-    else if (h.startsWith("#/heroes")) { section = "heroes"; tm = true; page = () => renderHeroes(t); }
-    else if (h.startsWith("#/search")) { section = "search"; page = async () => (await searchPage()).renderSearch(src); }
-    else { section = "matches"; tm = true; page = () => renderMatches(t); }
+    else if (p.startsWith("/predict")) { section = "predict"; page = async () => (await predictPage()).renderScrimPredict(); }
+    else if (/^\/teams\/[^/?]/.test(p)) { section = "standings"; tm = true; page = () => renderTeams(t, decodeURIComponent(p.split("/")[2])); }
+    else if (p.startsWith("/content") || p.startsWith("/week")) { section = "week"; page = () => renderWeek(src, Number(p.split("/")[2] ?? 0) || 0); }
+    else if (p.startsWith("/tiers")) { section = "players"; tm = true; page = () => renderPlayers(t); }
+    else if (p.startsWith("/player/")) { section = "players"; tm = true; page = () => renderPlayer(t, decodeURIComponent(p.slice("/player/".length))); }
+    else if (p.startsWith("/players")) { section = "players"; tm = true; page = () => renderPlayers(t); }
+    else if (p.startsWith("/hero/")) { section = "heroes"; tm = true; page = () => renderHero(t, p.slice("/hero/".length)); }
+    else if (p.startsWith("/heroes")) { section = "heroes"; tm = true; page = () => renderHeroes(t); }
+    else if (p.startsWith("/search")) { section = "search"; page = async () => (await searchPage()).renderSearch(src); }
+    // Teams: the table, the matches and the team grid. /teams and /matches were their own pages once.
+    else if (/^(\/(standings|matches|teams)?)?\/?$/.test(p)) { section = "standings"; tm = true; page = () => renderMatches(t); }
+    else page = () => renderNotFound(src);
   }
-  document.getElementById("nav").innerHTML = src.nav.map(([href, key, label, cls]) => {
-    const a = `<a href="${href}" data-nav="${key}" class="${cls ?? ""}${key === section ? " active" : ""}"${key === section ? ' aria-current="page"' : ""}${hasMenu(key, src) ? ' aria-haspopup="true" aria-expanded="false"' : ""}>${label}</a>`;
-    return hasMenu(key, src) ? `<div class="nav-item" data-menu="${key}">${a}<div class="nav-drop" hidden></div></div>` : a;
-  }).join("");
+  // Tabs past the first four carry nav-extra: phones hide them and show them under More ▾.
+  const extra = src.nav.length > NAV_SHOWN + 1;
+  document.getElementById("nav").innerHTML = src.nav.map(([href, key, label, cls], i) => {
+    const x = extra && i >= NAV_SHOWN ? " nav-extra" : "";
+    const a = `<a href="${href}" data-nav="${key}" class="${cls ?? ""}${key === section ? " active" : ""}${hasMenu(key, src) ? "" : x}"${key === section ? ' aria-current="page"' : ""}${hasMenu(key, src) ? ' aria-haspopup="true" aria-expanded="false"' : ""}>${label}</a>`;
+    return hasMenu(key, src) ? `<div class="nav-item${x}" data-menu="${key}">${a}<div class="nav-drop" hidden></div></div>` : a;
+  }).join("") + (extra ? `<div class="nav-item nav-more" data-menu="more"><button type="button" class="${src.nav.slice(NAV_SHOWN).some(([, key]) => key === section) ? "active" : ""}" aria-haspopup="true" aria-expanded="false">More<span class="caret" aria-hidden="true"></span></button><div class="nav-drop more-drop" hidden></div></div>` : "");
+  // Phones scroll the tabs sideways: bring the current one into view.
+  const navEl = document.getElementById("nav"), cur = navEl.querySelector("a.active");
+  if (cur && navEl.scrollWidth > navEl.clientWidth) {
+    const n = navEl.getBoundingClientRect(), c = cur.getBoundingClientRect();
+    navEl.scrollLeft += c.left - n.left - (n.width - c.width) / 2;
+  }
   navSrc = src;
-  settingsTables.href = `${src.ad2l ? src.root : "#"}/search?table=team`;
+  tableBtn.href = `${src.root}/search?table=team`;
   // League menu: each league opens on the tab you're on (Players stays Players). A team,
   // game or player page opens that tab's list, since it needn't exist in the other league.
-  // Standings, the scrim match list and scrim Teams all land on the other league's standings.
-  const tab = { standings: "", matches: "", teams: "" }[section] ?? section;
+  // Teams lands on the other league's Teams. The scrims have no Drafter: their Teams instead.
+  const tab = section === "standings" ? "" : section;
   leagueMenu.querySelectorAll("a").forEach((a) => {
     const l = a.dataset.league;
-    a.href = l === "scrim" ? `#/${tab === "drafter" ? "scrims" : tab || "scrims"}` : `${SOURCES[l].root}/${tab}`;
+    a.href = `${SOURCES[l].root}/${l === "scrim" && tab === "drafter" ? "" : tab}`;
   });
   divisionBar(src, h);
   timeBar(src, tm);
@@ -521,11 +570,30 @@ export function route() {
   setTitle(...(label ? [label] : []), leagueTitle);
   return Promise.resolve(page()).then(goToSection).finally(() => footSync(src));
 }
+// An address that isn't a page: say so, with the way back, rather than quietly showing another page.
+function renderNotFound(src) {
+  setTitle("Page not found");
+  const links = src.nav.filter(([, , , cls]) => !cls).map(([href, , label]) => `<a class="week-btn" href="${href}">${esc(label)}</a>`).join("");
+  app.innerHTML = `${pageHead(src.ad2l ? `AD2L · ${esc(src.all ? "All divisions" : src.division)}` : "Scrim League", "Page not found")}
+    <p class="nf-text">There's no page at <code>${esc(location.pathname + location.hash)}</code>. It may have moved, or the link was cut short.</p>
+    <div class="nf-links">${links}<a class="week-btn" href="#/">All leagues</a></div>`;
+}
 // Footer: when the page's division last synced (from its data file), on AD2L pages.
 function footSync(src) {
   const el = document.getElementById("foot-sync");
   const at = src?.ad2l && src.cache?.()?.updated;
   el.textContent = at ? ` · ${src.all ? "All divisions" : DIVISIONS[src.key].short} synced ${new Date(at).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}` : "";
+}
+
+// Privacy: a site-wide page, outside any league (pages/privacy.js).
+function routePrivacy() {
+  footSync(null);
+  document.body.dataset.league = "hub";
+  document.getElementById("league-name").innerHTML = "AD2L<b>Stat Tracker</b>";
+  document.getElementById("nav").innerHTML = "";
+  document.getElementById("div-switch").hidden = true;
+  timeBar(null, false);
+  return import("./pages/privacy.js").then((m) => m.renderPrivacy());
 }
 
 // The picker page: no tabs, no time machine, and the menu opens each league's first page.
@@ -536,7 +604,7 @@ function routeHub() {
   document.getElementById("league-name").innerHTML = "AD2L<b>Stat Tracker</b>";
   leagueMenu.querySelectorAll("a").forEach((a) => {
     a.classList.remove("current");
-    a.href = a.dataset.league === "scrim" ? "#/scrims" : `${SOURCES[a.dataset.league].root}/`;
+    a.href = `${SOURCES[a.dataset.league].root}/`;
   });
   document.getElementById("nav").innerHTML = "";
   document.getElementById("div-switch").hidden = true;
@@ -565,8 +633,25 @@ document.getElementById("skip-link").addEventListener("click", (e) => {
 window.addEventListener("hashchange", onNav);
 window.addEventListener("popstate", onNav);
 wireInfo();
+// Steam sign-in (fantasy) comes back as #fantasy-token=…: take it out of the address before the
+// router reads the hash as a page, then sign in with it (lib/store.js steamSignIn).
+const steamToken = /^#fantasy-token=([\w-]+\.[\w-]+\.[\w-]+)$/.exec(location.hash)?.[1];
+if (steamToken) {
+  let back = ""; try { back = sessionStorage.getItem("steam-back") ?? ""; sessionStorage.removeItem("steam-back"); } catch { /* storage blocked */ }
+  history.replaceState(history.state, "", location.pathname + location.search + (back.startsWith("#/") ? back : ""));
+  import("./lib/store.js").then((s) => s.steamSignIn(steamToken)).then(() => { mountMe(); route(); }).catch((e) => console.warn("Steam sign-in failed", e));
+}
 route();
+mountMe();
 countVisit();
+// Entry animations (style.css html.calm) play on the first page of a visit; after that, pages
+// appear at once. A visit is this tab: a reload keeps it calm.
+{
+  const calm = () => { document.documentElement.classList.add("calm"); try { sessionStorage.setItem("calm", "1"); } catch { /* storage blocked */ } };
+  let seen = false;
+  try { seen = sessionStorage.getItem("calm") === "1"; } catch { /* storage blocked */ }
+  if (seen) calm(); else setTimeout(calm, 1500);
+}
 // Feedback mode (lib/feedback.js) and the guided tour (lib/tour.js) load after the first page
 // starts drawing, so they don't hold it up.
 // Feedback: the Feedback button in the top bar.

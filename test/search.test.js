@@ -68,8 +68,8 @@ test("scrim players and teams", () => {
   const p = searchIndex(idx, "solo")[0];
   assert.equal(p.leagueLabel, "Scrims");
   assert.equal(p.team, "Pub Stars");
-  assert.equal(p.href, "#/player/solo%20andy");
-  assert.equal(p.teamHref, "#/teams/pub-stars");
+  assert.equal(p.href, "#/scrims/player/solo%20andy");
+  assert.equal(p.teamHref, "#/scrims/teams/pub-stars");
   const t = searchIndex(idx, "pub stars").find((r) => r.kind === "team");
   assert.deepEqual(t.players, ["Solo Andy"]);
 });

@@ -360,7 +360,7 @@ async function buildGame(id) {
   const det = detailOf(d);
   if (det) detail[d.match_id] = det;
   const extras = gameExtras(d);
-  const vis = visionFields(await visionMap(d.patch, CACHE), d);
+  const vis = visionFields(await visionMap(d.patch, CACHE), d, buildingsFrom(d.objectives));
   return {
     series_id: seriesOf?.id ?? null,
     // Captains Mode draft in order; OpenDota team 0 = Radiant = side "a".
@@ -446,6 +446,8 @@ async function buildGame(id) {
       sen_pos: wardLog(p.sen_log, p.sen_left_log),
       // Map their observers were first to light, % of the map, averaged (scripts/sync/vision.js).
       new_vision: vis?.new_vision[i] ?? null,
+      // The same, less ground the team's standing towers already saw (the playoff "Vision %").
+      ward_vision: vis?.ward_vision[i] ?? null,
       // Every death, flat groups of 6 (see public/lib/deathmap.js): second, killer, gold
       // lost, seconds dead, x, y (a spot only for teamfight deaths).
       death_log: deaths?.players[i] ?? null,

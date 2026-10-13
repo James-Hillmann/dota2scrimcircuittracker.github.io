@@ -1,8 +1,9 @@
 // Local dev server: serves public/ exactly as GitHub Pages will. No backend — the site
-// talks to Firestore directly. Usage: npm start → http://localhost:3000
+// talks to Firestore directly (one dev-only exception, the hero-art picker save below).
+// Usage: npm start → http://localhost:3000
 // `node server.js _site` serves a deploy build instead (preview pages, trimmed data files).
 import http from "node:http";
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -10,11 +11,23 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), process.
 const PORT = Number(process.env.PORT ?? 3000);
 const MIME = {
   ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8",
-  ".json": "application/json", ".txt": "text/plain; charset=utf-8", ".xml": "application/xml", ".svg": "image/svg+xml", ".png": "image/png", ".webp": "image/webp", ".ico": "image/x-icon",
+  ".json": "application/json", ".txt": "text/plain; charset=utf-8", ".xml": "application/xml", ".svg": "image/svg+xml", ".png": "image/png", ".webp": "image/webp", ".ico": "image/x-icon", ".woff2": "font/woff2",
 };
+
+// Dev only: the hero-art picker (public/_dev/cards.html) saves its choices here, so Claude can
+// read them. public/_dev/ is gitignored and never deployed.
+const HERO_ART = path.join(root, "_dev", "hero-art.json");
 
 http.createServer(async (req, res) => {
   const { pathname } = new URL(req.url, "http://localhost");
+  if (req.method === "PUT" && pathname === "/_dev/hero-art.json") {
+    let body = "";
+    for await (const c of req) { body += c; if (body.length > 100_000) { res.writeHead(413).end(); return; } }
+    try { JSON.parse(body); } catch { res.writeHead(400).end(); return; }
+    await writeFile(HERO_ART, body);
+    res.writeHead(204).end();
+    return;
+  }
   const file = path.normalize(path.join(root, decodeURIComponent(pathname === "/" ? "/index.html" : pathname)));
   if (!file.startsWith(root)) { res.writeHead(403).end(); return; }
   // A folder serves its index.html (a deploy build's preview pages), as GitHub Pages does.

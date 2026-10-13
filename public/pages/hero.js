@@ -22,12 +22,13 @@ import { heroItemsHtml } from "../parts/items.js";
 import { loading, errorBox, laneCutsOf, lanesPageHtml } from "../parts/lanes.js";
 import { heroRanks, heroRows, heroKey, statRows, statRanksHtml, HERO_RANKS, heroPlayersHtml, heroPubSection, overallHeroes, overallHeroRows } from "../parts/ranks.js";
 import { tierRef } from "../parts/tiers.js";
+import { tagContext, gameTags, tagsHtml, tagCells } from "../lib/gametags.js";
 
 // ---------- Hero page ----------
 
 export async function renderHero(src, slug) {
   const hero = HEROES.find((x) => heroSlug(x) === slug);
-  const back = `<div class="kicker" style="margin-bottom:16px"><a href="${src.ad2l ? `${src.root}/heroes` : "#/heroes"}">← All heroes</a></div>`;
+  const back = `<div class="kicker" style="margin-bottom:16px"><a href="${src.root}/heroes">← All heroes</a></div>`;
   if (!hero) { app.innerHTML = `${back}<div class="notice err">No such hero.</div>`; return; }
   app.innerHTML = loading(src.kicker, esc(hero));
   let matches;
@@ -46,7 +47,7 @@ export async function renderHero(src, slug) {
   // Same compact header as the player page: back link and league, then art, name, the pick line
   // and the tabs on one row.
   const header = (bar = "") => `<header class="page-head pp-head reveal">
-      <div class="kicker" style="--i:0">${crumbs(src, ["Heroes", src.ad2l ? `${src.root}/heroes` : "#/heroes"], hero)}</div>
+      <div class="kicker" style="--i:0">${crumbs(src, ["Heroes", `${src.root}/heroes`], hero)}</div>
       <div class="pp-row" style="--i:1">
         ${img ? `<img class="pp-hero-img" src="${img}" alt="">` : ""}
         <h1><span class="h1-name">${esc(hero)}</span></h1>
@@ -90,7 +91,7 @@ export async function renderHero(src, slug) {
   const known = new Set(statRows(detailed).map((r) => r.key));
 
   const tabs = playerTabs(pageTabs(HERO_TABS, src, [
-    ["stats", `<div class="cards player-cards reveal" style="--cols:${Math.ceil((cards.length + best.length) / 2)}">${cards.map(([k, v, t, tip], i) => `<div class="card" style="--i:${i}"><div class="k">${k}${info(tip)}</div><div class="v">${v}</div><div class="s">${t}</div></div>`).join("")}${best.join("")}</div>
+    ["stats", `<div class="cards player-cards lead-first reveal" style="--cols:${Math.ceil((cards.length + best.length) / 2)}">${cards.map(([k, v, t, tip], i) => `<div class="card" style="--i:${i}"><div class="k">${k}${info(tip)}</div><div class="v">${v}</div><div class="s">${t}</div></div>`).join("")}${best.join("")}</div>
       ${hl.length ? `<div class="cards reveal">${hl.map(([k, v, t], i) => `<div class="card hl" style="--i:${i}"><div class="k">${k}</div><div class="v small">${v}</div><div class="s">${t}</div></div>`).join("")}</div>` : ""}
       <div id="hero-ranks-box" data-hero="${esc(hero)}">${statRanksHtml(src, hkey, rows, null, HERO_RANKS)}</div>
       ${goldCurveSection(matches, byHero(hero), hero)}`],
@@ -111,9 +112,9 @@ export async function renderHero(src, slug) {
       ["deaths", "Deaths", "hero_deaths", playerDeathsHtml(matches, byHero(hero), { id: "hero-deaths", name: hero })],
       ["towers", "Towers", "hero_towers", towerSummaryHtml(matches, byHero(hero), { id: "hero-towers", name: hero })],
     ])],
-    ["games", h.games.length ? `<h2 id="game-analysis">Game analysis${info("game_analysis")}</h2>
-      <div id="game-box" data-hero="${esc(hero)}">${gameAnalysisHtml(src, "hero", h.games, 0, gameRated)}</div>
-      <h2>Every game</h2><div id="t"></div>` : ""],
+    ["games", h.games.length ? `<h2>Every game</h2><p class="table-note">Analyze opens a game in depth on the Analysis tab.</p><div id="t"></div>` : ""],
+    ["analysis", h.games.length ? `<h2 id="game-analysis">Game analysis${info("game_analysis")}</h2>
+      <div id="game-box" data-hero="${esc(hero)}">${gameAnalysisHtml(src, "hero", h.games, 0, gameRated)}</div>` : ""],
   ]), { store: "heroTab", label: "Hero sections" });
 
   app.innerHTML = `${header(tabs.bar)}${tabs.panels}`;
@@ -158,6 +159,7 @@ export async function renderHero(src, slug) {
     ["player", "Player", (v, r) => playerLink(src, r.p), "l"],
     ["us", "Team", (v, r) => teamLink(src, v, r.us_id), "l"],
     ["won", "Result", (v) => `<span class="res ${v ? "w" : "l"}">${v ? "Win" : "Loss"}</span>`],
+    ["tags", "Tags", (v, r) => tagsHtml(r.tag_list), "l"],
     ["vs", "Opponent", (v, r) => teamLink(src, v, r.vs_id), "l"],
     ["rating", "Game rating", (v) => (v == null ? "—" : v), "", "gold", "game_rating"],
     ["kills", "K"], ["deaths", "D"], ["assists", "A"],
@@ -165,6 +167,7 @@ export async function renderHero(src, slug) {
     ...(h.games.some((g) => fbOf(g.m)) ? [["fb", "First blood", fbCell, "", null, "first_blood"]] : []),
     ["link", "", (v) => `<a href="${v}" title="Open game">→</a>`],
   ], h.games.map((g, gi) => ({
+    ...tagCells(gameTags(g.m, tagContext(matches), g.p.team)),
     gi, rating: gameRated[gi].find((r) => r.key === playerKey(g.p))?.rating ?? null, fb: fbRole(g.m, g.p),
     date: g.m.createdAt ? +g.m.createdAt : 0, p: g.p, player: g.p.name, us: usOf(g).name, us_id: usOf(g).id ?? null,
     won: g.won ? 1 : 0, vs: vsOf(g).name, vs_id: vsOf(g).id ?? null,

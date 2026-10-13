@@ -128,11 +128,11 @@ const GA_PAGE = 8;
 function gamePickerHtml(src, mode, games, gi, rated, page = Math.floor(gi / GA_PAGE)) {
   const rateOf = (k) => rated[k].find((r) => r.key === playerKey(games[k].p));
   const ratings = games.map((_, k) => rateOf(k)?.rating ?? null).filter((r) => r != null);
-  const hi = Math.max(...ratings), lo = Math.min(...ratings);
+  const hi = Math.max(...ratings);
   const pages = Math.ceil(games.length / GA_PAGE), from = page * GA_PAGE;
   const tiles = games.slice(from, from + GA_PAGE).map((x, n) => {
     const k = from + n, r = rateOf(k), them = x.p.team === "a" ? x.m.team_b : x.m.team_a;
-    const flag = games.length > 2 && r && r.rating === hi ? "Best" : games.length > 2 && r && r.rating === lo ? "Worst" : "";
+    const flag = games.length > 2 && r && r.rating === hi ? "Best" : "";
     return `<button type="button" class="ga-g ${x.won ? "ga-w" : "ga-l"}${r ? ` t-${r.tier}` : ""}" data-gi="${k}" aria-pressed="${k === gi}" style="--i:${n}"
         title="${esc(mode === "hero" ? x.p.name : x.p.hero)} vs ${esc(them)} · ${x.won ? "Won" : "Lost"} · ${x.p.kills}/${x.p.deaths}/${x.p.assists}">
       ${portrait(x.p.hero, "ga-g-img")}
@@ -209,8 +209,8 @@ export function gameAnalysisHtml(src, mode, games, gi, rated, ctx = null) {
         </div>
       </div>
       <div class="ga-why">
-        <div class="ga-why-col up"><h4>Won it with</h4><ul>${up.map(why).join("") || "<li class='muted'>Nothing well above the position's average.</li>"}</ul></div>
-        <div class="ga-why-col down"><h4>Held back by</h4><ul>${down.map(why).join("") || "<li class='muted'>Nothing well below the position's average.</li>"}</ul></div>
+        <div class="ga-why-col up"><h3>Won it with</h3><ul>${up.map(why).join("") || "<li class='muted'>Nothing well above the position's average.</li>"}</ul></div>
+        <div class="ga-why-col down"><h3>Held back by</h3><ul>${down.map(why).join("") || "<li class='muted'>Nothing well below the position's average.</li>"}</ul></div>
       </div>
       <ol class="ga-ten">${ten}</ol>
     </div>
@@ -267,11 +267,17 @@ export function wireGameAnalysis(src, mode, games, rated, matches) {
     const wrap = box.querySelector(".ga-picker");
     if (pg && wrap) wrap.innerHTML = gamePickerHtml(src, mode, games, +wrap.dataset.gi, rated, +pg.dataset.page);
   });
+  // Analyze on a row of the Games list: that game, on whichever tab holds the analysis, scrolled
+  // to it just under the sticky header.
   document.getElementById("t")?.addEventListener("click", (e) => {
     const b = e.target.closest("button[data-analyze]");
     if (!b) return;
     show(+b.dataset.analyze);
-    document.getElementById("game-analysis")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    const panel = box.closest(".pp-panel");
+    if (panel?.hidden) document.getElementById(panel.id.replace("pp-panel-", "pp-tab-"))?.click();
+    const h2 = document.getElementById("game-analysis");
+    const head = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--head-h")) || 0;
+    if (h2) scrollTo({ top: scrollY + h2.getBoundingClientRect().top - head - 12 });
   });
   wireWardMaps(box);
   wireGameGold(box);

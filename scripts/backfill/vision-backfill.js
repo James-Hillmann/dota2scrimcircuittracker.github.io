@@ -1,12 +1,14 @@
-// Add observer vision (game `vision`, player `new_vision`; see scripts/sync/vision.js) to every game
-// already in public/data/*.json, from the cached OpenDota matches (.cache/opendota). The only
-// network call is the map download on first use. The sync writes both from now on.
+// Add observer vision (game `vision`, player `new_vision` and `ward_vision`; see
+// scripts/sync/vision.js) to every game already in public/data/*.json, from the cached OpenDota
+// matches (.cache/opendota). The only network call is the map download on first use. The sync
+// writes them from now on.
 // Usage: node scripts/backfill/vision-backfill.js
 import { readdir, readFile, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { visionMap, visionFields } from "../sync/vision.js";
+import { buildingsFrom } from "../../public/lib/towermap.js";
 import { leagueJson } from "../sync/league-json.js";
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -31,9 +33,9 @@ for (const f of (await readdir(DATA)).filter((f) => f.endsWith(".json") && !/-(d
     const od = JSON.parse(await readFile(file, "utf8"));
     const map = await visionMap(od.patch, CACHE);
     if (!map) noMap++;
-    const vis = visionFields(map, od);
+    const vis = visionFields(map, od, buildingsFrom(od.objectives));
     if (vis) done++;
-    d.games[gi] = placeAfter({ ...g, players: g.players.map((p, i) => placeAfter(p, "sen_pos", { new_vision: vis?.new_vision[i] ?? null })) }, "fights", { vision: vis?.vision ?? null });
+    d.games[gi] = placeAfter({ ...g, players: g.players.map((p, i) => placeAfter(p, "sen_pos", { new_vision: vis?.new_vision[i] ?? null, ward_vision: vis?.ward_vision[i] ?? null })) }, "fights", { vision: vis?.vision ?? null });
   }
   await writeFile(path.join(DATA, f), leagueJson(d));
   console.log(`${f}: vision for ${done} of ${d.games.length} games${missing ? `, ${missing} not in the cache` : ""}${noMap ? `, ${noMap} on a patch with no map` : ""} (${Date.now() - t0} ms)`);

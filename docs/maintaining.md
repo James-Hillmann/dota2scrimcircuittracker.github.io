@@ -80,10 +80,11 @@ own division in full and every other division as a trimmed copy (below).
 Every push to `main` deploys to GitHub Pages (`.github/workflows/pages.yml`). It copies `public/`
 to `_site/` and adds:
 
-- **Preview pages** (`scripts/deploy/share-pages.js`) at each shareable path (`/warrior/players/`
-  …): that page's title, description and preview card for Discord, then a forward into the app.
+- **Page copies** (`scripts/deploy/share-pages.js`) at each shareable path (`/warrior/players/`
+  …): the app's index.html with that page's title, description, canonical and preview card, so
+  search engines index each page (they ignore `#/…`) and Discord shows a preview. Old `/ad2l/…`
+  paths forward to `/champion/…`.
   Pages without one (player pages, a week other than the latest, uploaded games) keep `/#/…`.
-  Old `/ad2l/…` paths get forwarding pages too.
 - **`sitemap.xml`** (same script), named in `public/robots.txt`.
 - **Trimmed division files**, `data/<division>-lite.json` (`scripts/deploy/lite-data.js`,
   `public/lib/lite.js`): the division file without timelines, ward and building maps, items or
@@ -233,6 +234,21 @@ Scrim data lives in Firestore (the shared `pistachio-kitchen` Firebase project, 
 scrim picks in `predictions` (`league` says which), the scrim schedule in `scrim_fixtures`, casts
 in `casts` (`league`, `game` = the page's game ID, `url`, `caster`; up to 20 per game), feedback
 in `feedback/{id}` (items in `…/items/{n}`, limits in `feedback_limits/{uid}`).
+
+## Steam sign-in Worker (fantasy)
+
+`workers/steam-auth/` is a Cloudflare Worker (account jonahbyu@gmail.com, subdomain
+`ad2lstats.workers.dev`). `/login?return=<page>` sends the visitor to Steam; `/callback` confirms
+the reply with Steam and redirects back with `#fantasy-token=<Firebase custom token>` (app.js
+signs in with it). Only the site and the two localhost previews may receive a token
+(`ALLOWED_ORIGINS`). The signing key is the Worker secret `FIREBASE_SA` (a service-account JSON
+key, firebase-adminsdk, set in the Cloudflare dashboard; never in the repo). Tests:
+`test/steam-auth.test.js`.
+
+```bash
+cd workers/steam-auth && npx wrangler deploy     # after changing src/index.js
+npx wrangler secret list                          # FIREBASE_SA should be listed
+```
 
 ## Firestore rules
 

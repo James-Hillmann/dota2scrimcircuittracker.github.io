@@ -104,12 +104,15 @@ export const VERSIONS = {
     // Points per position, not per role. GPM, net worth and XPM moved almost together
     // (0.83–0.94 across cores), so net worth and farm share are gone; GPM and XPM stay. Damage
     // taken share is new, mostly for offlaners. Healing is down to 3: few heroes heal.
+    // New vision and ward uptime are one stat, Vision % (their points added together): new
+    // vision already counted only the time a ward was alive, and now ground a standing tower
+    // sees earns nothing either.
     weights: {
       1: { gpm: 20, dmg: 20, xpm: 14, kills: 14, lane: 10, tower: 8, assists: 6, soak: 5, stuns: 3 },
       2: { dmg: 18, xpm: 16, kills: 16, gpm: 14, lane: 10, assists: 10, stuns: 8, soak: 5, tower: 3 },
-      3: { dmg: 15, assists: 14, gpm: 13, soak: 12, xpm: 12, stuns: 12, kills: 8, lane: 8, tower: 6 },
-      4: { assists: 18, stuns: 12, dewards: 10, vision: 8, kills: 8, smokes: 8, lanewin: 7, gpm: 7, stacks: 6, dmg: 4, uptime: 3, xpm: 3, heal: 3, dust: 2, sentries: 1 },
-      5: { vision: 16, dewards: 15, assists: 13, lanewin: 9, stacks: 9, gpm: 7, uptime: 6, stuns: 6, kills: 5, smokes: 4, xpm: 3, heal: 3, sentries: 2, dust: 2 },
+      3: { dmg: 15, gpm: 13, soak: 12, xpm: 12, stuns: 12, assists: 11, kills: 11, lane: 8, tower: 6 },
+      4: { assists: 18, stuns: 12, vispct: 11, dewards: 10, kills: 8, smokes: 8, lanewin: 7, gpm: 7, stacks: 6, dmg: 4, xpm: 3, heal: 3, dust: 2, sentries: 1 },
+      5: { vispct: 22, dewards: 15, assists: 13, lanewin: 9, stacks: 9, gpm: 7, stuns: 6, kills: 5, smokes: 4, xpm: 3, heal: 3, sentries: 2, dust: 2 },
     },
     // Stat podium: impressive raw numbers, cores and supports apart. In each of a role's podium
     // stats (PODIUM_STATS), the best three season averages a game among players whose main
@@ -183,6 +186,7 @@ export const METRICS = {
   lane: { label: "Laning", def: "Gold earned in the first 10 minutes as a % of the most a lane can give." },
   stuns: { label: "Stun time", def: "Seconds of disable on enemy heroes per minute." },
   vision: { label: "New vision", def: "Share of the map outside their base that their observer wards lit up first on the team, averaged over the game. Trees and cliffs block wards; ground a teammate already showed doesn't count. Older games have no number." },
+  vispct: { label: "Vision %", def: "Share of the map outside their base that their observer wards lit and nothing else on the team already showed, averaged over the game: ground a teammate's ward or a standing tower already sees doesn't count, and a ward only counts while it's alive. Tower sight shrinks at night, and a fallen tower sees nothing, so a ward is worth more once the towers near it are down. Older games have no number." },
   uptime: { label: "Ward uptime", def: "Seconds of observer vision a minute: every observer's time alive, so one the enemy kills early counts only the time it lived. Sentries count half." },
   dewards: { label: "Dewards", def: "Enemy wards killed per 10 minutes; a sentry counts half an observer." },
   sentries: { label: "Sentries", def: "Sentry wards placed per 10 minutes." },
@@ -265,6 +269,7 @@ function gameRows(m) {
           lane: p.lane_eff ?? null,
           stuns: p.stuns != null ? p.stuns / minutes : null,
           vision: p.new_vision ?? null,
+          vispct: p.ward_vision ?? null,
           dewards: parsed ? per10((p.obs_killed ?? 0) + 0.5 * (p.sen_killed ?? 0)) : null,
           uptime: p.obs_pos ? (wardSeconds(p.obs_pos, m.duration_sec) + 0.5 * wardSeconds(p.sen_pos ?? [], m.duration_sec)) / minutes : null,
           sentries: parsed ? per10(p.sen_placed) : null,
@@ -310,15 +315,19 @@ function seriesRows(rows, unitOf = (r) => r.role) {
     const k = `${keyOf(r.p)}|${r.series}|${unitOf(r)}`;
     const m = r.match;
     const s = by.get(k) ?? {
-      key: keyOf(r.p), role: r.role, unit: unitOf(r), series: r.series, games: 0, wins: 0, z: {}, n: {},
+      key: keyOf(r.p), role: r.role, unit: unitOf(r), series: r.series, games: 0, wins: 0, z: {}, n: {}, game_ids: [],
       vs: (r.p.team === "a" ? m.team_b : m.team_a) ?? null, time: m.start_time ?? (m.createdAt ? +new Date(m.createdAt) / 1000 : null),
     };
     s.games++;
+    s.game_ids.push([m.start_time ?? (m.createdAt ? +new Date(m.createdAt) / 1000 : 0), m.id]);
     if (r.won) s.wins++;
     for (const [metric, z] of Object.entries(r.z)) { s.z[metric] = (s.z[metric] ?? 0) + z; s.n[metric] = (s.n[metric] ?? 0) + 1; }
     by.set(k, s);
   }
-  for (const s of by.values()) for (const m of Object.keys(s.z)) s.z[m] /= s.n[m];
+  for (const s of by.values()) {
+    for (const m of Object.keys(s.z)) s.z[m] /= s.n[m];
+    s.game_ids = s.game_ids.sort((a, b) => a[0] - b[0]).map(([, id]) => id); // played order
+  }
   return [...by.values()];
 }
 
@@ -560,7 +569,7 @@ function scorePlayers(rows, model, { consistency = true, teams = teamGames(rows)
       // season's survival, consistency and winning. Both average (weighted by games) to the
       // season's stat points and score.
       series: a.series.map((s) => ({
-        series: s.series, role: s.role, pos: typeof s.unit === "number" ? s.unit : null, games: s.games, wins: s.wins, vs: s.vs, time: s.time,
+        series: s.series, role: s.role, pos: typeof s.unit === "number" ? s.unit : null, games: s.games, wins: s.wins, vs: s.vs, time: s.time, game_ids: s.game_ids,
         points: s.points, opp: s.opp, opp_rate: s.opp_rate,
         score: s.points == null ? null : s.points * s.opp * mult.survival * mult.consistency * mult.winning + winPts,
       })).sort((x, y) => (y.time ?? 0) - (x.time ?? 0)),
@@ -813,6 +822,18 @@ export function gameRatings(m, matches, { model = null } = {}) {
   return scorePlayers(rows, model, { teams })
     .map((p) => { const rating_exact = ratingOf(p.score, model.game_curve ?? model.curve); return { ...p, rating_exact, rating: Math.round(rating_exact), tier: TIERS.find((t) => rating_exact >= t.min).tier }; })
     .sort((a, b) => b.score - a.score);
+}
+
+// One player's score in one game as if they had played position `pos` in it (the fantasy league
+// scores a pick against its slot's position, whatever they played). `models`: a tierModels set
+// (any version); opponent strength from all of `matches`. null when they're not in the game.
+export function gameScoreAt(m, matches, key, pos, models) {
+  const model = models[pos];
+  const teams = leagueTeams.get(matches) ?? leagueTeams.set(matches, teamGames(matches.flatMap(gameRows))).get(matches);
+  const rows = gameRows(m).filter((r) => keyOf(r.p) === String(key));
+  if (!rows.length) return null;
+  for (const r of rows) { r.pos = pos; r.role = pos <= 3 ? "core" : "support"; scoreRow(r, model); }
+  return scorePlayers(rows, model, { teams })[0].score;
 }
 
 // OpenDota rank_tier (tens = medal, ones = stars) -> label.

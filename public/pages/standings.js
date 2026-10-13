@@ -250,7 +250,7 @@ export async function renderStandings(src) {
     ["matches", matchesHtml(src, d, ratings)],
     ["cross", crossTableHtml(src, d, [...rows].sort((a, b) => b.gw - a.gw || a.gl - b.gl).map((r) => r.id))],
     ["race", raceHtml],
-  ]), { store: "standingsTab", label: "Standings sections" });
+  ]), { store: "standingsTab", label: "Standings sections", remember: false });
   app.innerHTML = `
     ${pageHead(kicker, "Teams", `${d.games.length} ticketed games · updated ${updated}.`, tabs.bar)}
     ${tabs.panels}`;

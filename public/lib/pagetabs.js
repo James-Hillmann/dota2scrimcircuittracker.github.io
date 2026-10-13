@@ -3,17 +3,21 @@
 // Each entry: [id, label or (src) => label, { ad2l: true } if the tab only exists on AD2L].
 // A page may still hide a tab for one team or player when it has nothing to show (core.js
 // playerTabs drops empty panels).
+// Team Draft: the hero grid (prep sheet), side and pick order, draft by phase, the model's
+// drafts. Team Resources: the gold block (curve, leads, comebacks), which needs AD2L timelines.
 export const TEAM_TABS = [
   ["overview", "Overview"], ["roster", "Roster"], ["games", (src) => (src.ad2l ? "Series" : "Games")], ["heroes", "Heroes"],
-  ["chances", "Outcomes", { ad2l: true }], ["lanes", "Laning", { ad2l: true }], ["map", "Map"],
+  ["draft", "Draft"], ["chances", "Outcomes", { ad2l: true }], ["lanes", "Laning", { ad2l: true }],
+  ["resources", "Resources", { ad2l: true }], ["map", "Map"],
 ];
+// Games is the list; game analysis sits under Stats (a row's ANALYZE opens it on that game).
 export const PLAYER_TABS = [
   ["stats", "Stats"], ["compare", "Compare"], ["heroes", "Heroes"], ["combat", "Combat"], ["lanes", "Laning", { ad2l: true }],
   ["items", "Items"], ["map", "Map"], ["games", "Games"],
 ];
 export const HERO_TABS = [
   ["stats", "Stats"], ["players", "Players"], ["draft", "Draft"], ["matchups", "Matchups"], ["combat", "Combat"],
-  ["lanes", "Laning", { ad2l: true }], ["items", "Items"], ["map", "Map"], ["games", "Games"],
+  ["lanes", "Laning", { ad2l: true }], ["items", "Items & skills"], ["map", "Map"], ["games", "Games"], ["analysis", "Analysis"],
 ];
 // The league's Players page. Laning and Medal vs rating need AD2L's replays and medals.
 export const PLAYERS_PAGE_TABS = [
@@ -23,9 +27,11 @@ export const PLAYERS_PAGE_TABS = [
 // The league's Heroes page.
 export const HEROES_PAGE_TABS = [["tiers", "Hero tiers"], ["players", "Players on heroes"], ["table", "All heroes"]];
 // AD2L's Predict page (the scrim one has no tabs).
-export const PREDICT_TABS = [["calls", "Predictions"], ["board", "Leaderboard"], ["bracket", "Bracket"], ["odds", "Seeding"]];
+export const PREDICT_TABS = [["calls", "Predictions"], ["board", "Leaderboard"], ["bracket", "Bracket"], ["odds", "Seeding"], ["fantasy", "Fantasy"]];
 // The Drafter's starting points (buttons on the page, not tabs, but linked the same way).
 export const DRAFTER_MODES = [["upcoming", "Upcoming series"], ["teams", "Any two teams"], ["game", "Past game"]];
+// The scrims' Teams page: the table built from the games, every match, and the team cards.
+export const SCRIM_TEAMS_TABS = [["table", "Table"], ["matches", "Matches"], ["teams", "Teams"]];
 // Race: AD2L divisions only, not All (sixty lines on one chart), once two league nights are in.
 export const STANDINGS_TABS = [
   ["table", "Table"], ["matches", "Matches"], ["cross", "Crosstable"], ["race", "Race", { div: true }],

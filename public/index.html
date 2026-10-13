@@ -34,9 +34,11 @@
     }
   }
   </script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Stencil+Display:wght@600;800;900&family=Epilogue:wght@400;500;600;700&family=Martian+Mono:wght@300;400;600&display=swap" rel="stylesheet">
+  <!-- Fonts are served from this site (fonts/), not from Google Fonts. They came from
+       fonts.googleapis.com/css2?family=Big+Shoulders+Stencil+Display:wght@600;800;900&family=Epilogue:wght@400;500;600;700&family=Martian+Mono:wght@300;400;600 -->
+  <link rel="preload" href="fonts/epilogue-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="fonts/big-shoulders-stencil-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="fonts/fonts.css">
   <link rel="stylesheet" href="style.css">
   <!-- Colour-blind mode and the theme (settings cog), set before the first paint so the colours don't flash. -->
   <script>try {
@@ -64,6 +66,10 @@
         <kbd class="search-key" aria-hidden="true">/</kbd>
         <div class="search-pop" id="search-pop" role="listbox" aria-label="Players and teams" hidden></div>
       </div>
+      <!-- The table builder (pages/search.js &table=), in the league being viewed (app.js sets the link). -->
+      <a class="tb-btn" id="table-btn" href="#/scrims/search?table=team" title="Table builder: any stat, any filter, as a table" aria-label="Table builder">
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="1"/><path d="M3.5 9.5h17M3.5 14.5h17M9.5 9.5v10"/></svg>
+      </a>
       <div class="switcher">
         <button class="league-btn" id="league-btn" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="league-menu">League<span class="caret" aria-hidden="true"></span></button>
         <div class="league-menu" id="league-menu" hidden>
@@ -77,6 +83,8 @@
         <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v11H9l-5 4z"/><path d="M9 10.5h6M12 7.5v6"/></svg>
         <span class="fb-open-label">Feedback</span><b class="fb-badge" hidden>0</b>
       </button>
+      <!-- Steam sign-in (Fantasy): "Sign in", or your avatar linking to your page (parts/me.js). -->
+      <div class="me" id="me"></div>
       <div class="settings">
         <button class="settings-btn" id="settings-btn" type="button" title="Settings" aria-label="Settings" aria-haspopup="true" aria-expanded="false" aria-controls="settings-pop">
           <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="7.5" stroke-width="3.5" stroke-dasharray="3.1 2.79"/><circle cx="12" cy="12" r="5.2" stroke-width="2.2"/></svg>
@@ -89,7 +97,7 @@
             <label><input type="radio" name="theme" value="light"> Light</label>
           </div>
           <label class="settings-row"><input type="checkbox" id="cb-mode"> Colour-blind mode</label>
-          <a class="settings-row settings-link" id="settings-tables" href="#/search?table=team">Table builder →</a>
+          <label class="settings-row" title="Page tabs (Table, Matches, Stats…) , and the Content page's weeks, move into a sidebar that slides in from the left edge"><input type="checkbox" id="rail-mode"> Move subtabs</label>
           <label class="settings-team"><span class="menu-label">My team</span><select id="my-team"><option value="">None set</option></select>
             <small>Hero grids read the draft model against this team. Kept in this browser.</small></label>
           <!-- Time machine: only on pages it applies to (app.js timeBar); its week panel opens in place. -->
@@ -108,7 +116,7 @@
     <span>Not affiliated with Valve.</span>
     <!-- Where the numbers come from; on AD2L pages, when that division last synced (app.js footSync). -->
     <span class="foot-data">AD2L data from <a href="https://dota.playon.gg/" target="_blank" rel="noopener">PlayOn</a> and
-      <a href="https://www.opendota.com/" target="_blank" rel="noopener">OpenDota</a>; scrims uploaded here<span id="foot-sync"></span></span>
+      <a href="https://www.opendota.com/" target="_blank" rel="noopener">OpenDota</a>; scrims uploaded here<span id="foot-sync"></span> · <a href="#/privacy">Privacy</a></span>
     <div class="foot-links">
       <button class="tour-open" id="tour-open" type="button" title="A guided tour of the site">New here?</button>
       <a class="discord-join" href="https://discord.gg/rPWa2tvt9k" target="_blank" rel="noopener" title="Join the Discord" aria-label="Join the Discord">

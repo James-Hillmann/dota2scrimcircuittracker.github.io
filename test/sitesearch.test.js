@@ -6,7 +6,7 @@ import { HEROES } from "../public/lib/heroes.js";
 import { TEAM_TABS, PLAYER_TABS, HERO_TABS, STANDINGS_TABS, PLAYERS_PAGE_TABS, HEROES_PAGE_TABS } from "../public/lib/pagetabs.js";
 import { fold } from "../public/lib/search.js";
 
-const LEAGUE_TABS = { "": STANDINGS_TABS.map(([id]) => id), heroes: HEROES_PAGE_TABS.map(([id]) => id), players: PLAYERS_PAGE_TABS.map(([id]) => id), week: [] };
+const LEAGUE_TABS = { "": STANDINGS_TABS.map(([id]) => id), heroes: HEROES_PAGE_TABS.map(([id]) => id), players: PLAYERS_PAGE_TABS.map(([id]) => id), content: [] };
 const PAGE_TABS = { team: TEAM_TABS, player: PLAYER_TABS, hero: HERO_TABS };
 const where = (at) => !at || INFO[at] || ANCHORS.includes(at);
 const clean = (w) => w === fold(w).replace(/[^\p{L}\p{N} ]/gu, "") && !/\s{2}/.test(w);
@@ -58,8 +58,8 @@ test("editDistance counts a swap of neighbours as one edit", () => {
 test("link helpers", () => {
   assert.equal(withAt("#/champion/teams/5", { tab: "overview", at: "team_sides" }), "#/champion/teams/5?tab=overview&at=team_sides");
   assert.equal(withAt("#/champion/teams/5", {}), "#/champion/teams/5");
-  assert.equal(leagueHref("#", { path: "" }), "#/scrims");
-  assert.equal(leagueHref("#", { path: "heroes", tab: "table" }), "#/heroes?tab=table");
+  assert.equal(leagueHref("#/scrims", { path: "" }), "#/scrims/");
+  assert.equal(leagueHref("#/scrims", { path: "heroes", tab: "table" }), "#/scrims/heroes?tab=table");
   assert.equal(leagueHref("#/champion", { path: "heroes", tab: "table", at: "radiant_rate" }), "#/champion/heroes?tab=table&at=radiant_rate");
   assert.equal(leagueHref("#/champion", { path: "" }), "#/champion/");
 });

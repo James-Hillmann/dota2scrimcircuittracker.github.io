@@ -16,6 +16,7 @@ import { routeOf, sharePath } from "./lib/share.js";
 import { withNicknames } from "./lib/nicknames.js";
 import { DIVISIONS as DIVISION_LIST, fullName, SEASON } from "./lib/divisions.js";
 import { teamSplits } from "./lib/combat.js";
+import { isBye } from "./lib/playoffs.js";
 
 // lib/tour.js loads after the first page (bottom of app.js), except when a reload left a tour
 // mid-way: loading it puts the tour's tab choices back in storage, which the page modules read
@@ -46,14 +47,14 @@ export const setTitle = (...parts) => { document.title = [...parts, "AD2L Stat T
 // Breadcrumbs on a detail page (player, hero, team, game): league › list › this page, and the
 // tab title from the same trail. `list` is [label, href]; `name` is plain text (escaped here).
 const leagueCrumb = (src) => src.all ? ["All divisions", "#/all/"]
-  : src.ad2l ? [`${DIVISIONS[src.key].short}${src.view ? ` ${src.view.toUpperCase()}` : ""}`, `${src.root}/`] : ["Scrim League", "#/scrims"];
+  : src.ad2l ? [`${DIVISIONS[src.key].short}${src.view ? ` ${src.view.toUpperCase()}` : ""}`, `${src.root}/`] : ["Scrim League", "#/scrims/"];
 export function crumbs(src, list, name) {
   const trail = [leagueCrumb(src), list];
   setTitle(name, list[0], trail[0][0]);
   return `<nav class="crumbs" aria-label="Breadcrumb"><ol>${trail.map(([label, href]) => `<li><a href="${href}">${esc(label)}</a></li>`).join("")}<li aria-current="page">${esc(name)}</li></ol></nav>`;
 }
 // A team name that opens the team's page. AD2L teams by PlayOn id (looked up by name when
-// only the name is known); scrim teams by name. Inside something that's already a link
+// only the name is known); scrim teams by name (#/scrims/teams/<slug>). Inside something that's already a link
 // (a match card), nested=true gives a span handled by the click listener at the bottom.
 function teamHref(src, name, id = null) {
   if (!name) return null;
@@ -61,7 +62,7 @@ function teamHref(src, name, id = null) {
     id ??= src.cache()?.teams.find((t) => t.name.trim().toLowerCase() === name.trim().toLowerCase())?.id;
     return id != null ? `${src.root}/teams/${id}` : null;
   }
-  return `#/teams/${teamSlug(name)}`;
+  return `${src.root}/teams/${teamSlug(name)}`;
 }
 export function teamLink(src, name, id = null, nested = false) {
   const href = teamHref(src, name, id);
@@ -80,7 +81,7 @@ export function profileLinks(accountId, playonId = null, sep = " · ") {
   return out.map(([name, href]) => `<a href="${href}" target="_blank" rel="noopener">${name} ↗</a>`).join(sep);
 }
 // A player name that opens their page (same nested rule as teamLink).
-export const playerHref = (src, key) => `${src.ad2l ? `${src.root}/player/` : "#/player/"}${encodeURIComponent(key)}`;
+export const playerHref = (src, key) => `${src.root}/player/${encodeURIComponent(key)}`;
 export function playerLink(src, p, nested = false, label = null) {
   const href = playerHref(src, p.key ?? playerKey(p));
   const text = label ?? esc(p.name);
@@ -89,7 +90,7 @@ export function playerLink(src, p, nested = false, label = null) {
     : `<a class="player-link" href="${href}">${text}</a>`;
 }
 // A hero name that opens the hero's page (same nested rule as teamLink).
-export const heroHref = (src, hero) => `${src.ad2l ? `${src.root}/hero/` : "#/hero/"}${heroSlug(hero)}`;
+export const heroHref = (src, hero) => `${src.root}/hero/${heroSlug(hero)}`;
 export function heroLink(src, hero, nested = false) {
   const href = heroHref(src, hero);
   return nested
@@ -232,17 +233,23 @@ const MY_TEAM_KEY = "my-team";
 export function myTeam() {
   try { const v = JSON.parse(localStorage.getItem(MY_TEAM_KEY)); return v?.div && v.id != null ? v : null; } catch { return null; }
 }
-export function setMyTeam(t) {
-  const v = t ? { div: t.div, id: t.id, name: t.name } : null;
-  try { if (v) localStorage.setItem(MY_TEAM_KEY, JSON.stringify(v)); else localStorage.removeItem(MY_TEAM_KEY); } catch { /* not remembered */ }
+// `auto`: set from the Steam sign-in (parts/me.js), the team whose roster has you. A choice made
+// by hand (a team, or None) is kept as such, and sign-in never overrides it.
+export function setMyTeam(t, { auto = false } = {}) {
+  const v = t ? { div: t.div, id: t.id, name: t.name, ...(auto ? { auto: true } : {}) } : null;
+  try { localStorage.setItem(MY_TEAM_KEY, JSON.stringify(v ?? { none: true })); } catch { /* not remembered */ }
   dispatchEvent(new CustomEvent("myteam", { detail: v }));
 }
+// Whether sign-in may set My team: never chosen, or last set by sign-in itself.
+export function myTeamAutoOk() {
+  try { const raw = localStorage.getItem(MY_TEAM_KEY); return raw == null || !!JSON.parse(raw)?.auto; } catch { return false; }
+}
 // <option>s for a "my team" <select>: none, then every division's teams (each division's lite
-// file, loaded once). Option values are "div:id".
+// file, loaded once), without PlayOn's bye-week placeholders. Option values are "div:id".
 let teamListReady = null;
 export async function myTeamOptions(selected = myTeam()) {
   teamListReady ??= Promise.all(ALL_DIVS.map(async (k) => [k, await divLite(k).catch(() => null)]))
-    .then((all) => all.filter(([, d]) => d?.teams?.length).map(([k, d]) => ({ k, teams: [...d.teams].sort((a, b) => a.name.localeCompare(b.name)) })));
+    .then((all) => all.filter(([, d]) => d?.teams?.length).map(([k, d]) => ({ k, teams: d.teams.filter((t) => !isBye(t)).sort((a, b) => a.name.localeCompare(b.name)) })));
   const sel = selected ? `${selected.div}:${selected.id}` : "";
   return `<option value="">None set</option>${(await teamListReady).map(({ k, teams }) => `<optgroup label="${esc(DIVISIONS[k].name)}">${teams.map((t) => `<option value="${k}:${t.id}"${sel === `${k}:${t.id}` ? " selected" : ""}>${esc(t.name)}</option>`).join("")}</optgroup>`).join("")}`;
 }
@@ -286,12 +293,14 @@ async function divGames(src) {
   return up.length ? [...d.games, ...up].sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0)) : d.games;
 }
 
+// Scrim pages live under #/scrims/ like a division's under #/<slug>/ (old #/week, #/teams…
+// links forward, app.js route). Teams (#/scrims/) holds the table, the matches and the team grid.
 export const SOURCES = {
   scrim: {
-    key: "scrim", kicker: "The ledger", load: allMatches,
-    link: (m) => `#/match/${m.id}`, base: "#/scrims",
-    empty: `The ledger is empty. <a href="#/upload">Upload the first scrim</a>.`,
-    nav: [["#/scrims", "matches", "Standings"], ["#/week", "week", "Content"], ["#/teams", "teams", "Teams"], ["#/players", "players", "Players"], ["#/heroes", "heroes", "Heroes"], ["#/predict", "predict", "Predict"], ["#/upload", "upload", "Upload", "nav-cta"]],
+    key: "scrim", kicker: "The ledger", load: allMatches, root: "#/scrims",
+    link: (m) => `#/scrims/match/${m.id}`, base: "#/scrims/content",
+    empty: `The ledger is empty. <a href="#/scrims/upload">Upload the first scrim</a>.`,
+    nav: [["#/scrims/", "standings", "Teams"], ["#/scrims/content", "week", "Content"], ["#/scrims/players", "players", "Players"], ["#/scrims/heroes", "heroes", "Heroes"], ["#/scrims/predict", "predict", "Predict"], ["#/scrims/upload", "upload", "Upload", "nav-cta"]],
   },
 };
 // AD2L divisions: `ad2l` marks the PlayOn/OpenDota pages, `root` prefixes their routes
@@ -302,9 +311,9 @@ for (const [key, dv] of Object.entries(DIVISIONS)) {
   SOURCES[key] = {
     key, ad2l: true, root, data: () => divData(key), cache: () => divCache[key],
     division: dv.name, kicker: `AD2L · ${dv.name}`, load: () => divGames(SOURCES[key]),
-    link: (m) => `${root}/game/${m.id}`, base: `${root}/week`,
+    link: (m) => `${root}/game/${m.id}`, base: `${root}/content`,
     empty: `No ticketed ${dv.short} games found yet.`,
-    nav: [[`${root}/`, "standings", "Teams"], [`${root}/week`, "week", "Content"], [`${root}/players`, "players", "Players"], [`${root}/heroes`, "heroes", "Heroes"], [`${root}/predict`, "predict", "Predict"], [`${root}/drafter`, "drafter", "Drafter"], [`${root}/upload`, "upload", "Upload", "nav-cta"]],
+    nav: [[`${root}/`, "standings", "Teams"], [`${root}/content`, "week", "Content"], [`${root}/players`, "players", "Players"], [`${root}/heroes`, "heroes", "Heroes"], [`${root}/predict`, "predict", "Predict"], [`${root}/drafter`, "drafter", "Drafter"], [`${root}/upload`, "upload", "Upload", "nav-cta"]],
   };
   // Sub-division views (#/heroic/a/..., #/heroic/b/...): same pages and league key, data
   // narrowed to that sub-division. Plain #/<key>/... is Combined.
@@ -314,7 +323,7 @@ for (const [key, dv] of Object.entries(DIVISIONS)) {
       ...h, view: v, root: vroot,
       data: async () => inDivision(await divData(key), div), cache: () => divCache[key] && inDivision(divCache[key], div),
       kicker: `${h.kicker} · Division ${div}`, load: () => divGames(src),
-      link: (m) => `${vroot}/game/${m.id}`, base: `${vroot}/week`,
+      link: (m) => `${vroot}/game/${m.id}`, base: `${vroot}/content`,
       empty: `No ticketed Division ${div} games found yet.`,
       nav: h.nav.map(([href, ...rest]) => [href.replace(root, vroot), ...rest]),
     };
@@ -357,9 +366,9 @@ export async function allLoad() {
 SOURCES.all = {
   key: "all", ad2l: true, all: true, root: "#/all", data: allData, cache: () => allCache,
   division: `${SEASON.name} All Divisions`, kicker: `AD2L · ${SEASON.name} · Every division`, load: allLoad,
-  link: (m) => `${SOURCES[gameLeague.get(m.id)]?.root ?? "#/all"}/game/${m.id}`, base: "#/all/week",
+  link: (m) => `${SOURCES[gameLeague.get(m.id)]?.root ?? "#/all"}/game/${m.id}`, base: "#/all/content",
   empty: "No ticketed games found yet.",
-  nav: [["#/all/", "standings", "Teams"], ["#/all/week", "week", "Content"], ["#/all/players", "players", "Players"], ["#/all/heroes", "heroes", "Heroes"]],
+  nav: [["#/all/", "standings", "Teams"], ["#/all/content", "week", "Content"], ["#/all/players", "players", "Players"], ["#/all/heroes", "heroes", "Heroes"]],
 };
 bySlug.all = "all";
 
@@ -482,7 +491,7 @@ window.addEventListener("resize", () => {
 // Hero card grids (.hp-grid): fewest rows that fit, then split the cards evenly across them,
 // so 8 cards go 4 + 4 instead of 7 + 1. Phones keep the CSS two-column layout.
 const HP_MIN = 220, HP_GAP = 10;
-const narrow = matchMedia("(max-width: 860px)");
+const narrow = matchMedia("(max-width: 1000px)");
 function balanceGrid(el) {
   const n = el.children.length, w = el.clientWidth;
   if (narrow.matches || !n || !w) return void el.style.removeProperty("grid-template-columns");
@@ -562,8 +571,9 @@ export const pubStartLabel = (d) => new Date(pubStart(d) * 1000).toLocaleDateStr
 // Only games far enough inside the pub window that the week before is all on record.
 export const PREP_DAYS = 7;
 
-// Team Map tab: objectives, vision and gold, each number ranked against every team in the
-// league (games with replay data), so what a team is good or bad at stands out.
+// Team Map and Resources tabs: objectives and vision (Map), gold (Resources), each number ranked
+// against every team in the league (games with replay data), so what a team is good or bad at
+// stands out.
 const leagueMapCache = new WeakMap();
 function leagueTeamMap(matches, teams) {
   const hit = leagueMapCache.get(matches);
@@ -600,7 +610,8 @@ const MAP_METRICS = {
   fb: ["First blood", pct, "team_first_blood", "first blood"],
 };
 
-export function teamMapHtml(src, matches, teams, team, h) {
+// part: "map" = strengths and weak spots, objectives, vision; "gold" = the Resources tab's gold block.
+export function teamMapHtml(src, matches, teams, team, h, part = "map") {
   const all = leagueTeamMap(matches, teams), me = all.get(team.key);
   if (!me) return "";
   const field = [...all.values()];
@@ -679,19 +690,21 @@ export function teamMapHtml(src, matches, teams, team, h) {
         </div>
       </div>`;
   }
-  return `${summary}${objectives}${gold}`;
+  return part === "gold" ? gold : `${summary}${objectives}`;
 }
 
 // Player and hero page tabs: one panel shows at a time. Empty panels (no map data in scrims) get
 // no tab. The open tab is remembered per kind of page, so going player to player (or hero to
 // hero) keeps you on Map or Games. Each tab click is its own history step with ?tab=<id> in the
 // address, so Back goes to the previous tab and a copied link opens on that tab.
+// remember: false opens on the first tab unless the address names one (the league's Teams page
+// always opens on Table, a team page on Overview); the click still saves it for pages that do.
 const TAB_KEY = "playerTab";
 export const tabInUrl = () => history.state?.tab ?? new URLSearchParams(location.search).get("tab");
-export function playerTabs(tabs, { store = TAB_KEY, label = "Player sections" } = {}) {
+export function playerTabs(tabs, { store = TAB_KEY, label = "Player sections", remember = true } = {}) {
   const shown = tabs.filter(([, , html]) => html.trim());
   let want = tabInUrl();
-  if (!shown.some(([id]) => id === want)) try { want = localStorage.getItem(store); } catch {}
+  if (remember && !shown.some(([id]) => id === want)) try { want = localStorage.getItem(store); } catch {}
   const open = shown.some(([id]) => id === want) ? want : shown[0][0];
   return {
     bar: `<div class="pp-tabs" role="tablist" aria-label="${label}" data-store="${store}">${shown.map(([id, label]) => `<button type="button" role="tab" id="pp-tab-${id}"
@@ -699,9 +712,74 @@ export function playerTabs(tabs, { store = TAB_KEY, label = "Player sections" } 
     panels: shown.map(([id, , html]) => `<section class="pp-panel" role="tabpanel" id="pp-panel-${id}" aria-labelledby="pp-tab-${id}"${id === open ? "" : " hidden"}>${html}</section>`).join(""),
   };
 }
+// "Move subtabs" (settings cog): a page's tabs (or the Content page's weeks) move into a sidebar
+// on the left, opened by its handle. Wide screens: it docks and the page moves over, and stays
+// open (remembered) while you switch. Phones: it slides over the page; picking one closes it.
+export const subtabsMoved = () => { try { return localStorage.getItem("moveSubtabs") === "1"; } catch { return false; } };
+const SIDE_KEY = "sideOpen", wideSide = matchMedia("(min-width: 1001px)");
+// groups: [{ label, el }]; each el moves into the sidebar under its label. now(): the handle's text.
+export function sideBar(groups, now) {
+  groups = groups.filter((g) => g.el);
+  if (!groups.length) return;
+  const side = document.createElement("div");
+  side.className = "side";
+  side.innerHTML = `<div class="side-shade" hidden></div>
+    <aside class="side-panel" id="side-panel" aria-label="Page sections" inert>
+      ${groups.map((g, i) => `<div class="side-group" data-i="${i}"><div class="menu-label">${esc(g.label)}</div></div>`).join("")}
+    </aside>
+    <button type="button" class="side-handle" aria-expanded="false" aria-controls="side-panel" title="Page sections">
+      <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m6 3 5 5-5 5"/></svg>
+      <span class="side-now"></span></button>`;
+  groups.forEach((g, i) => side.querySelector(`.side-group[data-i="${i}"]`).append(g.el));
+  const panel = side.querySelector(".side-panel"), handle = side.querySelector(".side-handle"), shade = side.querySelector(".side-shade");
+  const label = () => { side.querySelector(".side-now").textContent = now?.() || groups[0].label; };
+  const isOpen = () => side.classList.contains("open");
+  const set = (open, { keyboard = false, remember = true } = {}) => {
+    side.classList.toggle("open", open);
+    panel.inert = !open;
+    shade.hidden = !open || wideSide.matches;
+    handle.setAttribute("aria-expanded", String(open));
+    if (remember && wideSide.matches) try { localStorage.setItem(SIDE_KEY, open ? "1" : "0"); } catch {}
+    if (open && keyboard) panel.querySelector('[aria-selected="true"], [aria-current="page"], a, button')?.focus({ preventScroll: true });
+  };
+  app.append(side);
+  label();
+  // As wide as its longest entry: the handle and the page's shift follow it.
+  const fit = () => { if (side.isConnected) app.style.setProperty("--side-w", `${Math.ceil(panel.getBoundingClientRect().width)}px`); };
+  fit();
+  document.fonts?.ready.then(fit);
+  // Docked open last time: open it again without sliding in.
+  let docked = false;
+  try { docked = wideSide.matches && localStorage.getItem(SIDE_KEY) === "1"; } catch {}
+  if (docked) { side.classList.add("still"); set(true, { remember: false }); requestAnimationFrame(() => requestAnimationFrame(() => side.classList.remove("still"))); }
+  // A click's detail is 0 from the keyboard (Enter/Space): only then move focus into the list.
+  handle.addEventListener("click", (e) => set(!isOpen(), { keyboard: e.detail === 0 }));
+  shade.addEventListener("click", () => set(false));
+  // The guided tour opens it to point at the tabs, without changing the remembered choice.
+  side.addEventListener("side:open", () => { if (!isOpen()) set(true, { remember: false }); });
+  panel.addEventListener("click", (e) => {
+    if (!e.target.closest("[role=tab], a[href]")) return;
+    setTimeout(label);
+    if (!wideSide.matches) set(false);
+  });
+  side.addEventListener("keydown", (e) => { if (e.key === "Escape" && isOpen()) { set(false); handle.focus(); } });
+  // Back/Forward switch tabs without a click: keep the handle's text in step.
+  new MutationObserver(label).observe(panel, { subtree: true, attributes: true, attributeFilter: ["aria-selected"] });
+  const away = (e) => {
+    if (!side.isConnected) return document.removeEventListener("pointerdown", away);
+    if (!wideSide.matches && !side.contains(e.target)) set(false, { remember: false });
+  };
+  document.addEventListener("pointerdown", away);
+}
+// The sticky header's height, so the sidebar starts just under it.
+{
+  const top = document.querySelector(".top");
+  if (top) new ResizeObserver(() => document.documentElement.style.setProperty("--head-h", `${getComputedStyle(top).position === "sticky" ? top.offsetHeight : 0}px`)).observe(top);
+}
 export function wirePlayerTabs() {
   const bar = app.querySelector(".pp-tabs");
   if (!bar) return;
+  if (subtabsMoved()) sideBar([{ label: "Sections", el: bar }], () => bar.querySelector('[aria-selected="true"]')?.textContent.trim());
   const btns = [...bar.querySelectorAll("[role=tab]")];
   const withTab = (id) => { const u = new URL(location.href); u.searchParams.set("tab", id); return u.pathname + u.search + u.hash; };
   // The tab this history entry shows, so Back to it (or a reload) opens it again.
@@ -721,12 +799,13 @@ export function wirePlayerTabs() {
     }
     if (!push) return;
     // Switching from far down a long tab: bring the bar back up, just under the sticky header.
-    const head = document.querySelector(".top")?.offsetHeight ?? 0, top = bar.getBoundingClientRect().top;
+    const head = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--head-h")) || 0;
+    const top = (bar.closest(".side") ? app.querySelector(".pp-panel:not([hidden])") ?? bar : bar).getBoundingClientRect().top;
     if (top < head) scrollTo({ top: scrollY + top - head - 12 });
   };
   bar.addEventListener("click", (e) => { const b = e.target.closest("[role=tab]"); if (b) pick(b); });
   bar.addEventListener("keydown", (e) => {
-    const i = btns.indexOf(document.activeElement), step = { ArrowRight: 1, ArrowLeft: -1 }[e.key];
+    const i = btns.indexOf(document.activeElement), step = { ArrowRight: 1, ArrowLeft: -1, ArrowDown: 1, ArrowUp: -1 }[e.key];
     if (i < 0 || !step) return;
     e.preventDefault();
     pick(btns[(i + step + btns.length) % btns.length], true);
@@ -913,6 +992,8 @@ export function goToSection() {
     return (panel && within(panel)) ?? within(app);
   };
   const flash = (el) => {
+    // A section folded away (player Heroes' "Pubs and other leagues ▾") opens first.
+    for (let d = el.closest("details:not([open])"); d; d = d.parentElement?.closest("details:not([open])")) d.open = true;
     scrollToSection(el);
     el.classList.remove("search-flash");
     void el.offsetWidth; // restart the animation

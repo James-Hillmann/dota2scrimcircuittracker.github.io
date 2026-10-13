@@ -12,21 +12,30 @@ import { loading, errorBox, weekOfFn, lanesSection, laneCutsOf } from "../parts/
 import { overallStats, statRows } from "../parts/ranks.js";
 import { meter, tierSection, tierRef } from "../parts/tiers.js";
 import { pageTabs, PLAYERS_PAGE_TABS } from "../lib/pagetabs.js";
+import { POS_NAMES } from "../lib/herogrid.js";
 
 const LEADER_KEY = "scrim-leader-stat";
 let leaderStat = (() => { try { return localStorage.getItem(LEADER_KEY) ?? "kda"; } catch { return "kda"; } })();
+// Role filter: everyone, cores (pos 1–3), supports (4–5) or one position, by main position.
+const LEADER_ROLES = [["all", "Everyone", () => true], ["core", "Cores", (n) => n <= 3], ["support", "Supports", (n) => n >= 4],
+  ...[1, 2, 3, 4, 5].map((n) => [String(n), `Pos ${n} · ${POS_NAMES[n]}`, (x) => x === n])];
+let leaderRole = "all";
 
 // Players page: pick a stat, see the league's top and bottom 3 on it.
-function leadersSection(src, rows) {
-  const stats = RANK_STATS.filter((s) => rows.some((r) => r[s.key] != null));
+function leadersSection(src, allRows) {
+  const hasPos = allRows.some((r) => r.main_pos);
+  const stats = RANK_STATS.filter((s) => allRows.some((r) => r[s.key] != null));
   let overall = null;
   const draw = () => {
     const el = document.getElementById("leaders");
     if (!el) return;
     const stat = stats.find((s) => s.key === leaderStat) ?? stats.find((s) => s.key === "kda");
     const val = (r) => r[stat.key];
+    const role = LEADER_ROLES.find(([id]) => id === leaderRole) ?? LEADER_ROLES[0];
+    const inRole = (r) => role[0] === "all" || (r.main_pos != null && role[2](r.main_pos));
+    const rows = allRows.filter(inRole);
     const ranked = rankStat(rows, stat, floorOf(src)), { top, bottom, top_spill, bottom_spill } = ends(ranked, val);
-    const pool = overall && rankStat(overall, stat, floorOf(src));
+    const pool = overall && rankStat(overall.filter(inRole), stat, floorOf(src));
     // Meter: where the value sits between the league's worst (0) and best (full).
     const best = ranked.length ? val(ranked[0]) : 0, worst = ranked.length ? val(ranked.at(-1)) : 0;
     const meter = (v) => (best === worst ? 1 : (v - worst) / (best - worst));
@@ -56,17 +65,19 @@ function leadersSection(src, rows) {
         <div class="ld-plates reveal">${xs.length || sp ? `${xs.map((r, i) => plate(r, i, end)).join("")}${spill(sp, end, xs.length)}` : `<div class="tier-empty">Nobody with ${floorOf(src)}+ games yet</div>`}</div>
       </div>`;
     el.querySelector(".ld-lists").innerHTML = `${band("top", stat.low ? "Top 3 · fewest" : "Top 3", top, top_spill)}${band("bottom", stat.low ? "Bottom 3 · most" : "Bottom 3", bottom, bottom_spill)}`;
-    el.querySelector(".ld-note").textContent = `${ranked.length} players with ${floorOf(src)}+ games${stat.map ? " and replays" : ""}.${src.ad2l ? overall ? ` Badges: top or bottom 3 across all ${LEAGUE_COUNT} AD2L leagues (${pool.length} players).` : " Loading the other leagues…" : ""}`;
+    el.querySelector(".ld-note").textContent = `${ranked.length} ${{ all: "players", core: "cores", support: "supports" }[role[0]] ?? `pos ${role[0]} players`} with ${floorOf(src)}+ games${stat.map ? " and replays" : ""}${role[0] === "all" ? "" : ", by the position each plays most"}.${src.ad2l ? overall ? ` Badges: top or bottom 3 across all ${LEAGUE_COUNT} AD2L leagues (${pool.length} players).` : " Loading the other leagues…" : ""}`;
   };
   const html = `<h2 id="stat-leaders">Stat leaders${info("stat_leaders")}</h2>
     <div id="leaders">
-      <div class="sort-bar"><label>Stat <select id="ld-stat">${stats.map((s) => `<option value="${s.key}" ${s.key === leaderStat ? "selected" : ""}>${esc(s.label)}</option>`).join("")}</select></label></div>
+      <div class="sort-bar"><label>Stat <select id="ld-stat">${stats.map((s) => `<option value="${s.key}" ${s.key === leaderStat ? "selected" : ""}>${esc(s.label)}</option>`).join("")}</select></label>${hasPos ? `<label>Role <select id="ld-role">${LEADER_ROLES.map(([id, label]) => `<option value="${id}" ${id === leaderRole ? "selected" : ""}>${esc(label)}</option>`).join("")}</select></label>` : ""}</div>
       <div class="ld-lists"></div>
       <p class="table-note ld-note"></p>
     </div>`;
   const wire = () => {
     const sel = document.getElementById("ld-stat");
     if (sel) sel.onchange = () => { leaderStat = sel.value; try { localStorage.setItem(LEADER_KEY, leaderStat); } catch { /* not remembered */ } draw(); };
+    const role = document.getElementById("ld-role");
+    if (role) role.onchange = () => { leaderRole = role.value; draw(); };
     draw();
     overallStats(src).then((o) => { overall = o; if (o) draw(); else if (src.ad2l) { const n = document.querySelector("#leaders .ld-note"); if (n) n.textContent += " (the other leagues couldn't be loaded)"; } });
   };

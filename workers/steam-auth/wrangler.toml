@@ -1,0 +1,6 @@
+# Steam sign-in for the fantasy league. Deploy: npx wrangler deploy (from this folder).
+# The service-account key is a secret: npx wrangler secret put FIREBASE_SA
+name = "steam-auth"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+workers_dev = true

@@ -32,6 +32,10 @@ const predReq = (data, auth = { uid: "u1" }) => ({ auth, method: "create", path:
 const BR_PATH = "/databases/(default)/documents/scrimLeague/data/brackets/ad2l_u1";
 const bracket = (extra = {}) => ({ v: 1, league: "ad2l", name: "Rules Test", uid: "u1", picks: '{"tb:3-5":5,"pick":4}', updatedAt: NOW, ...extra });
 const brReq = (data, auth = { uid: "u1" }, path = BR_PATH) => ({ auth, method: "create", path, time: NOW, resource: { data } });
+const FAN_PATH = "/databases/(default)/documents/scrimLeague/data/fantasy/ad2l_2026-10-12_173365627";
+const STEAM = { uid: "steam:173365627", token: { steam: 173365627 } };
+const fantasy = (extra = {}) => ({ v: 1, league: "ad2l", week: "2026-10-12", account: 173365627, picks: [75379546, 192871338, 66653545, 349392031, 239724237], name: "Rules Test", uid: "steam:173365627", updatedAt: NOW, ...extra });
+const fanReq = (data, auth = STEAM, path = FAN_PATH) => ({ auth, method: "create", path, time: NOW, resource: { data } });
 const FIX_ID = "AbCdEfGhIjKlMnOpQrSt";
 const FIX_PATH = `/databases/(default)/documents/scrimLeague/data/scrim_fixtures/${FIX_ID}`;
 const fixture = (extra = {}) => ({ v: 1, team_a: "Rules Test A", team_b: "Rules Test B", start: "2026-09-26T02:00:00Z", best_of: 2, uid: "u1", createdAt: NOW, ...extra });
@@ -184,6 +188,18 @@ const cases = [
   ["bracket: picks not text", brReq(bracket({ picks: { pick: 4 } })), "DENY"],
   ["bracket: picks too long", brReq(bracket({ picks: "x".repeat(3001) })), "DENY"],
   ["bracket: stale updatedAt", brReq(bracket({ updatedAt: "2026-01-01T00:00:00Z" })), "DENY"],
+  ["fantasy: own, valid", fanReq(fantasy()), "ALLOW"],
+  ["fantasy: anonymous sign-in", fanReq(fantasy({ uid: "u1" }), { uid: "u1" }), "DENY"],
+  ["fantasy: uid not the steam account", fanReq(fantasy({ uid: "steam:1" }), { uid: "steam:1", token: { steam: 173365627 } }), "DENY"],
+  ["fantasy: someone else's account", fanReq(fantasy({ account: 1 }), STEAM, FAN_PATH.replace("_173365627", "_1")), "DENY"],
+  ["fantasy: id for another week", fanReq(fantasy(), STEAM, FAN_PATH.replace("2026-10-12", "2026-10-19")), "DENY"],
+  ["fantasy: picks themselves", fanReq(fantasy({ picks: [173365627, 192871338, 66653545, 349392031, 239724237] })), "DENY"],
+  ["fantasy: same player twice", fanReq(fantasy({ picks: [75379546, 75379546, 66653545, 349392031, 239724237] })), "DENY"],
+  ["fantasy: four picks", fanReq(fantasy({ picks: [75379546, 192871338, 66653545, 349392031] })), "DENY"],
+  ["fantasy: pick not a number", fanReq(fantasy({ picks: ["75379546", 192871338, 66653545, 349392031, 239724237] })), "DENY"],
+  ["fantasy: unknown league", fanReq(fantasy({ league: "scrim" }), STEAM, FAN_PATH.replace("ad2l", "scrim")), "DENY"],
+  ["fantasy: stale updatedAt", fanReq(fantasy({ updatedAt: "2026-01-01T00:00:00Z" })), "DENY"],
+  ["fantasy: extra field", fanReq(fantasy({ score: 999 })), "DENY"],
   ["bracket: extra field", brReq(bracket({ admin: true })), "DENY"],
   ["bracket: empty name", brReq(bracket({ name: "" })), "DENY"],
   ["prediction: id for another uid", { ...predReq(pred()), path: PRED_PATH.replace("_u1", "_u2") }, "DENY"],

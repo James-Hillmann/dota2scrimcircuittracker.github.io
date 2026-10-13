@@ -57,7 +57,7 @@ export function buildSearchIndex(leagues, scrims = null) {
     }
     for (const t of listTeams(matches)) {
       const names = [...(seen.get(t.slug) ?? [])].sort((a, b) => b[1] - a[1]).map(([n]) => n);
-      out.push({ kind: "team", name: t.name, league: "scrim", leagueLabel: scrims.label, href: `#/teams/${t.slug}`, players: names, terms: [t.name] });
+      out.push({ kind: "team", name: t.name, league: "scrim", leagueLabel: scrims.label, href: `#/scrims/teams/${t.slug}`, players: names, terms: [t.name] });
     }
     const players = new Map();
     for (const m of [...matches].sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0))) {
@@ -66,8 +66,8 @@ export function buildSearchIndex(leagues, scrims = null) {
         const k = playerKey(p), e = players.get(k);
         if (e) { if (!e.terms.includes(p.name)) e.terms.push(p.name); continue; }
         const team = p.team_name ?? (p.team === "a" ? m.team_a : m.team_b);
-        players.set(k, { kind: "player", name: p.name, league: "scrim", leagueLabel: scrims.label, team, teamHref: team ? `#/teams/${teamSlug(team)}` : null,
-          captain: false, standin: !!p.standin, href: `#/player/${encodeURIComponent(k)}`, terms: [p.name] });
+        players.set(k, { kind: "player", name: p.name, league: "scrim", leagueLabel: scrims.label, team, teamHref: team ? `#/scrims/teams/${teamSlug(team)}` : null,
+          captain: false, standin: !!p.standin, href: `#/scrims/player/${encodeURIComponent(k)}`, terms: [p.name] });
       }
     }
     out.push(...players.values());

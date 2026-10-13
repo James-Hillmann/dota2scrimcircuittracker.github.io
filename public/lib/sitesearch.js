@@ -43,8 +43,8 @@ export function withAt(href, { tab, at } = {}) {
   const s = p.toString();
   return s ? `${href}?${s}` : href;
 }
-// A league page from its root ("#" for scrims, whose standings live at #/scrims).
-export const leagueHref = (root, { path = "", tab, at } = {}) => withAt(root === "#" ? `#/${path || "scrims"}` : `${root}/${path}`, { tab, at });
+// A league page from its root ("#/scrims", "#/champion"…; "" path = the league's Teams page).
+export const leagueHref = (root, { path = "", tab, at } = {}) => withAt(`${root}/${path}`, { tab, at });
 
 const phraseWords = (p) => p.split(" ").filter((x) => !STOP.has(x));
 const TOPIC_WORDS = new Set([...TOPICS, ...PAGES].flatMap((t) => t.words.flatMap(phraseWords)));

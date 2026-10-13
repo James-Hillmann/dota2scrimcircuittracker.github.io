@@ -11,10 +11,10 @@
 // don't change). The Map tab's own overlays (lib/maplayers.js) join the same row.
 //
 // visionMapHtml() returns the <figure>; wireVisionMaps() loads the map and wires the controls.
-import { VB, IMG, Y, WARD_IMG } from "./wardmap.js";
+import { VB, IMG, Y, WARD_IMG, CX, CY, heat } from "./wardmap.js";
 import { applyZoom, wireZoom } from "./mapzoom.js";
 import { drawLayers } from "./maplayers.js";
-import { buildMap, mapDefAt, litAt, litOver, towersUp, isNight, toGrid, TOWER_RANGE, SENTRY_SIGHT, OBS_LIFE, SENTRY_LIFE } from "./vision.js";
+import { buildMap, mapDefAt, litAt, litOver, towersUp, isNight, toGrid, wardTile, fov, TOWER_RANGE, SENTRY_SIGHT, OBS_LIFE, SENTRY_LIFE } from "./vision.js";
 
 const attr = (s) => String(s).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
 const clock = (s) => `${s < 0 ? "-" : ""}${Math.floor(Math.abs(s) / 60)}:${String(Math.abs(s) % 60).padStart(2, "0")}`;
@@ -101,6 +101,40 @@ function rgb(css) {
 // The tile grid on the minimap: tile gx's centre is OpenDota grid gx / 2 + 46.25 (64-unit tiles
 // from world −10464; grid = (world + 16384) / 128), so the n×n picture spans n / 2 grid units.
 const gridBox = (n) => ({ x: 46, y: Y(46 + n / 2), w: n / 2, h: n / 2 });
+
+// Player and hero ward maps (lib/wardmap.js, Vision): every observer's sight summed over the
+// map, weighted by how long it stood, on the current patch's map. wards: [x, y, life, flip] at
+// their real spots on the grid; flip: mirror that ward's sight (a Dire ward on a both-sides map;
+// tile gx's centre is grid gx / 2 + 46.25, so the mirror of tile gx is 4·CX − 185 − gx).
+// Returns { href, box } for an <image> over the minimap, or null when no map covers the patch.
+export async function wardVisionImage(wards) {
+  const def = mapDefAt(Date.now() / 1000);
+  if (!def) return null;
+  const map = await loadMap(def), n = map.n, sum = new Float32Array(n * n);
+  const mx = (g, c) => Math.round(4 * c - 185 - g);
+  for (const [x, y, life, flip] of wards) {
+    const at = wardTile(map, x, y);
+    if (at == null) continue;
+    const wt = life >= 0 ? Math.min(life, OBS_LIFE) : OBS_LIFE;
+    for (const t of fov(map, at)) {
+      if (!flip) { sum[t] += wt; continue; }
+      const gx = mx(t % n, CX), gy = mx(Math.floor(t / n), CY);
+      if (gx >= 0 && gy >= 0 && gx < n && gy < n) sum[gx + gy * n] += wt;
+    }
+  }
+  let peak = 0;
+  for (const v of sum) if (v > peak) peak = v;
+  const canvas = Object.assign(document.createElement("canvas"), { width: n, height: n });
+  const ctx = canvas.getContext("2d"), img = ctx.createImageData(n, n), px = img.data;
+  for (let gy = 0; gy < n; gy++) for (let gx = 0; gx < n; gx++) {
+    const v = peak ? sum[gx + gy * n] / peak : 0;
+    if (v < 0.01) continue;
+    const o = (gx + (n - 1 - gy) * n) * 4, [r, g, b] = heat(v).match(/\d+/g).map(Number);
+    px[o] = r; px[o + 1] = g; px[o + 2] = b; px[o + 3] = Math.round(70 + 120 * v);
+  }
+  ctx.putImageData(img, 0, 0);
+  return { href: canvas.toDataURL(), box: gridBox(n) };
+}
 
 // An item icon in a team-coloured ring at grid x, y, keeping its size when zoomed.
 const icon = (fig, cls, x, y, img, tip) => `<g class="ward ${cls}" style="transform:translate(${x}px,${Y(y)}px) scale(var(--ms,1))"><title>${tip}</title>

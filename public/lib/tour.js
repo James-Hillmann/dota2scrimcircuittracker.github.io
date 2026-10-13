@@ -6,6 +6,14 @@
 // Design: docs/superpowers/specs/2026-09-29-guided-tour-design.md
 import { SEASON } from "./divisions.js";
 
+// "Move subtabs" puts the page tabs in a closed sidebar (core.js sideBar): open it before
+// pointing at them or clicking one.
+function showTabs(el) {
+  const side = el?.closest?.(".side");
+  if (side && !side.classList.contains("open")) side.dispatchEvent(new Event("side:open"));
+  return el;
+}
+
 const SEEN_KEY = "tour-seen";
 // The saved choices, also kept for the session: a reload mid-tour restores them on load.
 const KEPT_KEY = "tour-kept";
@@ -40,7 +48,8 @@ class Gone extends Error {}
 // title, text (string or ctx → string), leave(t)? }. enter must work from any page, since
 // Back re-enters the previous stop.
 
-const standingsKey = (ctx) => (ctx.ad2l ? "standings" : "matches");
+// The league's Teams page (the scrims' too, since they moved under #/scrims/).
+const standingsKey = () => "standings";
 
 const CORE = [
   {
@@ -71,7 +80,7 @@ const CORE = [
     title: "The main tabs",
     text: (ctx) => ctx.ad2l
       ? "Teams (the standings), Content (each week, and what's up next), Players, Heroes, Predict, and Upload for games played without a league ticket."
-      : "Standings, Content (each week's games), Teams, Players, Heroes, Predict, and Upload for adding a scrim from its screenshots.",
+      : "Teams (the table, every match and the team cards), Content (each week's games), Players, Heroes, Predict, and Upload for adding a scrim from its screenshots.",
     enter: async () => document.getElementById("nav"),
   },
   {
@@ -81,7 +90,8 @@ const CORE = [
       : "Every scrim team by game wins, with win %, kill difference and form. Private scrims count here too.",
     enter: async (t) => {
       await t.visit(navHref(standingsKey(t.ctx)));
-      if (t.ctx.ad2l) { await t.tab("table"); return t.find("#pp-panel-table #t table"); }
+      await t.tab("table");
+      if (t.ctx.ad2l) return t.find("#pp-panel-table #t table");
       return t.find("#standings");
     },
   },
@@ -90,7 +100,7 @@ const CORE = [
     text: "Tap ⓘ next to any stat to see how it's worked out.",
     enter: async (t) => {
       await t.visit(navHref(standingsKey(t.ctx)));
-      if (t.ctx.ad2l) await t.tab("table");
+      await t.tab("table");
       // The table's own bubbles, or (phones drop them from the table) any on the page.
       const btn = (await t.find(t.ctx.ad2l ? "#pp-panel-table .info" : "#standings .info", 2500)) ?? (await t.find("#app .info", 1000));
       if (!btn) return null;
@@ -103,7 +113,7 @@ const CORE = [
   {
     title: "Pages have tabs",
     text: "Team, player, hero and game pages have tabs like these. Your last tab is remembered, and Back returns to the one before.",
-    enter: async (t) => { if (!(await t.visitPicked("team"))) return null; return t.find(".pp-tabs"); },
+    enter: async (t) => { if (!(await t.visitPicked("team"))) return null; return showTabs(await t.find(".pp-tabs")); },
   },
   {
     title: "Draft by phase",
@@ -179,7 +189,7 @@ const part = ({ page, tab = null, sel, head = false, btn = false, title, text, w
     const el = typeof sel === "function" ? sel(scope) : await t.findIn(scope, sel, 2000);
     if (!el || !visible(el)) return null;
     const box = head ? t.withHead(el) : [el];
-    if (tab && btn) { const b = document.querySelector(`.pp-tabs [data-tab="${tab}"]`); if (b) box.push(b); }
+    if (tab && btn) { const b = showTabs(document.querySelector(`.pp-tabs [data-tab="${tab}"]`)); if (b) box.push(b); }
     return box;
   },
 });
@@ -192,7 +202,7 @@ const view = (page, id, title, text, when = ad2l) => ({
 const chart = (id, title, text) => ({
   title, text, when: ad2l,
   enter: async (t) => {
-    if (!(await t.open("game"))) return null;
+    if (!(await t.open("game")) || !(await t.tab("graphs"))) return null;
     const b = await t.find(`[data-chart-view="${id}"]`, 2500);
     if (!b) return null;
     if (b.getAttribute("aria-pressed") !== "true") await t.click(b);
@@ -292,11 +302,11 @@ const DEEP = [
       text: "Every player's stats in this team's games. Sort by any column." }),
     part({ page: "team", tab: "games", sel: ".history", btn: true, title: "Every result",
       text: (ctx) => ctx.ad2l ? "Every series with each game's result, newest first, and the next one scheduled." : "Every game, newest first." }),
-    part({ btn: true, page: "team", tab: "heroes", sel: ".phase-grid", head: true, when: ad2l, title: "Draft by phase",
+    part({ btn: true, page: "team", tab: "draft", sel: ".phase-grid", head: true, when: ad2l, title: "Draft by phase",
       text: "The team's bans, bans against it, and picks in each of the three phases." }),
     part({ page: "team", tab: "map", sel: ".tm-sum", btn: true, when: ad2l, title: "Strengths and weak spots",
       text: "Where the team ranks in the league on objectives, gold and vision: its best and worst." }),
-    part({ page: "team", tab: "map", sel: ".tg-grid", head: true, when: ad2l, title: "Gold",
+    part({ page: "team", tab: "resources", sel: ".tg-grid", head: true, btn: true, when: ad2l, title: "Gold",
       text: "The gold lead in every game on one chart: when the team gets ahead, and whether it holds." }),
     view("team", "wards", "Team wards", "Where the team places its wards. Both sides shows Radiant and Dire games together, with Dire games flipped so the team's base is bottom left."),
     filter({ page: "team", view: "wards", act: otherSide, title: "Radiant or Dire",
@@ -312,7 +322,7 @@ const DEEP = [
     part({ page: "game", sel: ".gm-draft", when: ad2l, title: "Draft",
       text: "All 24 draft steps in order: every ban and pick for both teams." }),
     chart("fights", "Items & fights", "The gold lead minute by minute, with each teamfight sized by deaths and coloured by who came out ahead, and core items on the same clock."),
-    filter({ page: "game", scope: ".gm-hero-chart", title: "Chart layers",
+    filter({ page: "game", tab: "graphs", scope: ".gm-hero-chart", title: "Chart layers",
       text: "Tick layers on and off: items, hero deaths, Roshan and Tormentor, towers and buybacks.",
       act: async (t, scope) => {
         const f = scope.querySelector('[data-chart-view="fights"]');
@@ -329,10 +339,10 @@ const DEEP = [
       text: "Each player's rating from this game alone, on the tier list's scale. Green tags lifted it, red held it back." }),
     part({ btn: true, page: "game", tab: "lanes", sel: ".table-wrap", head: true, when: ad2l, title: "Laning",
       text: "Every player's first 10 minutes in numbers." }),
-    part({ page: "game", tab: "farm", sel: ".obj-strip", head: true, btn: true, when: ad2l, title: "Map & objectives",
-      text: "Every Roshan and Tormentor with its time and the team that took it." }),
-    part({ page: "game", tab: "farm", sel: after(/^Fighting/), head: true, when: ad2l, title: "Fighting & laning",
-      text: "Each player's fighting and laning numbers side by side." }),
+    part({ page: "game", tab: "map", sel: ".obj-strip", head: true, btn: true, when: ad2l, title: "Vision & objectives",
+      text: "Every Roshan and Tormentor with its time and the team that took it, then each player's wards, smokes, objectives and building damage." }),
+    part({ page: "game", tab: "combat", sel: after(/^Stuns, damage taken/), head: true, btn: true, when: ad2l, title: "Stuns and survival",
+      text: "Each player's stun time, damage taken and time dead side by side." }),
     part({ page: "game", tab: "items", sel: ".items-table", head: true, btn: true, when: ad2l, title: "Items",
       text: "Every player's final items, and when each core item was finished." }),
     view("game", "wards", "Wards", "Every ward both teams placed in this game."),
@@ -360,7 +370,7 @@ const DEEP = [
       text: "Where each stat ranks in this league and across every league." }),
     part({ page: "player", tab: "heroes", sel: "#hero-ranks-box", btn: true, title: "Hero pool",
       text: "Their rating on each hero, and where it places among everyone who played that hero." }),
-    part({ page: "player", tab: "heroes", sel: after(/^Recent pubs/), head: true, when: ad2l, title: "Recent pubs",
+    part({ page: "player", tab: "heroes", sel: (scope) => { const d = scope.querySelector(".pubs-fold"); if (d) d.open = true; return after(/^Recent pubs/)(scope); }, head: true, when: ad2l, title: "Recent pubs",
       text: "Their public games since the last league night: results, form and heroes." }),
     part({ btn: true, page: "player", tab: "lanes", sel: ".table-wrap", head: true, when: ad2l, title: "Every lane",
       text: "Each lane they played, game by game." }),
@@ -375,8 +385,8 @@ const DEEP = [
       act: otherSide }),
     filter({ page: "player", tab: "games", act: choose("select.sort-key", /^GPM$/), box: "#pp-panel-games #t", when: always, title: "Sort any table",
       text: "Every table sorts by any column: pick from the list, or click a column header." }),
-    part({ page: "player", tab: "games", sel: "#game-box", head: true, btn: true, title: "Game analysis",
-      text: "Each game's stat line and how it placed among the 10 players, with their best and worst games marked." }),
+    part({ page: "player", tab: "stats", sel: "#game-box", head: true, btn: true, title: "Game analysis",
+      text: "Each game's stat line and how it placed among the 10 players, with their best game marked." }),
   ]),
 
   ...group("Hero page", [
@@ -396,7 +406,7 @@ const DEEP = [
     view("hero", "deaths", "Its deaths", "Where and when this hero dies."),
     filter({ page: "hero", view: "deaths", act: seg(/^0–10'$/), title: "Early deaths",
       text: "Only deaths in the first 10 minutes: where this hero dies in the laning stage." }),
-    part({ page: "hero", tab: "games", sel: "#game-box", head: true, btn: true, title: "Game analysis",
+    part({ page: "hero", tab: "analysis", sel: "#game-box", head: true, btn: true, title: "Game analysis",
       text: "Each game on it and how the stat line placed among the 10 players." }),
   ]),
 
@@ -658,7 +668,7 @@ class Tour {
   // Box and caption follow the target every frame (scrolling, late layout, tab switches).
   place() {
     const u = this.ui, els = this.target;
-    const phone = innerWidth < 640;
+    const phone = innerWidth < 761;
     u.card.classList.toggle("docked", phone || !els);
     if (!phone || !els) u.card.classList.remove("up");
     // No box (the closing card), or the boxed element went away (a bubble closed): the caption
@@ -790,12 +800,13 @@ class Tour {
     if (!(kind in this.ctx.picked)) {
       const from = {
         team: [navHref(standingsKey(this.ctx)), ad2l ? '#pp-panel-table #t tbody a[href*="/teams/"]' : "#standings a.team-link"],
-        game: ad2l ? [navHref("week"), 'a[href*="/game/"]'] : [navHref("matches"), 'a.fixture[href*="match/"]'],
+        game: ad2l ? [navHref("week"), 'a[href*="/game/"]'] : [navHref("standings"), 'a.fixture[href*="match/"]'],
         player: [navHref("players"), '#tiers a[href*="player/"], #t a[href*="player/"]'],
         hero: [navHref("heroes"), '#pp-panel-table #t a[href*="hero/"]'],
       }[kind];
       await this.visit(from[0]);
-      if ((kind === "team" && ad2l) || kind === "hero") await this.tab("table");
+      if (kind === "team" || kind === "hero") await this.tab("table");
+      if (kind === "game" && !ad2l) await this.tab("matches");
       await this.find(from[1]);
       // Private scrims have no stats to show: skip them.
       const link = [...document.querySelectorAll(from[1])].find((a) => visible(a) && !a.querySelector(".priv"));
@@ -847,7 +858,7 @@ class Tour {
 
   // Open a sub-tab on the current page (clicking it if it isn't open); its panel, or null.
   async tab(id) {
-    const bar = await this.find(".pp-tabs", 4000);
+    const bar = showTabs(await this.find(".pp-tabs", 4000));
     const b = bar?.querySelector(`[data-tab="${id}"]`);
     if (!b) return null;
     if (b.getAttribute("aria-selected") !== "true") await this.click(b);
@@ -1033,6 +1044,14 @@ function showInvite() {
   invite.querySelector(".tour-skip").onclick = () => { markSeen(); closeInvite(); };
   invite.querySelector(".tour-primary").onclick = () => startTour();
   document.body.append(invite);
+  // Ignored for 20s: step aside (not marked seen, so it asks again next visit; the footer's
+  // "New here?" is always there). Not while the pointer or focus is on it.
+  const mine = invite;
+  setTimeout(function away() {
+    if (invite !== mine) return;
+    if (mine.matches(":hover, :focus-within")) return void setTimeout(away, 4000);
+    closeInvite();
+  }, 20000);
 }
 
 // Left mid-tour by a reload: put its tab choices back. Runs on import, before app.js renders.

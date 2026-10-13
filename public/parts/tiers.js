@@ -38,7 +38,7 @@ const METRIC_FMT = {
   gpm: (v) => `${Math.round(v)}`, xpm: (v) => `${Math.round(v)}`, nw: kNum,
   lane: (v) => `${Math.round(v)}%`,
   stuns: (v) => `${v.toFixed(1)}s/m`, // seconds per minute
-  vision: (v) => `${v.toFixed(1)}% of map`,
+  vision: (v) => `${v.toFixed(1)}% of map`, vispct: (v) => `${v.toFixed(1)}% of map`,
   dewards: (v) => `${v.toFixed(1)}/10m`, uptime: (v) => `${Math.round(v)} s/min`, stacks: (v) => `${v.toFixed(1)} a game`, deaths: (v) => `${v.toFixed(1)}/10m`,
   heal: (v) => `${Math.round(v)}/min`,
   lanewin: (v) => `${v >= 0 ? "+" : "−"}${kNum(Math.abs(v))}`,
@@ -156,9 +156,11 @@ function breakdown(src, p, tabs) {
   // Per series: stat points (bar) and the series' score = its stat points × that opponent's
   // factor × the season's survival, consistency and winning. Weighted by games, each column
   // averages to the season's number, shown in the last row.
+  // Each game of the series, opening on its Ratings tab (that game's rating and what drove it).
+  const gameLinks = (s) => (src.link && s.game_ids?.length ? `<span class="bd-games">${s.game_ids.map((id, i) => `<a href="${src.link({ id })}?tab=ratings" title="Game ${i + 1}: its ratings">G${i + 1}</a>`).join("")}</span>` : "");
   const series = p.series.map((s) => `<div class="bd-series">
       <span class="bd-date">${s.time ? esc(new Date(s.time * 1000).toLocaleDateString(undefined, { month: "short", day: "numeric" })) : ""}</span>
-      <span class="bd-vs">${s.vs ? `vs ${teamLink(src, s.vs)}` : "—"}${s.pos != null ? (s.pos !== p.pos ? ` <em>as pos ${s.pos}</em>` : "") : s.role !== p.role ? ` <em>as ${s.role}</em>` : ""}</span>
+      <span class="bd-vs">${s.vs ? `vs ${teamLink(src, s.vs)}` : "—"}${s.pos != null ? (s.pos !== p.pos ? ` <em>as pos ${s.pos}</em>` : "") : s.role !== p.role ? ` <em>as ${s.role}</em>` : ""}${gameLinks(s)}</span>
       <span class="bd-wl">${s.wins}–${s.games - s.wins}</span>
       ${meter(s.points ?? 0)}<span class="bd-spts">${s.points == null ? "—" : s.points.toFixed(1)}</span>
       <span class="bd-opp">×${(s.opp ?? 1).toFixed(2)}</span><b>${s.score == null ? "—" : s.score.toFixed(1)}</b></div>`).join("");
@@ -270,7 +272,7 @@ export function tierSection(src, matches, model) {
       const shown = players;
       return `<div class="tier-band t-${tier}">
         <div class="tier-letter">${tier}</div>
-        <div class="tier-chips reveal">${shown.length ? shown.map(chip).join("") : `<div class="tier-empty">—</div>`}</div>
+        <div class="tier-chips reveal">${shown.length ? shown.map(chip).join("") : `<div class="tier-empty">No one in ${tier} yet</div>`}</div>
       </div>`;
     }).join("");
     const tab = (k, label) => `<button type="button" class="seg${tierRole === k ? " on" : ""}" data-role="${k}">${label}</button>`;

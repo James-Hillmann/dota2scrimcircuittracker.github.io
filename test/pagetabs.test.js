@@ -6,8 +6,8 @@ import { TEAM_TABS, PLAYER_TABS, HERO_TABS, STANDINGS_TABS, tabList, pageTabs } 
 const ad2l = { ad2l: {} }, all = { ad2l: {}, all: true }, scrims = {};
 
 test("menu tabs: AD2L-only tabs drop out for scrims, labels follow the source", () => {
-  assert.deepEqual(tabList(TEAM_TABS, ad2l).map(([id]) => id), ["overview", "roster", "games", "heroes", "chances", "lanes", "map"]);
-  assert.deepEqual(tabList(TEAM_TABS, scrims).map(([id]) => id), ["overview", "roster", "games", "heroes", "map"]);
+  assert.deepEqual(tabList(TEAM_TABS, ad2l).map(([id]) => id), ["overview", "roster", "games", "heroes", "draft", "chances", "lanes", "resources", "map"]);
+  assert.deepEqual(tabList(TEAM_TABS, scrims).map(([id]) => id), ["overview", "roster", "games", "heroes", "draft", "map"]);
   assert.equal(tabList(TEAM_TABS, ad2l)[2][1], "Series");
   assert.equal(tabList(TEAM_TABS, scrims)[2][1], "Games");
   assert.ok(!tabList(PLAYER_TABS, scrims).some(([id]) => id === "lanes"));

@@ -22,6 +22,7 @@ import { loading, errorBox, laneCutsOf, teamLanesHtml } from "../parts/lanes.js"
 import { tierRef } from "../parts/tiers.js";
 import { heroGridHtml, wireHeroGrid } from "../parts/herogrid.js";
 import { teamRows, overallTeamRows, statRanksHtml, TEAM_RANKS } from "../parts/ranks.js";
+import { tagContext, gameTags, tagsHtml } from "../lib/gametags.js";
 
 // ---------- Teams ----------
 
@@ -36,6 +37,36 @@ function rosterOf(team, ad2l) {
 const formPills = (results) => `<span class="form">${results.map((r) => `<i class="${r === "W" ? "w" : "l"}" title="${r === "W" ? "Win" : "Loss"}">${r}</i>`).join("")}</span>`;
 const POS = { 1: "Pos 1 · Carry", 2: "Pos 2 · Mid", 3: "Pos 3 · Offlane", 4: "Pos 4 · Soft support", 5: "Pos 5 · Hard support" };
 
+// A team page opens on Overview, except straight after the team picker on a team page, which
+// keeps the tab you were on. The picker leaves this flag; the next team page reads and clears it.
+const TEAM_SWITCH = "teamSwitch";
+function switchedTeam() {
+  try { const on = sessionStorage.getItem(TEAM_SWITCH) === "1"; sessionStorage.removeItem(TEAM_SWITCH); return on; } catch { return false; }
+}
+
+// The team cards: rank, record, form, roster and most-played heroes. The scrims' Teams page
+// (pages/games.js) shows them on its Teams tab. teams: in rank order (default: from the games).
+export function teamGridHtml(src, matches, ad2l = null, teams = listTeams(matches, ad2l?.teams ?? [])) {
+  const table = new Map(standingsRows(matches).map((r) => [r.slug, r]));
+  const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
+  const card = (t, i) => {
+    const r = table.get(t.slug), roster = rosterOf(t, ad2l), h = teamHistory(matches, t);
+    const names = roster
+      ? roster.map((p) => (p.captain ? `<b title="Captain">${esc(p.name)}</b>` : esc(p.name)))
+      : h.players.slice(0, 5).map((p) => esc(p.name));
+    return `<a class="team-card" href="${src.root}/teams/${t.slug}" style="--i:${Math.min(i, 14)}">
+      <span class="tc-rank">#${i + 1}</span>
+      <span class="tc-name">${esc(t.name)}</span>
+      <span class="tc-rec"><b>${t.wins}</b>–${t.losses}</span>
+      <span class="tc-meta">${t.games ? `${Math.round((t.wins / t.games) * 100)}% of ${plural(t.games, "game")}` : "No games yet"}${r?.form.length ? ` ${formPills(r.form)}` : ""}</span>
+      ${names.length ? `<span class="tc-roster">${names.join('<span class="sep"> · </span>')}</span>` : ""}
+      ${h.heroes.length ? `<span class="tc-heroes">${h.heroes.slice(0, 5).map((x) => portrait(x.hero)).join("")}</span>` : ""}
+    </a>`;
+  };
+  return teams.length ? `<div class="team-grid reveal">${teams.map(card).join("")}</div>`
+    : `<div class="panel empty"><strong>No teams yet</strong>${src.empty}</div>`;
+}
+
 export async function renderTeams(src, slug) {
   app.innerHTML = loading(src.kicker, "Teams");
   let matches, ad2l = null;
@@ -43,7 +74,7 @@ export async function renderTeams(src, slug) {
     matches = await src.load();
     if (src.ad2l) ad2l = await src.data();
   } catch (e) { app.innerHTML = `${pageHead(src.kicker, "Teams")}${errorBox(e)}`; return; }
-  const base = src.ad2l ? `${src.root}/teams` : "#/teams";
+  const base = `${src.root}/teams`;
   let teams = listTeams(matches, ad2l?.teams ?? []);
   if (ad2l) {
     // AD2L records from PlayOn's series scores (official; complete even when a game's
@@ -55,24 +86,9 @@ export async function renderTeams(src, slug) {
   const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
 
   if (!slug) {
-    const card = (t, i) => {
-      const r = table.get(t.slug), roster = rosterOf(t, ad2l), h = teamHistory(matches, t);
-      const names = roster
-        ? roster.map((p) => (p.captain ? `<b title="Captain">${esc(p.name)}</b>` : esc(p.name)))
-        : h.players.slice(0, 5).map((p) => esc(p.name));
-      return `<a class="team-card" href="${base}/${t.slug}" style="--i:${Math.min(i, 14)}">
-        <span class="tc-rank">#${i + 1}</span>
-        <span class="tc-name">${esc(t.name)}</span>
-        <span class="tc-rec"><b>${t.wins}</b>–${t.losses}</span>
-        <span class="tc-meta">${t.games ? `${Math.round((t.wins / t.games) * 100)}% of ${plural(t.games, "game")}` : "No games yet"}${r?.form.length ? ` ${formPills(r.form)}` : ""}</span>
-        ${names.length ? `<span class="tc-roster">${names.join('<span class="sep"> · </span>')}</span>` : ""}
-        ${h.heroes.length ? `<span class="tc-heroes">${h.heroes.slice(0, 5).map((x) => portrait(x.hero)).join("")}</span>` : ""}
-      </a>`;
-    };
     app.innerHTML = `
       ${pageHead(src.kicker, "Teams", teams.length ? `${teams.length} teams, ranked by game wins.` : "")}
-      ${teams.length ? `<div class="team-grid reveal">${teams.map(card).join("")}</div>`
-      : `<div class="panel empty"><strong>No teams yet</strong>${src.empty}</div>`}`;
+      ${teamGridHtml(src, matches, ad2l, teams)}`;
     return;
   }
 
@@ -175,6 +191,7 @@ export async function renderTeams(src, slug) {
 
   // Series (AD2L) or game (scrim) history rows, newest first.
   let historyRows;
+  const tagCtx = tagContext(matches);
   if (ad2l) {
     const tname = Object.fromEntries(ad2l.teams.map((t) => [t.id, t.name]));
     const mine = ad2l.series.filter((s) => s.home === team.id || s.away === team.id).sort((a, b) => (b.time ?? 0) - (a.time ?? 0));
@@ -188,7 +205,7 @@ export async function renderTeams(src, slug) {
         <span class="hist-res">${result === "upcoming" ? "Next" : result === "tie" ? "T" : result === "win" ? "W" : "L"}</span>
         <span class="hist-vs">vs <b>${tname[home ? s.away : s.home] ? teamLink(src, tname[home ? s.away : s.home], home ? s.away : s.home) : "TBD"}</b></span>
         <span class="hist-score">${done ? `${us}–${them}` : ""}</span>
-        <span class="hist-games">${gs.map(({ m, side }, j) => `<a href="${src.link(m)}" class="${m.winner === side ? "w" : "l"}">G${j + 1} ${m.winner === side ? "W" : "L"}</a>`).join("")}</span>
+        <span class="hist-games">${gs.map(({ m, side }, j) => `<a href="${src.link(m)}" class="${m.winner === side ? "w" : "l"}">G${j + 1} ${m.winner === side ? "W" : "L"}</a>${tagsHtml(gameTags(m, tagCtx, side))}`).join("")}</span>
         <span class="hist-date">${s.time ? new Date(s.time * 1000).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : ""}</span>
       </div>${gs.some(({ m }) => m.draft?.length) ? `<div class="hist-drafts">${seriesDraftsHtml(src, gs.map(({ m }) => m))}</div>` : ""}`;
     });
@@ -201,7 +218,7 @@ export async function renderTeams(src, slug) {
         <span class="hist-res">${won ? "W" : "L"}</span>
         <span class="hist-vs">vs <b>${teamLink(src, opp, null, true)}</b></span>
         <span class="hist-score">${us}–${them}</span>
-        <span class="hist-games">${dur(m.duration_sec)}${m.private ? ' · <span class="priv">Private</span>' : ""}</span>
+        <span class="hist-games">${dur(m.duration_sec)}${m.private ? ' · <span class="priv">Private</span>' : ""}${tagsHtml(gameTags(m, tagCtx, side))}</span>
         <span class="hist-date">${when(m.createdAt)}</span>
       </a>`;
     });
@@ -430,12 +447,9 @@ export async function renderTeams(src, slug) {
     ["overview", `${headCards}
       ${tline ? `<div id="team-ranks-box" data-key="${esc(team.key)}">${statRanksHtml(src, team.key, trows, null, TEAM_RANKS)}</div>` : ""}
       <div class="team-cols">
-        <section><h2>Recent ${ad2l ? "series" : "games"}</h2>
-          <div class="history reveal">${historyRows.slice(0, 5).join("") || noGames}</div>
-          ${historyRows.length > 5 ? goto("games", `All ${historyRows.length} ${ad2l ? "series" : "games"}`) : ""}</section>
+        <section>${h.heroes.length ? `<h2>Most played</h2>${chips(h.heroes, (x) => `${x.wins}–${x.picks - x.wins}`, 8)}${lineups.some(({ m }) => m.players.some((p) => p.position)) ? `<p class="table-note"><button type="button" class="link-btn" data-goto-tab="draft" data-goto-anchor="hero-grid">Their heroes by position, as a Dota hero grid →</button></p>` : ""}` : `<h2>Results</h2>${noGames}`}</section>
         <section><h2>Roster</h2>${rosterStrip}${goto("roster", "Full roster")}</section>
       </div>
-      ${h.heroes.length ? `<h2>Most played</h2>${chips(h.heroes, (x) => `${x.wins}–${x.picks - x.wins}`, 8)}${lineups.some(({ m }) => m.players.some((p) => p.position)) ? `<p class="table-note"><button type="button" class="link-btn" data-goto-tab="heroes" data-goto-anchor="hero-grid">Their heroes by position, as a Dota hero grid →</button></p>` : ""}` : ""}
       ${lengthSection}
       ${opponents}`],
     ["roster", `<h2>${roster ? "Roster" : "Players"}</h2>
@@ -445,24 +459,25 @@ export async function renderTeams(src, slug) {
       ${h.detailed.length ? `<h2>Player stats for this team</h2><div id="t"></div>` : ""}
       ${pairs.pairs.length ? `<h2>Pairs${info("team_pairs")}</h2><div id="pairs"></div>
         <h2>Lineups</h2><div id="lineups"></div>` : ""}`],
-    // Series, then the draft model's read of each drafted one (parts/cmdraft.js), filled when
-    // the tab is first shown.
-    ["games", `<div class="history reveal">${historyRows.join("") || noGames}</div>
-      ${ad2l && h.games.some(({ m }) => m.draft?.some((x) => x.pick)) ? `<h2>Drafts</h2><div id="td-box"><div class="panel empty">Reading the drafts…</div></div>` : ""}`],
+    ["games", `<div class="history reveal">${historyRows.join("") || noGames}</div>`],
     ["heroes", h.heroes.length ? `${cardsHtml([
         ["Hero pool", String(h.heroes.length), `different heroes in ${plural(h.detailed.length, "game")}`],
         ["Most played", esc(top.hero), `${plural(top.picks, "game")} · ${top.wins}–${top.picks - top.wins}`],
         ...(h.bans[0] ? [["Bans most", esc(h.bans[0].hero), `${plural(h.bans[0].n, "ban")} in ${plural(h.drafted, "draft")}`]] : []),
         ...(h.banned_against[0] ? [["Banned against", esc(h.banned_against[0].hero), `${h.banned_against[0].n} time${h.banned_against[0].n === 1 ? "" : "s"} by opponents`]] : []),
       ])}
-      <h2 id="hero-pool">Hero pool</h2>${heroPoolBox(h.heroes)}
-      ${heroGridHtml(team, lineups, { pubs: ad2l?.pubs ?? null })}
+      <h2 id="hero-pool">Hero pool</h2>${heroPoolBox(h.heroes)}` : ""],
+    // The prep sheet first: the hero grid, then side and pick order, draft by phase and the draft
+    // model's read of each drafted series (parts/cmdraft.js), filled when the tab is first shown.
+    ["draft", h.heroes.length ? `${heroGridHtml(team, lineups, { pubs: ad2l?.pubs ?? null })}
       ${sideSplit}
-      ${phases}` : ""],
+      ${phases}
+      ${ad2l && h.games.some(({ m }) => m.draft?.some((x) => x.pick)) ? `<h2>Series drafts</h2><div id="td-box"><div class="panel empty">Reading the drafts…</div></div>` : ""}` : ""],
     // Its chance of each final place (parts/playoffs.js), worked out when the tab is first shown.
     // The nav menu lists Outcomes for every AD2L team, so a bye slot keeps the tab and says why.
     ["chances", !ad2l ? "" : isBye(team) ? `<div class="panel empty">A bye week isn't a team, so it has no outcomes.</div>` : `<section class="po" id="tc-box"><div class="panel empty">Working out every outcome…</div></section>`],
     ["lanes", teamLanesHtml(src, h.games.map(({ m }) => ({ m, side: sideOf(m, team) })).filter((g) => g.side), laneCuts_, team)],
+    ["resources", ad2l ? teamMapHtml(src, matches, teams, team, h, "gold") : ""],
     ["map", `${teamMapHtml(src, matches, teams, team, h)}
       ${(() => { const gs = h.games.map(({ m }) => m), mine = (p, m) => p.team === sideOf(m, team);
         const fights = teamFightMapHtml(gs, (m) => sideOf(m, team), { name: team.name });
@@ -471,7 +486,7 @@ export async function renderTeams(src, slug) {
           ["fights", "Team fights", "team_fights", fights || ""],
           ["smokes", "Smokes", "team_smokes", teamSmokeHtml(gs, (m) => sideOf(m, team), { name: team.name })],
         ]); })()}`],
-  ]), { store: "teamTab", label: "Team sections" });
+  ]), { store: "teamTab", label: "Team sections", remember: switchedTeam() });
 
   // Same compact header as the player and hero pages: back link, league and team picker,
   // then name, the record line and the tabs.
@@ -600,7 +615,10 @@ export async function renderTeams(src, slug) {
     const el = document.getElementById("team-ranks-box");
     if (el?.dataset.key === team.key) el.innerHTML = statRanksHtml(src, team.key, trows, all ?? [], TEAM_RANKS);
   });
-  document.getElementById("team-select").onchange = (e) => { location.hash = `${base}/${e.target.value}`; };
+  document.getElementById("team-select").onchange = (e) => {
+    try { sessionStorage.setItem(TEAM_SWITCH, "1"); } catch { /* opens on Overview */ }
+    location.hash = `${base}/${e.target.value}`;
+  };
   if (h.detailed.length) {
     // Only this team's side of each game.
     const ownSide = h.games.filter(({ m }) => hasDetails(m)).map(({ m, side }) => ({ ...m, players: m.players.filter((p) => p.team === side) }));
