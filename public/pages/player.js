@@ -19,6 +19,7 @@ import { tierRef, tierBreakdown } from "../parts/tiers.js";
 import { compareHtml, wireCompare } from "../parts/compare.js";
 import { radarSvg, roleScores } from "../parts/radar.js";
 import { tagContext, gameTags, tagsHtml, tagCells } from "../lib/gametags.js";
+import { mountProfileCollection } from '../parts/collection.js';
 
 // ---------- Player page ----------
 
@@ -146,6 +147,7 @@ export async function renderPlayer(src, key) {
       <div class="tm-body">${tierBreakdown(src, tierOf)}</div>
     </dialog>` : ""}`;
   wirePlayerTabs();
+  if(/^\d+$/.test(key)) mountProfileCollection(app,{account:Number(key),name:s.name,matches,team:roster?.team?.name??s.team,tier:tierOf}).catch(()=>{});
   wireItemHeroes();
   wireCharts(app);
   wireTierModal();

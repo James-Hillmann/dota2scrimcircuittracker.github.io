@@ -615,8 +615,17 @@ shrunk-resolution problem above, not a finding problem.
 
 ## Fantasy (AD2L divisions)
 
+The tier list and Fantasy share player cards (`parts/player-card.js`), including saved hero
+and role choices. Every card front shows the player’s win-loss record; tier cards keep their
+selected tier model’s rating and a separate Breakdown button. The tier list uses compact
+portrait trading cards with text and controls on the cards, one row per tier; crowded rows scroll sideways. Fantasy keeps full-size cards.
+
+Team logos appear beside the team name on both card faces and beside each team-page title.
+The 74 playing teams use local 128px images, matched by PlayOn and in-game Dota IDs;
+source records are in `scripts/gen/team-logo-sources.json`. Bye-week placeholders have no logo.
+
 Predict's **Fantasy** tab (`<league>/predict?tab=fantasy`; `pages/fantasy.js`, loaded when the
-tab first opens; rules and scoring in `lib/fantasy.js`). One game per division; Heroic A/B views
+tab first opens; rules and scoring in `lib/fantasy.js`). One game per division after the shared tiebreaker test; Heroic A/B views
 play the whole Heroic/Aegis game. Predict's "Your name" bar hides on this tab (Fantasy has its own).
 
 - **Sign in with Steam** — **Sign in** in the top bar (left of the settings cog) or on the tab.
@@ -629,7 +638,7 @@ play the whole Heroic/Aegis game. Predict's "Your name" bar hides on this tab (F
   anonymous one that owns this browser's uploads is untouched. Only the Steam ID is shared.
 - **Each week** — five picks, one per position (Pos 1 Carry … Pos 5 Hard support), from rostered
   players of teams with a series that week (no byes, no stand-ins); never yourself, teammates
-  fine. "Your official picks", a dark display case, stands each pick's card face up on a lit
+  fine. "Your picks", a dark display case, stands each pick's card face up on a lit
   pedestal engraved with its position (click the card to turn it over; the pedestal is the tab
   for that position; a back under 200px wide uses a compact layout; on a phone the case scrolls
   sideways). It sits over a deck of player cards
@@ -638,12 +647,12 @@ play the whole Heroic/Aegis game. Predict's "Your name" bar hides on this tab (F
   loading screens, arcana and release art from the Dota 2 wiki, Valve's site and the Steam
   market); `node scripts/gen/gen-hero-art.js` self-hosts them as `img/hero-art/<slug>.webp` and
   writes `lib/hero-art.js`. Styles (style.css `.ft-card[data-style]`, SVG filters in
-  pages/fantasy.js): stencil, the default worn print to match the display type (posterize
+  parts/player-card.js): stencil, the default worn print to match the display type (posterize
   `#ft-paint`, speckle mask `img/grit.png` from `scripts/gen/gen-grit.js`), clean, cinematic,
   ember, frost, ink and noir. A hero without a pick (a new one) gets Valve's `_vert.jpg` as
   stencil; art that fails to load falls back to the wide image. Each card is a trading card (5:7)
   in a metal frame of its tier's colour: the front shows the art, tier shield, main position and a
-  nameplate (name, team, card hero) with a Pick button; clicking the card anywhere else (or its
+  nameplate (name, player win-loss record, team, card hero) with a Pick button; clicking the card anywhere else (or its
   turn button, from the keyboard) turns it to the back: games, win %, average
   K/D/A, then GPM, XPM, hero damage and last hits for a core (pos 1–3) or observer/sentry wards
   placed, camps stacked and healing for a support (pos 4–5); latest medal with Core or Support,
@@ -656,27 +665,26 @@ play the whole Heroic/Aegis game. Predict's "Your name" bar hides on this tab (F
   them. Signed out, the buttons read "Sign in to pick" and start the Steam sign-in. Picks can be
   changed until the week's first series starts (weeks run Monday to Monday UTC). The database
   stamps each save with server time; a save after the lock never counts.
-- **Your card** — signed in, and on a roster in the league you're viewing, your own card shows
-  above the week (you can't pick yourself, so it isn't in the deck). Pick the hero on its front
-  (any hero; default your most played) and your role (Pos 1–5; default the position you've played
-  most). Use the role for a role swap: your card moves to that position's deck, its back shows that
-  role's numbers, and its position pill gets a dot (role set by the player). Points don't change,
-  since every pick scores as the slot it fills. The card updates as you choose; **Save card**
-  stores it in Firestore `scrimLeague/data/cards/<account>`, which only that account's Steam
-  sign-in can write (rules: `firebase/scrimleague.rules`). One card per player, shared by every
-  division.
+- **Card customization**: the Fantasy tab links to Collection customization. Hero, role,
+  artwork, filters, framing, borders and signatures are managed there with three saved designs,
+  a primary card and optional shuffle. Fantasy uses the shared card renderer.
+- **Captain**: choose one of your five picks as captain before saving. Their weekly points are
+  doubled after selecting their best two games. Captain choices lock with the lineup and are
+  stored as an account ID in the entry. Older entries without a captain retain their base score.
 - **Announced series** — series the admins announce before PlayOn posts them
   (`lib/divisions.js` ANNOUNCED) count as that week's series, so the week opens on time; PlayOn's
   own series replace them when the sync brings them, and their games count by teams and week.
   S48 week 8 tiebreakers (Thu Oct 15, start assumed at the usual league night): Challenger
   Castaway Baes v Get Ganked Challenger 2 (Bo3, 4th seed), Champion WIMCC v SWM.Twinks (Bo3, 8th
   seed), Heroic Josh A. Suicidal Thoughts v A femboy + 4 Mejicanos (Bo1), the winner v Team
-  Awesome (Bo1, 8th seed). The other divisions have no tiebreakers, so no week opens there.
-- **Scoring** — each game a pick plays that week is scored on the playoff tier model
-  (`lib/tiers.js` NEXT) as if they'd played the slot's position (`gameScoreAt`), and the best two
-  count (a Bo3: best two of three). A pick who doesn't play scores 0.
-- **Leaderboard** — the season so far, from the first week anyone entered: total points, weeks
-  played, last week; open a name for each week's picks and points. Your latest locked week shows
-  above it pick by pick, dropped games struck through.
+  Awesome (Bo1, 8th seed). This first test week pools these divisions into one shared game available from every division. Afterward, only the selected division’s playoff bracket is eligible. The shared test remains available for review.
+- **Scoring**: raw stats multiplied by fixed fantasy weights, with no curve or comparison
+  against other players. Best two games per pick count; a pick who does not play scores 0.
+  The scoring and rules info bubble lists every weight. Missing stats count as zero.
+- **Player lineups**: open any saved entrant and week to see their five player cards, points
+  per pick, and weekly score breakdown. The breakdown lists each game's stat contributions,
+  counted or dropped status, and a link to the game. Unlocked weeks display pending scores.
+- **Leaderboards**: playoff totals and weekly boards below the lineups. The cross-division
+  tiebreaker test has a separate leaderboard and does not add to division playoff totals.
 - Local preview only: `?fantasy_now=<unix seconds>` sets the clock, to see an open week out of
   season; `?fantasy_me=<account id>` shows the tab as that player (their own card), display only.

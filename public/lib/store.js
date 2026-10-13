@@ -48,6 +48,10 @@ export async function steamSignIn(token) {
   return steamOf((await signInWithCustomToken(fantasyAuth, token)).user);
 }
 export const steamSignOut = () => signOut(fantasyAuth);
+export async function steamIdToken() {
+  await fantasyReady;
+  return fantasyAuth.currentUser?.getIdToken() ?? null;
+}
 
 // Fantasy entries (lib/fantasy.js): one per person per league per week, id
 // "<league>_<week>_<account>", written through the Steam session so the rules can tie it to the
@@ -57,11 +61,12 @@ export async function listFantasy(league) {
   const snap = await getDocs(query(collection(db, "scrimLeague", "data", "fantasy"), where("league", "==", league), limit(5000)));
   return snap.docs.map((d) => ({ id: d.id, ...d.data(), updatedAt: d.data().updatedAt?.toDate?.() ?? null }));
 }
-export async function saveFantasy(league, week, picks, name) {
+export async function saveFantasy(league, week, picks, name, captain) {
   const account = await steamAccount();
   if (account == null) throw new Error("Sign in with Steam first.");
+  if(!Number.isInteger(captain)||!picks.includes(captain))throw new Error("Choose a captain from your picks.");
   await setDoc(doc(fantasyColl, `${league}_${week}_${account}`), {
-    v: 1, league, week, account, picks, name: name.trim().slice(0, 24), uid: fantasyAuth.currentUser.uid, updatedAt: serverTimestamp(),
+    v: 1, league, week, account, picks, captain, name: name.trim().slice(0, 24), uid: fantasyAuth.currentUser.uid, updatedAt: serverTimestamp(),
   });
 }
 
@@ -70,13 +75,21 @@ export async function saveFantasy(league, week, picks, name) {
 // they play now, 1–5, or null (their most played position). A Map account -> { hero, pos }.
 const cardColl = collection(getFirestore(fantasyApp), "scrimLeague", "data", "cards");
 export async function listCards() {
-  const snap = await getDocs(query(collection(db, "scrimLeague", "data", "cards"), limit(5000)));
-  return new Map(snap.docs.map((d) => [d.data().account, { hero: d.data().hero ?? null, pos: d.data().pos ?? null }]));
+  const snap = await getDocs(query(collection(db, "scrimLeague", "data", "cards"), limit(5000))).catch(()=>null);
+  const cards=new Map((snap?.docs??[]).map((d) => [Number(d.data().account), { hero: d.data().hero ?? null, pos: d.data().pos ?? null, art: d.data().art ?? null, style: d.data().style ?? null, crop: d.data().crop ?? null }]));
+  try {
+    const {cosmeticAppearances}=await import('./cosmetics.js');
+    for(const [id,cosmetics] of Object.entries(await cosmeticAppearances())) cards.set(Number(id),{...cards.get(Number(id)),...cosmetics.baseCard,cosmetics});
+  } catch { /* Existing cards remain available if the collection service is offline. */ }
+  return cards;
 }
-export async function saveCard({ hero = null, pos = null }) {
+export async function saveCard({ hero = null, pos = null, art = null, style = null, crop = null }) {
+  const { checkCardChoices } = await import("./card-art.js");
+  const error = checkCardChoices({ hero, pos, art, style, crop });
+  if (error) throw new Error(error);
   const account = await steamAccount();
   if (account == null) throw new Error("Sign in with Steam first.");
-  await setDoc(doc(cardColl, String(account)), { v: 1, account, hero, pos, uid: fantasyAuth.currentUser.uid, updatedAt: serverTimestamp() });
+  await setDoc(doc(cardColl, String(account)), { v: 1, account, hero, pos, art, style, crop, uid: fantasyAuth.currentUser.uid, updatedAt: serverTimestamp() });
 }
 
 // Review-form draft → the stored document shape the rules validate.

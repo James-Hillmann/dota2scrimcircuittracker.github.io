@@ -17,6 +17,7 @@ import { renderStandings } from "./pages/standings.js";
 import { renderTeams } from "./pages/teams.js";
 import { renderWeek } from "./pages/week.js";
 import { mountMe } from "./parts/me.js";
+import { mountGift } from './parts/collection.js';
 
 // Upload (and editing an upload) and Predictions load on first visit.
 const uploadPage = () => import("./pages/upload.js");
@@ -639,10 +640,11 @@ const steamToken = /^#fantasy-token=([\w-]+\.[\w-]+\.[\w-]+)$/.exec(location.has
 if (steamToken) {
   let back = ""; try { back = sessionStorage.getItem("steam-back") ?? ""; sessionStorage.removeItem("steam-back"); } catch { /* storage blocked */ }
   history.replaceState(history.state, "", location.pathname + location.search + (back.startsWith("#/") ? back : ""));
-  import("./lib/store.js").then((s) => s.steamSignIn(steamToken)).then(() => { mountMe(); route(); }).catch((e) => console.warn("Steam sign-in failed", e));
+  import("./lib/store.js").then((s) => s.steamSignIn(steamToken)).then(() => { mountMe(); mountGift(); route(); }).catch((e) => console.warn("Steam sign-in failed", e));
 }
 route();
 mountMe();
+mountGift();
 countVisit();
 // Entry animations (style.css html.calm) play on the first page of a visit; after that, pages
 // appear at once. A visit is this tab: a reload keeps it calm.
@@ -656,6 +658,7 @@ countVisit();
 // starts drawing, so they don't hold it up.
 // Feedback: the Feedback button in the top bar.
 import("./lib/feedback.js").then((m) => m.initFeedback()).catch((e) => console.warn("feedback unavailable", e));
+import("./lib/bonus-offers.js").then((m) => { m.syncPackOfferBadges(); document.querySelector('[data-pack-offer="discord"]')?.addEventListener("click", () => m.markPackOffer("discord"), { once: true }); }).catch(() => {});
 // Tour: invites first-time visitors; "New here?" (or Resume) in the footer starts it.
 // rerender re-routes the current page (after the tour puts back the choices it changed).
 import("./lib/tour.js").then((m) => m.initTour({

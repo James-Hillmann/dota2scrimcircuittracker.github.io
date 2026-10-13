@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import { weekKey, fantasyWeeks, openWeek, pickable, checkPicks, pickPoints, scoreEntry, leaderboard, fantasyModels, weekGames, GAMES_COUNTED } from "../public/lib/fantasy.js";
+import { weekKey, fantasyWeeks, openWeek, pickable, checkPicks, pickPoints, scoreEntry, leaderboard, fantasyPoints, playoffWeeks, testWeek, TEST_WEEK, weekBoard, weekGames, GAMES_COUNTED } from "../public/lib/fantasy.js";
 
 const T = (iso) => Date.parse(iso) / 1000;
 const series = [
@@ -35,20 +35,37 @@ test("only teams playing that week can be picked, and never yourself", () => {
 
 // Real games: the Champion file.
 const d = JSON.parse(fs.readFileSync(new URL("../public/data/ad2l.json", import.meta.url)));
-const weeks = fantasyWeeks(d.series), models = fantasyModels(d.games);
+const weeks = fantasyWeeks(d.series);
 
-test("a pick counts its best two games, scored as the slot's position", () => {
-  const w = weeks.find((x) => weekGames(d.games, x).length);
-  const games = weekGames(d.games, w);
-  const acct = games[0].players.find((p) => p.account_id).account_id;
-  const asOne = pickPoints(acct, 1, games, d.games, models), asFive = pickPoints(acct, 5, games, d.games, models);
-  assert.ok(asOne.games.length >= 1 && asOne.games.filter((g) => g.counted).length === Math.min(GAMES_COUNTED, asOne.games.length));
-  const top = [...asOne.games].sort((a, b) => b.score - a.score).slice(0, GAMES_COUNTED);
-  assert.ok(Math.abs(asOne.points - top.reduce((t, g) => t + g.score, 0)) < 0.2);
-  assert.notEqual(asOne.points, asFive.points); // the slot's position changes the score
-  // Three games: still only the best two.
-  const three = pickPoints(acct, 1, [...games, ...games.slice(0, 1).map((m) => ({ ...m, id: `${m.id}x`, start_time: (m.start_time ?? 0) + 1 }))], d.games, models);
-  assert.ok(three.games.length > asOne.games.length && three.games.filter((g) => g.counted).length === GAMES_COUNTED);
+test("raw fantasy points have fixed weights, no position or population curve", () => {
+  const p = { kills: 10, deaths: 2, last_hits: 200, denies: 10, gpm: 500, tf_part: 0.5,
+    obs_placed: 2, camps_stacked: 2, runes: [2, 2], first_blood: 1, roshan_kills: 1, stuns: 10 };
+  const f = fantasyPoints(p);
+  assert.equal(f.points, 17);
+  assert.equal(f.parts.find((x) => x.label === "Deaths").points, 2.4);
+  assert.equal(fantasyPoints({ deaths: 20 }).points, 0);
+});
+
+test("a pick counts its best two raw-stat games and exposes every contribution", () => {
+  const games = [0, 10, 20].map((kills, i) => ({ id: i, start_time: i + 1, players: [{ account_id: 1, kills }] }));
+  const result = pickPoints(1, games);
+  assert.equal(result.points, 15);
+  assert.deepEqual(result.games.map((g) => g.counted), [false, true, true]);
+  assert.equal(result.games[2].parts.find((x) => x.label === "Kills").points, 6);
+  assert.equal(pickPoints(999, games).points, 0);
+});
+
+test("the first week pools tiebreakers and later weeks only include the playoff bracket", () => {
+  const divisions = TEST_WEEK.leagues.map((key) => ({ key, ...JSON.parse(fs.readFileSync(new URL(`../public/data/${key}.json`, import.meta.url))) }));
+  const w = testWeek(divisions);
+  assert.equal(w.key, TEST_WEEK.key);
+  assert.equal(w.league, "all");
+  assert.equal(w.teams.size, 7);
+  assert.equal(pickable(divisions.flatMap((x) => x.teams), w).length, 35);
+  const later = { id: "playoff", time: T("2026-10-23T01:00:00Z"), home: 10, away: 11 };
+  const ws = playoffWeeks("ad2l", [...series, later]);
+  assert.deepEqual(ws.map((x) => x.key), ["2026-10-19"]);
+  assert.equal(weekGames([{ ...later, series_id: "playoff", league: "heroic" }], ws[0]).length, 0);
 });
 
 test("entries saved after the lock never count; the board adds weeks up", () => {
@@ -56,12 +73,15 @@ test("entries saved after the lock never count; the board adds weeks up", () => 
   const picks = d.teams.filter((t) => w.teams.has(t.id)).flatMap((t) => t.players.map((p) => p.account_id)).slice(0, 5);
   const early = { account: 1, name: "Early", week: w.key, picks, updatedAt: new Date((w.lock - 60) * 1000) };
   const late = { account: 2, name: "Late", week: w.key, picks, updatedAt: new Date((w.lock + 60) * 1000) };
-  assert.equal(scoreEntry(late, w, d.games, models), null);
-  const board = leaderboard([early, late], weeks, d.games, w.lock + 1, models);
+  assert.equal(scoreEntry(late, w, d.games), null);
+  assert.equal(scoreEntry(early, { ...w, eligible: new Set() }, d.games), null);
+  assert.equal(scoreEntry({ ...early, updatedAt: new Date(w.lock * 1000) }, w, d.games), null);
+  const board = leaderboard([early, late], weeks, d.games, w.lock + 1);
   assert.deepEqual(board.map((r) => r.name), ["Early"]);
-  assert.equal(board[0].points, scoreEntry(early, w, d.games, models).points);
+  assert.equal(board[0].points, scoreEntry(early, w, d.games).points);
+  assert.deepEqual(weekBoard([early, late], w, d.games).map((r) => r.name), ["Early"]);
   // Before the lock nothing is scored yet.
-  assert.deepEqual(leaderboard([early], weeks, d.games, w.lock - 1, models), []);
+  assert.deepEqual(leaderboard([early], weeks, d.games, w.lock - 1), []);
 });
 
 test("announced series join the week until PlayOn posts its own", async () => {
@@ -78,4 +98,21 @@ test("announced series join the week until PlayOn posts its own", async () => {
   // Its games count by teams and week even without a PlayOn series id.
   const g = { ...d.games[0], id: "x", series_id: null, start_time: a.time + 600, team_a_id: a.home, team_b_id: a.away };
   assert.equal(weekGames([g], w).length, 1);
+});
+test("captain doubles one pick's best-two-game total and legacy entries retain their score", () => {
+  const week={key:'2026-10-12',lock:100,seriesIds:new Set(['captain-test']),teams:new Set()};
+  const picks=[11,12,13,14,15];
+  const entry={account:99,picks,week:week.key,updatedAt:new Date(90000)};
+  const games=[0,10,20].map((kills,i)=>({id:i,series_id:'captain-test',start_time:101+i,players:picks.map(account_id=>({account_id,kills}))}));
+  const original=scoreEntry(entry,week,games),result=scoreEntry({...entry,captain:12},week,games);
+  assert.equal(original.points,75);
+  assert.equal(result.points,90);
+  assert.equal(result.picks[1].points,30);
+  assert.equal(result.picks[1].basePoints,15);
+  assert.equal(result.picks.filter(p=>p.captain).length,1);
+  assert.deepEqual(result.picks[1].games.map(g=>g.counted),[false,true,true]);
+  assert.equal(weekBoard([{...entry,captain:12}],week,games)[0].points,90);
+  assert.equal(leaderboard([{...entry,captain:12}],[week],games,101)[0].points,90);
+  assert.equal(scoreEntry({...entry,captain:99},week,games),null);
+  assert.equal(scoreEntry({...entry,captain:'12'},week,games),null);
 });

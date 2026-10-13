@@ -5,6 +5,7 @@
 // AD2L divisions (the scrims have far fewer stats): the first stop makes you pick one.
 // Design: docs/superpowers/specs/2026-09-29-guided-tour-design.md
 import { SEASON } from "./divisions.js";
+import { markPackOffer } from "./bonus-offers.js";
 
 // "Move subtabs" puts the page tabs in a closed sidebar (core.js sideBar): open it before
 // pointing at them or clicking one.
@@ -540,6 +541,7 @@ class Tour {
   // A chapter: a list of stops, then a closing card.
   // at: the stop to start from (its group and title, from a paused tour).
   async chapter(name, at = null) {
+    if (this.chapterName === "core" && name === "deep") markPackOffer("tour");
     const { stops, closing } = CHAPTERS[name];
     this.chapterName = name;
     this.stops = stops.filter((s) => !s.when || s.when(this.ctx));
@@ -906,6 +908,7 @@ class Tour {
   // Done: forget the tour's place and go back where it started.
   end() {
     if (!this.close()) return;
+    if (this.chapterName === "core") markPackOffer("tour");
     try { localStorage.removeItem(PAUSE_KEY); } catch { /* private mode */ }
     syncTopBar();
     if (norm(deps.here()) !== norm(this.start)) deps.go(this.start);

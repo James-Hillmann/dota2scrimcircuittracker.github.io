@@ -129,11 +129,11 @@ export function wireCompare(src, key, players, tier, play = null) {
       </div>
       ${chart}
       ${play ? overTimeHtml(cols) : ""}
+      ${play ? wardsHtml(cols) + deathsHtml(cols) : ""}
       <h2>${others.length ? "Head to head" : "Stats"}</h2><div class="cmp-wrap"><table class="cmp-table">
         <thead><tr><th scope="col" class="l"></th>${head}</tr></thead>
         <tbody>${body}</tbody>
-      </table></div>
-      ${play ? wardsHtml(cols) + deathsHtml(cols) : ""}`;
+      </table></div>`;
     if (play) wirePlay(box);
     const input = box.querySelector("#cmp-in");
     const add = () => {

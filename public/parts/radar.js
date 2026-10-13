@@ -16,7 +16,11 @@ export function radarSvg(shapes, metrics, label = "Tier stats, 0 to 100") {
     + metrics.map((_, i) => { const [x, y] = pt(i, 100); return `<line class="radar-grid" x1="0" y1="0" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}"/>`; }).join("");
   const labels = metrics.map((m, i) => {
     const [x, y] = pt(i, 116), anchor = Math.abs(x) < 8 ? "middle" : x > 0 ? "start" : "end";
-    return `<text class="radar-label" x="${x.toFixed(1)}" y="${(y + 3).toFixed(1)}" text-anchor="${anchor}">${esc(METRICS[m].label)}</text>`;
+    const label = METRICS[m].label;
+    const text = m === "tower"
+      ? `<tspan x="${x.toFixed(1)}" dy="-4">Building</tspan><tspan x="${x.toFixed(1)}" dy="10">share</tspan>`
+      : esc(label);
+    return `<text class="radar-label" x="${x.toFixed(1)}" y="${(y + 3).toFixed(1)}" text-anchor="${anchor}" aria-label="${esc(label)}">${text}</text>`;
   }).join("");
   const shape = ({ name, cls, scores }) => `<g class="${cls}"><polygon class="radar-shape" points="${metrics.map((m, i) => xy(pt(i, clamp(scores[m])))).join(" ")}"/>${metrics.map((m, i) => {
     const [x, y] = pt(i, clamp(scores[m]));
@@ -26,5 +30,5 @@ export function radarSvg(shapes, metrics, label = "Tier stats, 0 to 100") {
 }
 
 // One player's main-role stats (a tier-list result), metric -> 0–100, in the scoring's order.
-export const roleScores = (tp) => Object.fromEntries((tp?.roles[0]?.stats ?? []).map((s) => [s.metric, s.score]));
+export const roleScores = (tp, role = null) => Object.fromEntries(((role ? tp?.roles?.find((r) => r.role === role || r.unit === role) : tp?.roles?.[0])?.stats ?? []).map((s) => [s.metric, s.score]));
 

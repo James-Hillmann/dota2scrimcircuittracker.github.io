@@ -111,7 +111,8 @@ export async function renderWeek(src, back = 0) {
   const first = weeks[weeks.length - 1];
   const counts = new Map();
   for (const m of games) { const w = weekOf(m); counts.set(w, (counts.get(w) ?? 0) + 1); }
-  const picker = `<nav class="week-pick" aria-label="Weeks">
+  const weekCols = Math.ceil(weeks.length / Math.ceil(weeks.length / 8));
+  const picker = `<nav class="week-pick" aria-label="Weeks" style="--week-cols:${weekCols}">
     <div class="week-pick-label">Week</div>
     <div class="week-chips">${weeks.map((w, i) => {
       const n = Math.round((w - first) / WEEK_MS) + 1, c = counts.get(w);

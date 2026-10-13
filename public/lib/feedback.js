@@ -10,6 +10,7 @@
 // Coordinates are page coordinates (client + scroll), so marks stay put when the page
 // scrolls. Nothing here builds anything from a ticket: they're read outside the app.
 import { submitFeedback, MAX_FEEDBACK_ITEMS, FEEDBACK_PER_HOUR } from "./store.js";
+import { markPackOffer } from "./bonus-offers.js";
 
 // Renders the page's DOM into a canvas (SVG foreignObject). Loaded on first capture only.
 const SHOT_LIB = "https://cdn.jsdelivr.net/npm/modern-screenshot@4.7.0/dist/index.mjs";
@@ -551,6 +552,7 @@ function openSubmit() {
       items = [];
       save();
       refresh();
+      markPackOffer("feedback");
       card.innerHTML = `<h3 id="fb-modal-title">Thanks, ${esc(nm)}</h3>
         <p>Your ticket is <b class="fb-id">${esc(res.id)}</b>. Fav reads every one.</p>
         <div class="fb-card-foot"><button type="submit" class="fb-go">Done</button></div>`;

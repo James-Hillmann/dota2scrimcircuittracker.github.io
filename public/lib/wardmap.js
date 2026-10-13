@@ -83,6 +83,7 @@ export function wardMapHtml(layers, { mirrored = false, mode = null, id = "wards
   const pi = new Map(people.map(([who], i) => [who, i]));
   const compact = layers.map((l) => ({ label: l.label, cls: l.cls, w: l.wards.map((w) => [w.kind === "obs" ? 1 : 0, w.x, w.y, w.t, w.life, w.killed ? 1 : 0, pi.get(w.who) ?? -1, w.side === "b" ? 1 : 0]) }));
   const start = mode ?? "dots";
+  const maxTime = Math.max(0, ...layers.flatMap((l) => l.wards.map((w) => w.t ?? 0)));
   const gamesOn = (side) => new Set(layers.flatMap((l) => l.wards.filter((w) => w.side === side).map((w) => w.game))).size;
   const sides = mirrored ? [["a", "Radiant"], ["b", "Dire"]].map(([v, l]) => [v, l, gamesOn(v)]).filter(([, , n]) => n) : [];
   const side = sides.length === 1 ? sides[0][0] : "all";
@@ -90,12 +91,13 @@ export function wardMapHtml(layers, { mirrored = false, mode = null, id = "wards
   const pick = people.length > 1
     ? `<select class="wm-player" aria-label="Player"><option value="all">All players</option>${people.map(([, n, label], i) => `<option value="${i}">${attr(label)} (${n})</option>`).join("")}</select>`
     : "";
-  return `<figure class="wardmap" id="${id}" data-mode="${start}" data-side="${side}" data-mirrored="${mirrored ? 1 : 0}" data-people="${attr(JSON.stringify(people.map(([, , label]) => label)))}" data-wards="${attr(JSON.stringify(compact))}">
+  return `<figure class="wardmap" id="${id}" data-mode="${start}" data-side="${side}" data-mirrored="${mirrored ? 1 : 0}" data-time="${Math.ceil(maxTime / 60) * 60}" data-people="${attr(JSON.stringify(people.map(([, , label]) => label)))}" data-wards="${attr(JSON.stringify(compact))}">
     <div class="wm-controls">
       ${sides.length ? seg("side", [...(sides.length > 1 ? [["all", "Both sides"]] : []), ...sides.map(([v, l, n]) => [v, `As ${l} (${n})`])], side) : ""}
       ${seg("kind", [["all", "All wards"], ["obs", "Observers"], ["sen", "Sentries"]], "all")}
       ${seg("phase", [["all", "Whole game"], ["0", "0–10'"], ["1", "10–20'"], ["2", "20–35'"], ["3", "35'+"]], "all")}
       ${pick}
+      ${mirrored && maxTime ? `<label class="wm-time"><span>Through <output>${clock(maxTime)}</output></span><input class="wm-time-slider" type="range" min="0" max="${Math.ceil(maxTime / 60) * 60}" step="30" value="${Math.ceil(maxTime / 60) * 60}"></label>` : ""}
       ${seg("mode", [["dots", "Dots"], ["heat", "Heat"], ...(mirrored ? [["vision", "Vision"]] : [])], start)}
     </div>
     <div class="wm-body"><div class="wm-map"></div><div class="wm-side"></div></div>
@@ -174,7 +176,8 @@ function draw(fig) {
   const mode = fig.dataset.mode, kind = fig.dataset.kind ?? "all", phase = fig.dataset.phase ?? "all", who = fig.dataset.who ?? "all";
   const people = JSON.parse(fig.dataset.people ?? "[]");
   const mirrored = fig.dataset.mirrored === "1", side = mirrored ? fig.dataset.side ?? "all" : "all";
-  const keep = (w) => (kind === "all" || (kind === "obs") === (w[0] === 1)) &&
+  const time = Number(fig.dataset.time ?? Infinity);
+  const keep = (w) => (kind === "all" || (kind === "obs") === (w[0] === 1)) && w[3] <= time &&
     (phase === "all" || (w[3] >= PHASES[+phase][0] && w[3] < PHASES[+phase][1])) &&
     (who === "all" || w[6] === +who) &&
     (side === "all" || w[7] === (side === "b" ? 1 : 0));
@@ -236,5 +239,10 @@ export function wireWardMaps(root) {
       draw(fig);
     }));
     fig.querySelector(".wm-player")?.addEventListener("change", (e) => { fig.dataset.who = e.target.value; draw(fig); });
+    fig.querySelector(".wm-time-slider")?.addEventListener("input", (e) => {
+      fig.dataset.time = e.target.value;
+      const out = fig.querySelector(".wm-time output"); if (out) out.textContent = clock(Number(e.target.value));
+      draw(fig);
+    });
   });
 }

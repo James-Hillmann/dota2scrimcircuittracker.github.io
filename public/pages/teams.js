@@ -1,4 +1,5 @@
 // Teams: the scrim team list and every team's page.
+import { teamLogoHtml } from "../lib/team-logos.js";
 import { hasDetails, playerLeaderboard } from "../lib/stats.js";
 import { tierList, rankLabel } from "../lib/tiers.js";
 import { listTeams, standingsRows, teamHistory, sideOf, seriesRecords } from "../lib/teams.js";
@@ -56,7 +57,7 @@ export function teamGridHtml(src, matches, ad2l = null, teams = listTeams(matche
       : h.players.slice(0, 5).map((p) => esc(p.name));
     return `<a class="team-card" href="${src.root}/teams/${t.slug}" style="--i:${Math.min(i, 14)}">
       <span class="tc-rank">#${i + 1}</span>
-      <span class="tc-name">${esc(t.name)}</span>
+      <span class="tc-name">${teamLogoHtml(t, "tc-logo")}${esc(t.name)}</span>
       <span class="tc-rec"><b>${t.wins}</b>–${t.losses}</span>
       <span class="tc-meta">${t.games ? `${Math.round((t.wins / t.games) * 100)}% of ${plural(t.games, "game")}` : "No games yet"}${r?.form.length ? ` ${formPills(r.form)}` : ""}</span>
       ${names.length ? `<span class="tc-roster">${names.join('<span class="sep"> · </span>')}</span>` : ""}
@@ -478,14 +479,14 @@ export async function renderTeams(src, slug) {
     ["chances", !ad2l ? "" : isBye(team) ? `<div class="panel empty">A bye week isn't a team, so it has no outcomes.</div>` : `<section class="po" id="tc-box"><div class="panel empty">Working out every outcome…</div></section>`],
     ["lanes", teamLanesHtml(src, h.games.map(({ m }) => ({ m, side: sideOf(m, team) })).filter((g) => g.side), laneCuts_, team)],
     ["resources", ad2l ? teamMapHtml(src, matches, teams, team, h, "gold") : ""],
-    ["map", `${teamMapHtml(src, matches, teams, team, h)}
-      ${(() => { const gs = h.games.map(({ m }) => m), mine = (p, m) => p.team === sideOf(m, team);
+    ["map", `${(() => { const gs = h.games.map(({ m }) => m), mine = (p, m) => p.team === sideOf(m, team);
         const fights = teamFightMapHtml(gs, (m) => sideOf(m, team), { name: team.name });
         return mapCard([
           ["wards", "Wards", "ward_map", wardView(collectWards(gs, mine), team.name)],
           ["fights", "Team fights", "team_fights", fights || ""],
           ["smokes", "Smokes", "team_smokes", teamSmokeHtml(gs, (m) => sideOf(m, team), { name: team.name })],
-        ]); })()}`],
+        ]); })()}
+      ${teamMapHtml(src, matches, teams, team, h)}`],
   ]), { store: "teamTab", label: "Team sections", remember: switchedTeam() });
 
   // Same compact header as the player and hero pages: back link, league and team picker,
@@ -496,7 +497,7 @@ export async function renderTeams(src, slug) {
         <label class="team-picker"><span class="sr-only">Team</span>
           <select id="team-select" aria-label="Team">${teams.map((t) => `<option value="${t.slug}" ${t.slug === slug ? "selected" : ""}>${esc(t.name)} (${t.wins}–${t.losses})</option>`).join("")}</select></label></div>
       <div class="pp-row" style="--i:1">
-        <h1><span class="h1-name">${esc(team.name)}</span></h1>
+        <h1 class="team-title">${teamLogoHtml(team, "team-page-logo")}<span class="h1-name">${esc(team.name)}</span></h1>
         <p class="pp-sub">${sub}</p>
         ${tabs.bar}
       </div>

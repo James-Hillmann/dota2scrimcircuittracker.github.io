@@ -8,6 +8,7 @@ import { teamSlug, sideOf } from "./lib/teams.js";
 import { goldCurves, teamObjectives, teamTimeline, BIG_LEAD } from "./lib/timeline.js";
 import { lineChart, leadChart } from "./lib/charts.js";
 import { wardMapHtml } from "./lib/wardmap.js";
+import { teamLogoHtml } from "./lib/team-logos.js";
 import { aliasOf, openGames, asAd2l } from "./lib/unticketed.js";
 import { listMatches } from "./lib/store.js";
 import { info } from "./lib/glossary.js";
@@ -67,9 +68,10 @@ function teamHref(src, name, id = null) {
 export function teamLink(src, name, id = null, nested = false) {
   const href = teamHref(src, name, id);
   if (!href) return esc(name ?? "");
+  const mark = teamLogoHtml({ id, name }, "inline-team-logo");
   return nested
-    ? `<span class="team-link" role="link" tabindex="0" data-href="${href}">${esc(name)}</span>`
-    : `<a class="team-link" href="${href}">${esc(name)}</a>`;
+    ? `<span class="team-link" role="link" tabindex="0" data-href="${href}">${mark}<span>${esc(name)}</span></span>`
+    : `<a class="team-link" href="${href}">${mark}<span>${esc(name)}</span></a>`;
 }
 // A player's pages elsewhere: the same /players/<account ID> path on Stratz, OpenDota and
 // Dotabuff, and their PlayOn page when the roster gave its id. "" without a numeric account ID.
@@ -114,7 +116,7 @@ export function goldCurveSection(matches, match, what) {
 }
 
 // Where one player / hero / team puts wards, over all their parsed games (own side bottom left).
-export const wardView = (wards, what) => wardMapHtml([{ label: what, cls: "s-mine", wards }], { mirrored: true });
+export const wardView = (wards, what) => wardMapHtml([{ label: what, cls: "s-mine", wards }], { mirrored: true, mode: "vision" });
 
 // The Map tabs: one card, one map at a time, picked with buttons above it. Views are
 // [id, label, glossary key, html]; empty ones are dropped. The pick is remembered across pages,
@@ -693,15 +695,13 @@ export function teamMapHtml(src, matches, teams, team, h, part = "map") {
   return part === "gold" ? gold : `${summary}${objectives}`;
 }
 
-// Player and hero page tabs: one panel shows at a time. Empty panels (no map data in scrims) get
-// no tab. The open tab is remembered per kind of page, so going player to player (or hero to
-// hero) keeps you on Map or Games. Each tab click is its own history step with ?tab=<id> in the
-// address, so Back goes to the previous tab and a copied link opens on that tab.
-// remember: false opens on the first tab unless the address names one (the league's Teams page
-// always opens on Table, a team page on Overview); the click still saves it for pages that do.
+// Page tabs: one panel shows at a time. Empty panels (no map data in scrims) get no tab. A fresh
+// page opens on its first available tab unless its address names one. Each tab click is its own
+// history step with ?tab=<id>, so Back and copied links still reopen the intended tab. Pages can
+// opt into restoring their last tab with remember: true.
 const TAB_KEY = "playerTab";
 export const tabInUrl = () => history.state?.tab ?? new URLSearchParams(location.search).get("tab");
-export function playerTabs(tabs, { store = TAB_KEY, label = "Player sections", remember = true } = {}) {
+export function playerTabs(tabs, { store = TAB_KEY, label = "Player sections", remember = false } = {}) {
   const shown = tabs.filter(([, , html]) => html.trim());
   let want = tabInUrl();
   if (remember && !shown.some(([id]) => id === want)) try { want = localStorage.getItem(store); } catch {}

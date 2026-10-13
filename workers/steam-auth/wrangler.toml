@@ -4,3 +4,11 @@ name = "steam-auth"
 main = "src/index.js"
 compatibility_date = "2026-09-01"
 workers_dev = true
+
+[[durable_objects.bindings]]
+name = "COSMETICS"
+class_name = "CosmeticsVault"
+
+[[migrations]]
+tag = "cosmetics-v1"
+new_sqlite_classes = ["CosmeticsVault"]

@@ -10,6 +10,8 @@
 // `npx wrangler secret put FIREBASE_SA`; it never lives in this repo. Use an account made only for
 // this, with no IAM roles: signing a custom token needs its private key, not permissions.
 
+import { cosmeticsRequest } from './cosmetics.js';
+export { CosmeticsVault } from './cosmetics.js';
 const STEAM_OPENID = "https://steamcommunity.com/openid/login";
 const STEAM_ID_RE = /^https:\/\/steamcommunity\.com\/openid\/id\/(\d{17})$/;
 const STEAM64_BASE = 76561197960265728n;
@@ -73,6 +75,7 @@ const text = (msg, status = 400) => new Response(msg, { status, headers: { "cont
 export default {
   async fetch(req, env) {
     const url = new URL(req.url);
+    if(url.pathname.startsWith('/cosmetics')) return cosmeticsRequest(req,env,ALLOWED_ORIGINS);
     if (url.pathname === "/login") {
       const ret = url.searchParams.get("return");
       if (!allowedReturn(ret)) return text("Unknown return page.");

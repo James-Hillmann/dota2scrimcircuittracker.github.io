@@ -1,6 +1,9 @@
 // Tier list: ratings, the breakdown modal and the tier section on the Players page.
+import { createPlayerCards, PAINT_FILTER, wirePlayerCards } from "./player-card.js";
+import { listCards } from "../lib/store.js";
+import { playerEquipment, applyExpandedEquipment } from '../lib/cosmetics.js';
 import { hasDetails } from "../lib/stats.js";
-import { tierModel, tierModels, METRICS, tierList, rankLabel, ratingOf, TIERS, VERSIONS, LIVE, NEXT, perPosition, PODIUM_STATS } from "../lib/tiers.js";
+import { tierModel, tierModels, METRICS, tierList, ratingOf, TIERS, VERSIONS, LIVE, NEXT, perPosition, PODIUM_STATS } from "../lib/tiers.js";
 import { info, tierInfo } from "../lib/glossary.js";
 import { radarSvg, roleScores } from "./radar.js";
 import { leagueSrc, floorOf, pct, esc, teamLink, playerLink, allLeagues, leagueShort } from "../core.js";
@@ -217,15 +220,16 @@ function breakdown(src, p, tabs) {
 // A tier list cut down to some of its players (tiers and the unranked).
 const only = (list, keep) => ({ ...list, tiers: list.tiers.map((t) => ({ ...t, players: t.players.filter(keep) })), unranked: list.unranked.filter(keep), eligible: list.tiers.reduce((k, t) => k + t.players.filter(keep).length, 0) });
 
-// Games at each position, for the role tag's tooltip: "Pos 4: 9 games · Pos 5: 3 games".
-const posTitle = (p) => `${p.role === "core" ? "Core" : "Support"}. ` + Object.entries(p.pos_games ?? {}).filter(([, n]) => n).map(([k, n]) => `Pos ${k}: ${n} game${n === 1 ? "" : "s"}`).join(" · ");
-
 // The tier list, shown at the top of the Players page: returns its HTML and a function
 // that fills it in once it's on the page.
 export function tierSection(src, matches, model) {
   // The whole list per scoring version (the live one from `model`), made once each.
   const fulls = { [LIVE]: tierList(matches, { model, minGames: floorOf(src) }) };
   const full0 = fulls[LIVE];
+  const cardData = Promise.all([
+    listCards().catch(() => new Map()),
+    src.ad2l ? src.data().catch(() => ({ teams: [] })) : Promise.resolve({ teams: [] }),
+  ]).then(([cards, data]) => ({cards,renderer:createPlayerCards(matches, { cards, teams: data.teams })}));
   // Pos 1–5: the players whose main position it is (all their games), made once.
   const posLists = {};
   // Every league's games (for "All leagues"), loaded on first use, and the models made from them
@@ -257,22 +261,23 @@ export function tierSection(src, matches, model) {
       posLists[lk] = made;
     }
     const list = n ? posLists[lk] : full;
-    const chip = (p, i) => {
-      const rank = rankLabel(p.rank_tier);
+    const { renderer:{card}, cards } = await cardData;
+    const chip = (p, i, tier) => {
       const open = tierOpen.has(p.key);
-      return `<div class="chip ${p.role}${open ? " open" : ""}" style="--i:${i}" data-key="${esc(p.key)}" tabindex="0" role="button" aria-expanded="${open}" title="${open ? "Click to close" : "Click for the breakdown"}">
-        <div class="chip-top"><span class="chip-name">${playerLink(src, p)}</span><span class="chip-rating">${p.rating}</span></div>
-        <div class="chip-meta">${p.team ? teamLink(src, p.team) : ""}${p.standin ? " · stand-in" : ""}</div>
-        <div class="chip-foot"><span class="role-tag" title="${esc(posTitle(p))}">Pos ${p.pos}</span><span>${p.wins}–${p.games - p.wins}</span>${rank ? `<span>${esc(rank)}</span>` : ""}</div>
-        <div class="chip-caret" aria-hidden="true">${open ? "Close <b>▴</b>" : "Breakdown <b>▾</b>"}</div>
-        ${open ? tierBreakdown(src, p) : ""}
+      const account = p.account_id ?? (/^\d+$/.test(p.key) ? Number(p.key) : p.key);
+      return `<div class="chip fantasy-tier-chip ${p.role}${open ? " open" : ""}" style="--i:${i}" data-key="${esc(p.key)}">
+        <div class="tier-card-main">${card({ account, name: p.name, team: p.team, record: { wins: p.wins, games: p.games } }, p.pos, { own: true, tier: { tier, rating: p.rating }, nameHtml: playerLink(src, p) })}
+          <div class="tier-card-actions">
+            <button type="button" class="chip-caret" aria-expanded="${open}" aria-label="${open ? "Close breakdown" : "Breakdown"} for ${esc(p.name)}">${open ? "×" : "&#8964;"}</button>
+          </div>
+        </div>${open ? `<div class="tier-open-head"><b>${playerLink(src, p)}</b>${p.team ? `<span>${teamLink(src, p.team)}</span>` : ""}<small>Pos ${p.pos} &middot; ${p.wins}&ndash;${p.games - p.wins}</small></div>${tierBreakdown(src, p)}` : ""}
       </div>`;
     };
     const bands = list.tiers.map(({ tier, players }) => {
       const shown = players;
       return `<div class="tier-band t-${tier}">
         <div class="tier-letter">${tier}</div>
-        <div class="tier-chips reveal">${shown.length ? shown.map(chip).join("") : `<div class="tier-empty">No one in ${tier} yet</div>`}</div>
+        <div class="tier-chips reveal">${shown.length ? shown.map((p, i) => chip(p, i, tier)).join("") : `<div class="tier-empty">No one in ${tier} yet</div>`}</div>
       </div>`;
     }).join("");
     const tab = (k, label) => `<button type="button" class="seg${tierRole === k ? " on" : ""}" data-role="${k}">${label}</button>`;
@@ -286,7 +291,7 @@ export function tierSection(src, matches, model) {
       ${ver !== LIVE ? `<p class="table-note keep tier-vs-note">The ${esc(VERSIONS[ver].label.toLowerCase())} model, still being tuned. Only this list uses it; player, team and game pages use the ${esc(VERSIONS[LIVE].label.toLowerCase())} model.</p>` : ""}
       ${n ? `<p class="table-note">Players whose main position is ${n}. Every game they played counts, each compared with the position they played in it; open a breakdown to see the score at each position.</p>` : ""}
       ${against ? `<p class="table-note keep tier-vs-note">${against}</p>` : ""}
-      <div class="tier-board">${bands}</div>
+      ${PAINT_FILTER}<div class="tier-board">${bands}</div>
       ${list.unranked.length ? `<p class="table-note keep">Not ranked yet (needs ${floorOf(src)}+ games): ${list.unranked.map((p) => `${playerLink(src, p)} (${p.games})`).join(", ")}.</p>` : ""}`;
     el.querySelectorAll(".tier-pos .seg").forEach((b) => (b.onclick = () => { tierRole = b.dataset.role; draw(); }));
     el.querySelectorAll(".tier-vs .seg[data-vs]").forEach((b) => (b.onclick = () => { tierVs[b.dataset.vs] = !tierVs[b.dataset.vs]; draw(); }));
@@ -303,11 +308,33 @@ export function tierSection(src, matches, model) {
       const k = c.dataset.key;
       tierOpen.has(k) ? tierOpen.delete(k) : tierOpen.add(k);
       draw();
-      el.querySelector(`.chip[data-key="${CSS.escape(k)}"]`)?.focus({ preventScroll: true });
+      el.querySelector(`.chip[data-key="${CSS.escape(k)}"] .chip-caret`)?.focus({ preventScroll: true });
     };
-    el.querySelectorAll(".chip").forEach((c) => {
-      c.onclick = (e) => { if (!e.target.closest("a") && !e.target.closest(".bd")) toggle(c); };
-      c.onkeydown = (e) => { if ((e.key === "Enter" || e.key === " ") && e.target === c) { e.preventDefault(); toggle(c); } };
+    wirePlayerCards(el);
+    el.querySelectorAll(".fantasy-tier-chip").forEach((c) => {
+      const art = c.querySelector(".tier-card-main .ft-art img");
+      if (c.classList.contains("open") && art?.src) c.style.setProperty("--tier-art", `url(${JSON.stringify(art.src)})`);
+      if(c.classList.contains('open')) {
+        const card=c.querySelector('.ft-card'),account=card.dataset.pick;
+        c.dataset.expandedAccount=account;c.dataset.playerName=card.dataset.playerName;
+        applyExpandedEquipment(c,playerEquipment(account,cards.get(Number(account))?.cosmetics),card.dataset.playerName);
+      }
+      c.querySelector(".chip-caret").onclick = () => toggle(c);
+      // Once expanded, the whole breakdown is a generous close target. Keep links,
+      // info bubbles and the breakdown's other controls usable without collapsing it.
+      if (c.classList.contains("open")) c.addEventListener("click", (e) => {
+        if (e.target.closest("a, button, input, select, textarea, label, [role='button'], .info-pop")) return;
+        toggle(c);
+      });
+      // Tier-list cards are a breakdown affordance, not a card preview. Stop the shared
+      // player-card click handler from flipping the whole surface. The dedicated turn button
+      // is the one exception and keeps its normal front/back behavior.
+      c.querySelector(".tier-card-main .ft-card")?.addEventListener("click", (e) => {
+        if (e.target.closest(".ft-turn")) return;
+        e.stopPropagation();
+        if (e.target.closest("a,button")) return;
+        toggle(c);
+      });
     });
   };
   const html = full0.eligible ? `<h2 id="tier-list">Tier list${info("tier_list")}</h2>

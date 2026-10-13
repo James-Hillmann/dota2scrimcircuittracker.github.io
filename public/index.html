@@ -40,6 +40,8 @@
   <link rel="preload" href="fonts/big-shoulders-stencil-latin.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="fonts/fonts.css">
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="cosmetics-effects.css">
+  <link rel="stylesheet" href="collection.css">
   <!-- Colour-blind mode and the theme (settings cog), set before the first paint so the colours don't flash. -->
   <script>try {
     const h = document.documentElement, theme = localStorage.getItem("theme");
@@ -81,7 +83,7 @@
       </div>
       <button class="fb-open" id="fb-open" type="button" title="Suggest a change: mark up any page and say what you'd change" aria-pressed="false">
         <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v11H9l-5 4z"/><path d="M9 10.5h6M12 7.5v6"/></svg>
-        <span class="fb-open-label">Feedback</span><b class="fb-badge" hidden>0</b>
+        <span class="fb-open-label">Feedback</span><b class="pack-offer-badge" data-offer-badge="feedback" aria-label="Unclaimed bonus pack">1</b><b class="fb-badge" hidden>0</b>
       </button>
       <!-- Steam sign-in (Fantasy): "Sign in", or your avatar linking to your page (parts/me.js). -->
       <div class="me" id="me"></div>
@@ -118,10 +120,10 @@
     <span class="foot-data">AD2L data from <a href="https://dota.playon.gg/" target="_blank" rel="noopener">PlayOn</a> and
       <a href="https://www.opendota.com/" target="_blank" rel="noopener">OpenDota</a>; scrims uploaded here<span id="foot-sync"></span> · <a href="#/privacy">Privacy</a></span>
     <div class="foot-links">
-      <button class="tour-open" id="tour-open" type="button" title="A guided tour of the site">New here?</button>
-      <a class="discord-join" href="https://discord.gg/rPWa2tvt9k" target="_blank" rel="noopener" title="Join the Discord" aria-label="Join the Discord">
+      <button class="tour-open" id="tour-open" type="button" title="A guided tour of the site">New here? <span class="pack-offer-badge" data-offer-badge="tour" aria-label="Unclaimed bonus pack">1</span></button>
+      <a class="discord-join" data-pack-offer="discord" href="https://discord.gg/rPWa2tvt9k" target="_blank" rel="noopener" title="Join the Discord · earn a bonus pack" aria-label="Join the Discord and earn a bonus pack">
         <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true" fill="currentColor"><path d="M20.32 4.37a19.8 19.8 0 0 0-4.89-1.52.07.07 0 0 0-.08.04c-.21.38-.44.87-.61 1.25a18.27 18.27 0 0 0-5.49 0 12.6 12.6 0 0 0-.62-1.25.08.08 0 0 0-.08-.04 19.74 19.74 0 0 0-4.89 1.52.07.07 0 0 0-.03.03C.53 9.05-.32 13.58.1 18.06a.08.08 0 0 0 .03.06 19.9 19.9 0 0 0 5.99 3.03.08.08 0 0 0 .08-.03c.46-.63.87-1.3 1.23-1.99a.08.08 0 0 0-.04-.11 13.1 13.1 0 0 1-1.87-.89.08.08 0 0 1-.01-.13l.37-.29a.07.07 0 0 1 .08-.01c3.93 1.79 8.18 1.79 12.07 0a.07.07 0 0 1 .08.01l.37.29a.08.08 0 0 1-.01.13c-.6.35-1.22.65-1.87.89a.08.08 0 0 0-.04.11c.36.7.77 1.36 1.22 1.99a.08.08 0 0 0 .08.03 19.84 19.84 0 0 0 6-3.03.08.08 0 0 0 .03-.06c.5-5.18-.84-9.67-3.55-13.66a.06.06 0 0 0-.03-.03zM8.02 15.33c-1.18 0-2.16-1.09-2.16-2.42 0-1.33.96-2.42 2.16-2.42 1.21 0 2.18 1.1 2.16 2.42 0 1.33-.96 2.42-2.16 2.42zm7.97 0c-1.18 0-2.16-1.09-2.16-2.42 0-1.33.96-2.42 2.16-2.42 1.21 0 2.18 1.1 2.16 2.42 0 1.33-.95 2.42-2.16 2.42z"/></svg>
-        <span class="discord-join-label">Join the Discord</span>
+        <span class="discord-join-label">Join the Discord</span><b class="pack-offer-badge" data-offer-badge="discord" aria-label="Unclaimed bonus pack">1</b>
       </a>
     </div>
   </footer>
