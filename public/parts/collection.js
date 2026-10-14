@@ -89,8 +89,12 @@ export async function openCollection({tab='packs',viewAccount=null,cardHtml=null
     const existing=document.querySelector(`.ft-card[data-pick="${target}"]`);
     if(existing)cardHtml=existing.outerHTML;
     else {
-      const cards=target==null?new Map():await listCards().catch(()=>new Map()), renderer=createPlayerCards([],{cards});
-      cardHtml=PAINT_FILTER+renderer.card({account:target??0,name,team:'AD2L'},null,{own:true});
+      // Your record, heroes and team from every division's games and rosters, as on Fantasy.
+      const [cards,matches,teams]=target==null?[new Map(),[],[]]:await Promise.all([listCards().catch(()=>new Map()),allLoad().catch(()=>[]),SOURCES.all.data().then(d=>d.teams).catch(()=>[])]);
+      const team=teams.find(t=>t.players.some(p=>p.account_id===Number(target)));
+      const renderer=createPlayerCards(matches,{cards,teams});
+      name=team?.players.find(p=>p.account_id===Number(target))?.name??name; // the name the site shows for you
+      cardHtml=PAINT_FILTER+renderer.card({account:Number(target??0),name,team:team?.name??'AD2L'},null,{own:true});
     }
   }
   const signIn=()=>{closeView();startSteamSignIn();};
@@ -193,7 +197,7 @@ export async function openCollection({tab='packs',viewAccount=null,cardHtml=null
     const artOptions=cardArtOptions(effectiveHero);
     body.innerHTML=`${editable?'<div data-name-editor></div>':''}${cardSlotsHtml()}<div class="card-editor"><div data-card-editor>${cardHtml}<p>Drag the artwork to adjust its framing. Drag the signature separately; arrow keys move the focused signature one step.</p></div><div class="card-editor-controls">${select('border','Default grey')}${select('finish','No finish')}<details class="card-settings" open><summary>Text settings</summary><div>${visualTextChoices('autograph')}${visualTextChoices('translation')}<p>Signatures use your player name.</p><details class="image-adjustments"><summary>Signature positioning</summary><div>${[['x','Horizontal',0,100],['y','Vertical',0,100],['size','Size',5,30],['rotation','Rotation',-180,180]].map(([k,label,min,max])=>`<label>${label} <output data-value="${k}">${Math.round(equipment[k])}</output><input type="range" data-position="${k}" min="${min}" max="${max}" value="${equipment[k]}"></label>`).join('')}<button type="button" data-reset>Reset signature placement</button></div></details></div></details><details class="card-settings" ${imageOpen?'open':''}><summary>Image settings</summary><div><label>Hero<select data-base="hero"><option value="">Most played hero</option>${[...HERO_META].sort((a,b)=>a[1].localeCompare(b[1])).map(([id,name])=>`<option value="${id}">${esc(name)}</option>`).join('')}</select></label><div data-image-gallery></div><details class="image-adjustments"><summary>Hue &amp; positioning</summary><div><label>Hue <output data-hue-value>${equipment.hue??0}</output><input type="range" data-hue min="0" max="360" value="${equipment.hue??0}"></label>${[['x','Image horizontal',0,100,1],['y','Image vertical',0,100,1],['zoom','Image zoom',1,3,.01]].map(([key,label,min,max,step])=>`<label>${label}<input type="range" data-crop="${key}" min="${min}" max="${max}" step="${step}" value="${(base.crop??defaultCardCrop(cardArtwork(effectiveHero,base)))[key]}"></label>`).join('')}</div></details></div></details>${layoutControlsHtml()}<button type="button" data-save>Save my card</button></div></div>`;
     wireCardSlots();
-    if(editable)mountNameEditor(body.querySelector('[data-name-editor]'),{state,inGame:name,action,onSaved:next=>{state=next;draw();}});
+    if(editable)mountNameEditor(body.querySelector('[data-name-editor]'),{state,inGame:name,action,onSaved:next=>{state=next;draw();say(shownNickname(next)?`Showing ${shownNickname(next)} on your cards and profile.`:'Showing your in-game name.');}});
     const card=body.querySelector('.ft-card');card.dataset.designSlot=selectedSlot;card.classList.remove('flipped');
     card.querySelectorAll('button').forEach(b=>b.remove());
     const update=()=>{applyEquipment(card,equipment,shownName());wireSignature();say(JSON.stringify(equipment)===initialEquipment?'':'Unsaved card changes');};
