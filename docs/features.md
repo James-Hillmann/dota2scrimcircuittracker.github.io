@@ -667,7 +667,15 @@ play the whole Heroic/Aegis game. Predict's "Your name" bar hides on this tab (F
   stamps each save with server time; a save after the lock never counts.
 - **Card customization**: the Fantasy tab links to Collection customization. Hero, role,
   artwork, filters, framing, borders and signatures are managed there with three saved designs,
-  a primary card and optional shuffle. Fantasy uses the shared card renderer.
+  a primary card and optional shuffle. Fantasy uses the shared card renderer. Layout settings:
+  your own card name and its size; each front part shown or hidden, sized, and dragged anywhere;
+  up to eight back stats in any order; the back's position bars and top heroes on or off.
+- **Full-size cards**: every card has an expand button under its flip button that opens it
+  filling the screen; it still flips.
+- **Card ratings**: on a profile, each saved design shows how players rated it (common, rare,
+  epic, legendary) and the community's pick. Signed in, you get one vote per card (changeable),
+  never on your own. Votes belong to the design: changing the card starts it at none, and
+  changing it back restores them.
 - **Captain**: choose one of your five picks as captain before saving. Their weekly points are
   doubled after selecting their best two games. Captain choices lock with the lineup and are
   stored as an account ID in the entry. Older entries without a captain retain their base score.

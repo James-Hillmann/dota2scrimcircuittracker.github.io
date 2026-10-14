@@ -2,7 +2,7 @@
 // leaderboard. Rules and scoring in lib/fantasy.js; Steam sign-in through workers/steam-auth
 // (lib/store.js, parts/me.js). Loaded when the tab is first shown.
 import { SLOTS, GAMES_COUNTED, weekKey, TEST_WEEK, FANTASY_POINTS, playoffWeeks, testWeek, openWeek, pickable, checkPicks, scoreEntry, leaderboard, weekBoard } from "../lib/fantasy.js";
-import { createPlayerCards, PAINT_FILTER, flipPlayerCard } from "../parts/player-card.js";
+import { createPlayerCards, PAINT_FILTER, flipPlayerCard, showBigCard } from "../parts/player-card.js";
 import { tierList, tierModel, NEXT } from "../lib/tiers.js";
 import { listFantasy, saveFantasy, listCards, steamAccount, steamSignOut } from "../lib/store.js";
 import { esc, playerLink, SOURCES } from "../core.js";
@@ -213,6 +213,7 @@ export async function mountFantasy(host, viewSrc, scope = null) {
     if (!c) return;
     if (ev.target.closest("[data-act=signin]")) { startSteamSignIn(); return; }
     if (ev.target.closest("[data-act=pick]")) return; // the deck's handler picks
+    if (ev.target.closest(".ft-expand")) { showBigCard(c); return; }
     if (ev.target.closest(".ft-mine-card .ft-front")) return;
     flip(c, !c.classList.contains("flipped"));
   });

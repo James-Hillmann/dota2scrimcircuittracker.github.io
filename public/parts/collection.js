@@ -1,6 +1,7 @@
 import { esc } from '../core.js';
 import { steamAccount, steamLoginUrl, listCards } from '../lib/store.js';
-import { CATALOG, DEFAULT_EQUIPMENT, collectionState, collectionAction, publicCollection, applyEquipment } from '../lib/cosmetics.js';
+import { CATALOG, DEFAULT_EQUIPMENT, collectionState, collectionAction, publicCollection, applyEquipment, cardRatings } from '../lib/cosmetics.js';
+import { RATINGS } from '../lib/card-ratings.js';
 import { TIERS, itemByKey } from '../lib/cosmetics-catalog.js';
 import { signatureHtml, japaneseName } from '../lib/signatures.js';
 import { createPlayerCards, PAINT_FILTER, wirePlayerCards } from './player-card.js';
@@ -9,6 +10,8 @@ import { HERO_META } from '../lib/hero-meta.js';
 import { cardArtOptions, CARD_STYLES, defaultCardCrop, cardArtwork } from '../lib/card-art.js';
 import { cardDesignState } from '../lib/cosmetics-engine.js';
 import { availablePackOffers, markPackOfferClaimed } from '../lib/bonus-offers.js';
+import { startFeedback } from '../lib/feedback.js';
+import { FRONT_PARTS, BACK_STATS, MAX_BACK_STATS, MAX_NAME, backStats, applyLayout } from '../lib/card-layout.js';
 
 const gift=`<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M4 13h24v6H4zm2 6h20v11H6zm10-6v17M16 13C4 13 5 2 11 4c4 1 5 9 5 9zm0 0c12 0 11-11 5-9-4 1-5 9-5 9z"/></svg>`;
 const colors={common:'#abb3be',rare:'#80c4ff',epic:'#d7a3ff',legendary:'#ffd879'};
@@ -33,7 +36,7 @@ export async function openCollection({tab='packs',viewAccount=null,cardHtml=null
   const selectedEquipment=()=>({...DEFAULT_EQUIPMENT,...(designs().cardDesigns[selectedSlot]??state?.equipment??equipment)});
   let clockOffset=0, timerRetryAt=0;
   const dialog=document.createElement('dialog');dialog.className='collection-dialog';dialog.setAttribute('aria-labelledby','collection-title');
-  dialog.innerHTML=`<div class="collection-head"><div><small>AD2L COLLECTION</small><h2 id="collection-title">Your collection</h2></div><button type="button" data-close aria-label="Close collection">×</button></div><nav class="collection-tabs" aria-label="Collection sections">${['packs','collection','customize','recycle'].map(t=>`<button type="button" data-tab="${t}">${t[0].toUpperCase()+t.slice(1)}</button>`).join('')}</nav><div class="collection-body"></div><p class="collection-message" role="status" aria-live="polite"></p>`;
+  dialog.innerHTML=`<div class="collection-head"><div><small>AD2L COLLECTION</small><h2 id="collection-title">Your collection</h2></div><div class="collection-head-actions"><button type="button" data-feedback title="Suggest a change: mark up the collection and say what you'd change">Feedback</button><button type="button" data-close aria-label="Close collection">×</button></div></div><nav class="collection-tabs" aria-label="Collection sections">${['packs','collection','customize','recycle'].map(t=>`<button type="button" data-tab="${t}">${t[0].toUpperCase()+t.slice(1)}</button>`).join('')}</nav><div class="collection-body"></div><p class="collection-message" role="status" aria-live="polite"></p>`;
   document.querySelector('.collection-dialog')?.close();document.querySelector('.collection-dialog')?.remove();document.body.append(dialog);dialog.showModal();
   const body=dialog.querySelector('.collection-body'), message=dialog.querySelector('.collection-message');
   if(target!=null&&!editable) {
@@ -63,8 +66,9 @@ export async function openCollection({tab='packs',viewAccount=null,cardHtml=null
     catch(e){say(e.message);return null;}finally{setBusy(false);}
   };
   dialog.querySelector('[data-close]').onclick=()=>dialog.close();
+  dialog.querySelector('[data-feedback]').onclick=()=>startFeedback();
   dialog.addEventListener('click',e=>{if(e.target===dialog)dialog.close();});
-  dialog.addEventListener('close',()=>{if(dialog._revealTimer)clearTimeout(dialog._revealTimer);clearInterval(dialog._packTimer);dialog.remove();});
+  dialog.addEventListener('close',()=>{if(dialog.open)return;/* feedback mode reopening it */if(dialog._revealTimer)clearTimeout(dialog._revealTimer);clearInterval(dialog._packTimer);dialog.remove();});
   dialog.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{tab=b.dataset.tab;draw();});
   try {
     if(editable) {const data=adapter?{state:adapter.state}:await action('session');if(data.serverNow)clockOffset=data.serverNow-Date.now();state=data.state;selectedSlot=state.primaryCard??0;inventory=state.inventory;equipment=selectedEquipment();initialEquipment=JSON.stringify(equipment);}
@@ -173,11 +177,12 @@ export async function openCollection({tab='packs',viewAccount=null,cardHtml=null
     const template=document.createElement('template');template.innerHTML=cardHtml;
     const effectiveHero=base.hero||Number(template.content.querySelector('.ft-card').dataset.autoHero);
     const artOptions=cardArtOptions(effectiveHero);
-    body.innerHTML=`${cardSlotsHtml()}<div class="card-editor"><div data-card-editor>${cardHtml}<p>Drag the artwork to adjust its framing. Drag the signature separately; arrow keys move the focused signature one step.</p></div><div class="card-editor-controls">${select('border','Default grey')}${select('finish','No finish')}<details class="card-settings" open><summary>Text settings</summary><div>${visualTextChoices('autograph')}${visualTextChoices('translation')}<p>Signatures use your player name.</p><details class="image-adjustments"><summary>Signature positioning</summary><div>${[['x','Horizontal',0,100],['y','Vertical',0,100],['size','Size',5,30],['rotation','Rotation',-180,180]].map(([k,label,min,max])=>`<label>${label} <output data-value="${k}">${Math.round(equipment[k])}</output><input type="range" data-position="${k}" min="${min}" max="${max}" value="${equipment[k]}"></label>`).join('')}<button type="button" data-reset>Reset signature placement</button></div></details></div></details><details class="card-settings" ${imageOpen?'open':''}><summary>Image settings</summary><div><label>Hero<select data-base="hero"><option value="">Most played hero</option>${[...HERO_META].sort((a,b)=>a[1].localeCompare(b[1])).map(([id,name])=>`<option value="${id}">${esc(name)}</option>`).join('')}</select></label><div data-image-gallery></div><details class="image-adjustments"><summary>Hue &amp; positioning</summary><div><label>Hue <output data-hue-value>${equipment.hue??0}</output><input type="range" data-hue min="0" max="360" value="${equipment.hue??0}"></label>${[['x','Image horizontal',0,100,1],['y','Image vertical',0,100,1],['zoom','Image zoom',1,3,.01]].map(([key,label,min,max,step])=>`<label>${label}<input type="range" data-crop="${key}" min="${min}" max="${max}" step="${step}" value="${(base.crop??defaultCardCrop(cardArtwork(effectiveHero,base)))[key]}"></label>`).join('')}</div></details></div></details><button type="button" data-save>Save my card</button></div></div>`;
+    body.innerHTML=`${cardSlotsHtml()}<div class="card-editor"><div data-card-editor>${cardHtml}<p>Drag the artwork to adjust its framing. Drag the signature separately; arrow keys move the focused signature one step.</p></div><div class="card-editor-controls">${select('border','Default grey')}${select('finish','No finish')}<details class="card-settings" open><summary>Text settings</summary><div>${visualTextChoices('autograph')}${visualTextChoices('translation')}<p>Signatures use your player name.</p><details class="image-adjustments"><summary>Signature positioning</summary><div>${[['x','Horizontal',0,100],['y','Vertical',0,100],['size','Size',5,30],['rotation','Rotation',-180,180]].map(([k,label,min,max])=>`<label>${label} <output data-value="${k}">${Math.round(equipment[k])}</output><input type="range" data-position="${k}" min="${min}" max="${max}" value="${equipment[k]}"></label>`).join('')}<button type="button" data-reset>Reset signature placement</button></div></details></div></details><details class="card-settings" ${imageOpen?'open':''}><summary>Image settings</summary><div><label>Hero<select data-base="hero"><option value="">Most played hero</option>${[...HERO_META].sort((a,b)=>a[1].localeCompare(b[1])).map(([id,name])=>`<option value="${id}">${esc(name)}</option>`).join('')}</select></label><div data-image-gallery></div><details class="image-adjustments"><summary>Hue &amp; positioning</summary><div><label>Hue <output data-hue-value>${equipment.hue??0}</output><input type="range" data-hue min="0" max="360" value="${equipment.hue??0}"></label>${[['x','Image horizontal',0,100,1],['y','Image vertical',0,100,1],['zoom','Image zoom',1,3,.01]].map(([key,label,min,max,step])=>`<label>${label}<input type="range" data-crop="${key}" min="${min}" max="${max}" step="${step}" value="${(base.crop??defaultCardCrop(cardArtwork(effectiveHero,base)))[key]}"></label>`).join('')}</div></details></div></details>${layoutControlsHtml()}<button type="button" data-save>Save my card</button></div></div>`;
     wireCardSlots();
     const card=body.querySelector('.ft-card');card.dataset.designSlot=selectedSlot;card.classList.remove('flipped');
     card.querySelectorAll('button').forEach(b=>b.remove());
     const update=()=>{applyEquipment(card,equipment,name);wireSignature();say(JSON.stringify(equipment)===initialEquipment?'':'Unsaved card changes');};
+    wireLayout(card,update);
     const refreshTextChoices=()=>body.querySelectorAll('[data-text-choice]').forEach(button=>{
       const type=button.dataset.textChoice,id=button.dataset.choice,selected=equipment[type]===id;
       button.setAttribute('aria-pressed',String(selected));button.querySelector('[data-choice-status]').textContent=selected?'Selected':'Select';
@@ -212,7 +217,7 @@ export async function openCollection({tab='packs',viewAccount=null,cardHtml=null
     const syncControls=()=>body.querySelectorAll('[data-position]').forEach(input=>{input.value=equipment[input.dataset.position];body.querySelector(`[data-value="${input.dataset.position}"]`).textContent=Math.round(equipment[input.dataset.position]);});
     const front=card.querySelector('.ft-front');let pan=null;
     front.onpointerdown=e=>{
-      if(!editable||busy||!effectiveHero||e.button!==0||e.target.closest('.card-autograph,a,button'))return;
+      if(!editable||busy||!effectiveHero||e.button!==0||e.target.closest('.card-autograph,[data-part],a,button'))return;
       const rect=front.getBoundingClientRect();
       pan={id:e.pointerId,x:e.clientX,y:e.clientY,width:rect.width,height:rect.height,crop:{...(base.crop??defaultCardCrop(cardArtwork(effectiveHero,base)))}};
       front.setPointerCapture(e.pointerId);front.classList.add('panning');e.preventDefault();
@@ -242,6 +247,47 @@ export async function openCollection({tab='packs',viewAccount=null,cardHtml=null
     body.querySelector('[data-reset]').onclick=()=>{Object.assign(equipment,{x:50,y:60,size:15,rotation:-7});syncControls();update();};
     if(!editable)body.querySelectorAll('input,select,button').forEach(n=>n.disabled=true);
     update();
+  }
+  // Layout (lib/card-layout.js): the card's name and its size, each front part shown or hidden,
+  // sized and dragged anywhere, and the back's stats and sections.
+  const layoutOf=()=>equipment.layout??={name:null,nameSize:100,front:{},back:{stats:null,positions:true,heroes:true}};
+  function layoutControlsHtml() {
+    const L=equipment.layout,role=Number(new DOMParser().parseFromString(cardHtml,'text/html').querySelector('.ft-card')?.dataset.role)||0;
+    const stats=backStats(L,role),part=k=>L?.front?.[k];
+    const statSelect=i=>`<select data-back-stat="${i}" aria-label="Back stat ${i+1}"><option value="">Empty</option>${BACK_STATS.map(([k,label])=>`<option value="${k}"${stats[i]===k?' selected':''}>${esc(label)}</option>`).join('')}</select>`;
+    return `<details class="card-settings card-layout-settings"><summary>Layout settings</summary><div>
+      <label>Card name <input type="text" data-layout-name maxlength="${MAX_NAME}" placeholder="${esc(name)}" value="${esc(L?.name??'')}"></label>
+      <label>Name size <output data-layout-namesize-value>${L?.nameSize??100}%</output><input type="range" data-layout-namesize min="40" max="160" value="${L?.nameSize??100}"></label>
+      <fieldset class="layout-parts"><legend>Front</legend><p>Drag any text on the card to move it.</p>${FRONT_PARTS.map(([k,label])=>`<div class="layout-part"><label><input type="checkbox" data-part-show="${k}"${part(k)?.show===false?'':' checked'}> ${label}</label><input type="range" data-part-size="${k}" min="40" max="250" value="${part(k)?.size??100}" aria-label="${label} size"><button type="button" data-part-reset="${k}">Reset</button></div>`).join('')}</fieldset>
+      <fieldset class="layout-back"><legend>Back</legend><div class="layout-stats">${Array.from({length:MAX_BACK_STATS},(_,i)=>statSelect(i)).join('')}</div>
+      <label><input type="checkbox" data-back-section="positions"${L?.back?.positions===false?'':' checked'}> Positions played</label>
+      <label><input type="checkbox" data-back-section="heroes"${L?.back?.heroes===false?'':' checked'}> Top heroes</label></fieldset>
+      <button type="button" data-layout-flip>Show the back</button> <button type="button" data-layout-reset>Reset layout</button>
+    </div></details>`;
+  }
+  function wireLayout(card,update) {
+    const front=card.querySelector('.ft-front'),q=sel=>body.querySelector(sel);
+    q('[data-layout-name]').oninput=e=>{layoutOf().name=e.target.value.trim()||null;update();};
+    q('[data-layout-namesize]').oninput=e=>{layoutOf().nameSize=Number(e.target.value);q('[data-layout-namesize-value]').textContent=`${e.target.value}%`;update();};
+    const partOf=k=>layoutOf().front[k]??={show:true,x:null,y:null,size:100};
+    body.querySelectorAll('[data-part-show]').forEach(b=>b.onchange=()=>{partOf(b.dataset.partShow).show=b.checked;update();});
+    body.querySelectorAll('[data-part-size]').forEach(r=>r.oninput=()=>{partOf(r.dataset.partSize).size=Number(r.value);update();});
+    body.querySelectorAll('[data-part-reset]').forEach(b=>b.onclick=()=>{delete layoutOf().front[b.dataset.partReset];const k=b.dataset.partReset;body.querySelector(`[data-part-show="${k}"]`).checked=true;body.querySelector(`[data-part-size="${k}"]`).value=100;update();});
+    const readStats=()=>{const keys=[...body.querySelectorAll('[data-back-stat]')].map(s=>s.value).filter(Boolean);layoutOf().back.stats=[...new Set(keys)];update();};
+    body.querySelectorAll('[data-back-stat]').forEach(s=>s.onchange=readStats);
+    body.querySelectorAll('[data-back-section]').forEach(b=>b.onchange=()=>{layoutOf().back[b.dataset.backSection]=b.checked;update();});
+    q('[data-layout-flip]').onclick=e=>{const on=!card.classList.contains('flipped');card.classList.toggle('flipped',on);e.target.textContent=on?'Show the front':'Show the back';};
+    q('[data-layout-reset]').onclick=()=>{delete equipment.layout;drawEditor();};
+    // Drag a part: it leaves the plate and centres on the pointer, in percent of the face.
+    front.addEventListener('pointerdown',e=>{
+      const el=e.target.closest('[data-part]');if(!el||!editable||busy||e.button!==0)return;
+      e.preventDefault();e.stopPropagation();
+      const k=el.dataset.part,rect=front.getBoundingClientRect(),box=el.getBoundingClientRect();
+      const p=partOf(k),off={x:e.clientX-(box.left+box.width/2),y:e.clientY-(box.top+box.height/2)};
+      const at=ev=>{p.x=Math.round(Math.max(0,Math.min(100,(ev.clientX-off.x-rect.left)/rect.width*100))*10)/10;p.y=Math.round(Math.max(0,Math.min(100,(ev.clientY-off.y-rect.top)/rect.height*100))*10)/10;applyLayout(card,equipment.layout,name);say('Unsaved card changes');};
+      const move=ev=>at(ev),up=()=>{removeEventListener('pointermove',move);removeEventListener('pointerup',up);update();};
+      addEventListener('pointermove',move);addEventListener('pointerup',up);
+    },true);
   }
   function drawRecycle() {
     if(!editable){body.innerHTML='<p>Sign in with Steam to recycle duplicate cards.</p>';return;}
@@ -287,5 +333,36 @@ export async function mountProfileCollection(host,{account,name,matches,team,tie
     section.innerHTML=`<div class="profile-collection-card profile-card-designs">${PAINT_FILTER}${showcase||cardHtml}</div><div><h3>Card collection</h3>${preferences.shuffleCards?'<p>Saved cards are on shuffle for other viewers.</p>':''}${data.unavailable?'<p>Collection service is currently unavailable.</p>':`<strong>${count} / ${CATALOG.length} discovered</strong><progress value="${count}" max="${CATALOG.length}" aria-label="Collection completion"></progress>`}<button type="button" data-profile-collection>View collection & cards</button></div>`;
     section.querySelector('[data-profile-collection]').onclick=()=>openCollection({tab:'collection',viewAccount:account,cardHtml,name});
     wirePlayerCards(section.querySelector('.profile-collection-card'));
+    if(showcase)mountRatings(section,account).catch(()=>{});
   } catch {if(section.isConnected)section.innerHTML='<h3>Card collection</h3><p>Collection service is unavailable. Try again shortly.</p><button type="button">View designs</button>';section.querySelector('button')?.addEventListener('click',()=>openCollection({tab:'collection',viewAccount:account,name}));}
+}
+
+// Ratings under each saved design: the counts and the community's pick for everyone, and for a
+// signed-in player on someone else's card, a vote (one per design; the Worker keeps it to that).
+// Your own vote is remembered in this browser only, to show which button you pressed.
+const RATING_NAMES={common:'Common',rare:'Rare',epic:'Epic',legendary:'Legendary'};
+async function mountRatings(section,account) {
+  const [cards,viewer]=await Promise.all([cardRatings(account),steamAccount().catch(()=>null)]);
+  if(!section.isConnected)return;
+  const canVote=viewer!=null&&String(viewer)!==String(account);
+  const mineKey=r=>`ad2l-card-rating:${account}:${r.key}`;
+  const mine=r=>{try{return localStorage.getItem(mineKey(r));}catch{return null;}};
+  const html=r=>`<div class="card-rating" data-rating-slot="${r.slot}"><p class="card-rating-pick">${r.total?`Rated <b data-rarity="${r.pick}">${RATING_NAMES[r.pick]}</b> · ${r.total} vote${r.total===1?'':'s'}`:'No ratings yet'}</p>
+    <div class="card-rating-bar" aria-hidden="true">${RATINGS.map(k=>`<i data-rarity="${k}" style="flex:${r.counts[k]}"></i>`).join('')}</div>
+    <div class="card-rating-votes" role="group" aria-label="Rate this card">${RATINGS.map(k=>`<button type="button" data-rate="${k}" data-rarity="${k}" aria-pressed="${mine(r)===k}"${canVote?'':' disabled'} title="${canVote?`Rate it ${RATING_NAMES[k]}`:viewer==null?'Sign in with Steam to rate cards':'You can\'t rate your own card'}">${RATING_NAMES[k]} <small>${r.counts[k]}</small></button>`).join('')}</div></div>`;
+  for(const r of cards) {
+    if(!r)continue;
+    const fig=section.querySelector(`[data-design-slot="${r.slot}"]`)?.closest('figure');if(!fig)continue;
+    fig.querySelector('.card-rating')?.remove();fig.insertAdjacentHTML('beforeend',html(r));
+    const wire=()=>fig.querySelectorAll('[data-rate]').forEach(b=>b.onclick=async()=>{
+      const rating=b.getAttribute('aria-pressed')==='true'?null:b.dataset.rate;
+      fig.querySelectorAll('[data-rate]').forEach(x=>x.disabled=true);
+      try {
+        const {rating:next}=await collectionAction('rate',{target:Number(account),cardSlot:r.slot,rating});
+        try{if(next.mine)localStorage.setItem(mineKey(next),next.mine);else localStorage.removeItem(mineKey(next));}catch{}
+        fig.querySelector('.card-rating').outerHTML=html(next);wire();
+      } catch(e) {fig.querySelectorAll('[data-rate]').forEach(x=>x.disabled=!canVote);fig.querySelector('.card-rating-pick').textContent=e.message;}
+    });
+    wire();
+  }
 }

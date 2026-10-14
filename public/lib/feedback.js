@@ -155,6 +155,7 @@ let drawTimer = 0;
 let seenPage = pageKey();
 let watch = 0;
 let root, catcher, hoverBox, snipBox, ink, pins, noteBox, listBox, modal, bar, openBtn;
+let lifted = null; // a modal dialog reopened as non-modal for feedback mode
 
 // ---------- DOM ----------
 function build() {
@@ -250,6 +251,7 @@ function setOn(v) {
   if (!root) return;
   root.hidden = !on;
   document.documentElement.classList.toggle("fb-on", on);
+  liftDialog(on);
   openBtn?.setAttribute("aria-pressed", String(on));
   clearInterval(watch);
   if (on) {
@@ -262,6 +264,23 @@ function setOn(v) {
     discard();
     listBox.hidden = true;
     modal.hidden = true;
+  }
+}
+
+// A modal dialog (the collection) makes the rest of the page inert, the feedback tools included.
+// While feedback mode is on it's reopened as a non-modal one under the tools, then put back.
+// Its close listener has to ignore these swaps (it's open again when the event arrives).
+function liftDialog(up) {
+  if (up) {
+    const d = document.querySelector("dialog:modal");
+    if (!d) return;
+    d.close(); d.show(); d.classList.add("fb-lifted");
+    lifted = d;
+  } else if (lifted) {
+    const d = lifted;
+    lifted = null;
+    d.classList.remove("fb-lifted");
+    if (d.isConnected && d.open) { d.close(); d.showModal(); }
   }
 }
 
@@ -575,6 +594,7 @@ function onKey(e) {
   const typing = e.target.closest?.("input, textarea, select, [contenteditable]");
   if (e.key === "Escape") {
     e.stopImmediatePropagation();
+    e.preventDefault(); // or a dialog just put back to modal (liftDialog) takes it as a close
     if (!modal.hidden) modal.hidden = true;
     else if (pending || !noteBox.hidden) discard();
     else if (editing != null) { editing = null; renderList(); }
@@ -586,6 +606,9 @@ function onKey(e) {
   const t = TOOLS.find((x) => x.key === e.key);
   if (t) { e.preventDefault(); e.stopImmediatePropagation(); setTool(t.id); }
 }
+
+// Feedback mode from inside a modal (the collection's own Feedback button).
+export function startFeedback() { setOn(true); }
 
 export function initFeedback() {
   openBtn = document.getElementById("fb-open");

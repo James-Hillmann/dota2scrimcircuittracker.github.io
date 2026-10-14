@@ -3367,6 +3367,9 @@ a.discord-join:hover { color: #fff; background: #5865f2; border-color: #5865f2; 
 .foot-data a { text-decoration: underline; text-underline-offset: 3px; }
 
 .fb[hidden] { display: none; }
+/* A modal dialog reopened non-modal for feedback mode (liftDialog): kept centred and dimmed,
+   under the feedback tools. */
+dialog.fb-lifted { position: fixed; inset: 0; margin: auto; z-index: 980; box-shadow: 0 0 0 100vmax rgba(8, 7, 10, .85); }
 .fb-banner {
   position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%); z-index: 1002; pointer-events: none;
   max-width: calc(100vw - 32px); padding: 8px 16px; border-radius: 999px;
@@ -4556,6 +4559,11 @@ td .gtags, .hist-games .gtags { margin-left: 4px; }
 .ft-card .ft-face:focus-visible { outline: 2px solid var(--bone); outline-offset: 3px; }
 .ft-card .ft-front:disabled { cursor: default; }
 .ft-card .ft-back { transform: rotateY(180deg); } /* after .ft-face's all: unset */
+/* Some browsers drop backface-visibility once a face holds blended or filtered layers (the
+   cosmetics), showing the turned-away face mirrored. Hide it outright at the turn's midpoint,
+   about .1s into the .7s curve. */
+.ft-card .ft-face { transition: box-shadow .3s, visibility 0s .1s; }
+.ft-card.flipped .ft-front, .ft-card:not(.flipped) .ft-back { visibility: hidden; }
 /* The inner keyline of the art window. */
 .ft-front::before {
   content: ""; position: absolute; inset: 0; z-index: 3; pointer-events: none; border-radius: calc(var(--r) - var(--frame));
@@ -4632,6 +4640,36 @@ td .gtags, .hist-games .gtags { margin-left: 4px; }
 .ft-card .ft-turn svg { width: 52%; fill: currentColor; }
 .ft-card .ft-turn:hover { background: var(--tc); color: #14110d; rotate: 180deg; }
 .ft-card .ft-turn:focus-visible { outline: 2px solid var(--bone); outline-offset: 2px; }
+/* Full-size button, under the flip button (opens .ft-big, player-card.js). */
+.ft-card .ft-expand {
+  all: unset; box-sizing: border-box; position: absolute; z-index: 8; top: calc(19px + var(--turn)); right: 13px; transform: translateZ(1px);
+  display: grid; place-items: center; width: var(--turn); aspect-ratio: 1; border-radius: 50%; cursor: pointer;
+  color: #f3ede3; background: rgba(12, 11, 10, .66); border: 1px solid rgba(255, 255, 255, .28); backdrop-filter: blur(4px);
+  transition: background .2s, color .2s;
+}
+.ft-card .ft-expand svg { width: 50%; fill: currentColor; }
+.ft-card .ft-expand:hover { background: var(--tc); color: #14110d; }
+.ft-card .ft-expand:focus-visible { outline: 2px solid var(--bone); outline-offset: 2px; }
+.tier-card-main .ft-card .ft-expand, .ft-big .ft-card .ft-expand { display: none; }
+.ft-big {
+  width: 100vw; height: 100dvh; max-width: none; max-height: none; margin: 0; padding: 0; border: 0; background: none;
+  display: grid; place-items: center; overflow: hidden;
+}
+.ft-big:not([open]) { display: none; }
+.ft-big::backdrop { background: rgba(8, 7, 10, .88); backdrop-filter: blur(6px); }
+.ft-big .ft-card { width: min(92vw, calc(88dvh * 5 / 7)); }
+.ft-big-close {
+  all: unset; position: fixed; top: 14px; right: 16px; z-index: 2; width: 40px; height: 40px; display: grid; place-items: center;
+  border-radius: 50%; cursor: pointer; font-size: 26px; color: #f3ede3; background: rgba(12, 11, 10, .7); border: 1px solid rgba(255, 255, 255, .28);
+}
+.ft-big-close:focus-visible { outline: 2px solid var(--bone); outline-offset: 2px; }
+/* Layouts (lib/card-layout.js): a part's size, parts placed anywhere on the face, hidden parts and stats. */
+.ft-card [data-part] { zoom: var(--part-size, 1); }
+.ft-card .ft-bname .ft-name { zoom: var(--name-size, 1); }
+.ft-card .ft-front > .ft-placed { position: absolute; z-index: 6; zoom: 1; transform: translate(-50%, -50%) scale(var(--part-size, 1)); max-width: calc(96% / var(--part-size, 1)); margin: 0; white-space: nowrap; }
+.ft-card [data-part][hidden], .ft-stats > span[hidden] { display: none; }
+.ft-no-posbars .ft-posbars, .ft-no-posbars .ft-label:has(+ .ft-posbars),
+.ft-no-heroes .ft-heroes, .ft-no-heroes .ft-label:has(+ .ft-heroes) { display: none; }
 
 /* Back: the player's numbers on a dark panel tinted by the tier. */
 .ft-card .ft-back {
@@ -4680,18 +4718,18 @@ td .gtags, .hist-games .gtags { margin-left: 4px; }
 .ft-card.picked .ft-pickbtn { background: rgba(12, 11, 10, .7); color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
 .ft-card[data-taken]:not([data-taken=""]) .ft-pickbtn { background: rgba(12, 11, 10, .7); color: var(--bone); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .35); }
 
-/* A small card's back (under 200px, e.g. the display case on a phone): two stat columns, no
-   position bars, the top hero. */
+/* A small card's back (under 200px: the display case's minis, a profile card on a phone). Four
+   stat columns can't fit at that width, so two, with no position bars and only the top hero. */
 @container (width < 200px) {
-  .ft-mini .ft-back { gap: 3cqi; padding: 5cqi; }
-  .ft-mini .ft-bhead .ft-tier { display: none; }
-  .ft-mini .ft-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2cqi 4cqi; padding: 3cqi 0; }
-  .ft-mini .ft-stats > span { font-size: clamp(7px, 4.4cqi, 9px); }
-  .ft-mini .ft-stats b { font-size: clamp(10px, 6.4cqi, 14px); }
-  .ft-mini .ft-posbars, .ft-mini .ft-label { display: none; }
-  .ft-mini .ft-back .ft-heroes .ft-hrow:nth-child(n + 2) { display: none; }
-  .ft-mini .ft-hrow { grid-template-columns: 22cqi minmax(0, 1fr); }
-  .ft-mini .ft-hrec { display: none; }
+  .ft-card .ft-back { gap: 3cqi; padding: 5cqi; }
+  .ft-card .ft-bhead .ft-tier { display: none; }
+  .ft-card .ft-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2cqi 4cqi; padding: 3cqi 0; }
+  .ft-card .ft-stats > span { font-size: clamp(7px, 4.4cqi, 9px); }
+  .ft-card .ft-stats b { font-size: clamp(10px, 6.4cqi, 14px); }
+  .ft-card .ft-posbars, .ft-card .ft-label { display: none; }
+  .ft-card .ft-back .ft-heroes .ft-hrow:nth-child(n + 2) { display: none; }
+  .ft-card .ft-hrow { grid-template-columns: 22cqi minmax(0, 1fr); }
+  .ft-card .ft-hrec { display: none; }
 }
 
 /* The pick-up: the card lifts off the table, tips toward you, and settles raised. */

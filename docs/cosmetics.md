@@ -49,6 +49,24 @@ grant packs, choose odds or equip unowned items. Public endpoints expose collect
 quantities and appearance, never pack queues or grant history. The gift button,
 collection index, editor and profile card use the same inventory service.
 
+## Layout and ratings
+
+Each saved design can carry a layout (`public/lib/card-layout.js`, saved as `equipment.layout`):
+the owner's own card name (plain text, at most 24 characters) and its size, each front part
+(tier, position, name, record, team, hero line) shown or hidden, sized, and dragged anywhere on
+the face, and the back's stats (up to eight, in order) and its position-bar and top-hero sections.
+`validLayout` is the only check, and the Worker runs it through `equipCosmetics`. The free-text
+name is a moderation risk: it shows on public cards, so offensive names need removing by hand.
+
+Every card has a full-size button (`showBigCard` in `public/parts/player-card.js`).
+
+Signed-in players rate other players' saved designs common, rare, epic or legendary
+(`public/lib/card-ratings.js`). Votes belong to a design's fingerprint (`designKey`), not its
+slot: changing a card starts it at no votes, and changing it back restores them. The Worker
+keeps one vote per voter per design (`rate` action, never your own card) under
+`votes:<owner>:<key>`, and `GET /cosmetics/ratings/<account>` returns each saved design's counts.
+Profiles show them under each saved design. Your own vote is remembered in your browser only.
+
 ## Launch
 
 1. In `workers/steam-auth`, configure `FIREBASE_WEB_API_KEY` for the same Firebase
@@ -65,7 +83,8 @@ The browser implementation points at `https://steam-auth.ad2lstats.workers.dev/c
 Before the Worker deploys, existing cards still load and the gift dialog can show
 the collection catalog, while account collection operations report unavailable.
 The collection Worker was deployed on October 13, 2026 (version
-`038d9d4d-8bb0-4448-a634-ec77289e1d5c`), with `FIREBASE_WEB_API_KEY`
+`038d9d4d-8bb0-4448-a634-ec77289e1d5c`; layouts and ratings in
+`ea2e17e3-bd2e-424d-a7e4-72eb3055ce53`, October 13), with `FIREBASE_WEB_API_KEY`
 configured and the `COSMETICS` migration applied. Public appearance reads and
 localhost CORS preflight passed against the deployed service. The frontend remains
 an unpushed local preview at `http://localhost:3000/`; Steam-authenticated pack

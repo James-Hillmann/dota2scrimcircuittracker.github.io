@@ -1,4 +1,5 @@
 import { grantLogin, rollPack, recycleCards, saveCardDesign, setCardPreferences, cardAppearance, cardDesignState } from '../../../public/lib/cosmetics-engine.js';
+import { designKey, castVote, tally } from '../../../public/lib/card-ratings.js';
 
 const json=(value,status=200)=>Response.json(value,{status});
 const secureRandom=()=>crypto.getRandomValues(new Uint32Array(1))[0]/4294967296;
@@ -15,6 +16,17 @@ export class CosmeticsVault {
     }
     const account=url.searchParams.get('account');
     if(!/^\d{1,10}$/.test(account??'')) return json({error:'Invalid account.'},400);
+    // Each saved design's ratings (lib/card-ratings.js), by the design's fingerprint.
+    if(req.method==='GET' && url.pathname==='/ratings') {
+      const state=await this.ctx.storage.get(`user:${account}`);
+      const designs=state?cardDesignState(state).cardDesigns:[];
+      const cards=await Promise.all(designs.map(async(design,slot)=>{
+        if(!design)return null;
+        const key=designKey(design);
+        return {slot,key,...tally(await this.ctx.storage.get(`votes:${account}:${key}`))};
+      }));
+      return json({cards});
+    }
     if(req.method==='GET') {
       const state=await this.ctx.storage.get(`user:${account}`);
       return json({inventory:state?.inventory??{},equipment:state?.equipment??null,...(state?cardDesignState(state):{})});
@@ -42,6 +54,19 @@ export class CosmeticsVault {
         else if(body.action==='recycle') result=recycleCards(saved,body.selections);
         else if(body.action==='equip') result={state:saveCardDesign(saved,body.equipment,body.cardSlot)};
         else if(body.action==='card-settings')result={state:setCardPreferences(saved,body)};
+        else if(body.action==='rate') {
+          // One vote per voter per design, never your own; the design is read here, not sent.
+          const target=String(body.target??'');
+          if(!/^\d{1,10}$/.test(target))throw new Error('Choose a player card.');
+          if(target===account)throw new Error("Rate other players' cards, not your own.");
+          if(!Number.isInteger(body.cardSlot)||body.cardSlot<0||body.cardSlot>2)throw new Error('Choose one of their cards.');
+          const owner=await txn.get(`user:${target}`),design=owner&&cardDesignState(owner).cardDesigns[body.cardSlot];
+          if(!design)throw new Error('That card has no saved design.');
+          const key=designKey(design),votesKey=`votes:${target}:${key}`;
+          const votes=castVote(await txn.get(votesKey),account,body.rating??null);
+          await txn.put(votesKey,votes);
+          result={state:saved,rating:{slot:body.cardSlot,key,mine:votes[account]??null,...tally(votes)}};
+        }
         else throw new Error('Unknown collection action.');
         await txn.put(key,result.state);
         if(body.action==='equip'||body.action==='card-settings') await txn.put(`appearance:${account}`,cardAppearance(result.state));
@@ -64,6 +89,8 @@ export async function cosmeticsRequest(req,env,allowedOrigins) {
   if(req.method==='GET' && url.pathname==='/cosmetics/appearances') return respond(await vault.fetch('https://vault/appearances'));
   const publicAccount=/^\/cosmetics\/collection\/(\d{1,10})$/.exec(url.pathname)?.[1];
   if(req.method==='GET' && publicAccount) return respond(await vault.fetch(`https://vault/collection?account=${publicAccount}`));
+  const ratedAccount=/^\/cosmetics\/ratings\/(\d{1,10})$/.exec(url.pathname)?.[1];
+  if(req.method==='GET' && ratedAccount) return respond(await vault.fetch(`https://vault/ratings?account=${ratedAccount}`));
   if(req.method!=='POST' || url.pathname!=='/cosmetics') return respond(json({error:'Not found.'},404));
   if(!env.FIREBASE_WEB_API_KEY) return respond(json({error:'Collection authentication is not configured yet.'},503));
   const token=/^Bearer (.+)$/.exec(req.headers.get('authorization')??'')?.[1];

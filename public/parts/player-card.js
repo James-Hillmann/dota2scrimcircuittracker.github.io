@@ -5,6 +5,7 @@ import { heroById, heroImg, heroVert, HERO_META } from "../lib/hero-meta.js";
 import { cardArtwork } from "../lib/card-art.js";
 import { teamLogoHtml } from "../lib/team-logos.js";
 import { cosmeticAttributes, cosmeticLayers, playerEquipment } from '../lib/cosmetics.js';
+import { BACK_STATS, backStats, partState } from '../lib/card-layout.js';
 
 // The cards' hero art filters. Each hero has its own art and style (lib/hero-art.js, picked by
 // Fav; styles in style.css .ft-card[data-style]). The default, stencil, is a print to match the
@@ -98,7 +99,7 @@ export function createPlayerCards(matches, { cards = new Map(), teams = [], tier
     const face = heroById(ov?.hero)?.name ?? top[0]?.hero, faceRec = face && st?.heroes.get(face);
     const ha = face && cardArtwork(face, ov), art = ha?.src ?? (face && heroVert(face)), wide = face && heroImg(face);
     const cropStyle = ha?.crop ? `--art-x:${ha.crop.x}%;--art-y:${ha.crop.y}%;--art-zoom:${ha.crop.zoom};` : "";
-    const appearance=cosmeticAttributes(equipment).replace('style="',`style="${cropStyle}`);
+    const appearance=cosmeticAttributes(equipment).replace('style="',`style="${cropStyle}${equipment?.layout?.nameSize && equipment.layout.nameSize !== 100 ? `--name-size:${equipment.layout.nameSize / 100};` : ""}`);
     const avg = (v) => (g ? v / g : 0), one = (v) => (g ? avg(v).toFixed(1) : "—");
     const role = roleOf(p.account, ov), set = ov?.pos != null;
     const record = p.record ?? st;
@@ -107,38 +108,57 @@ export function createPlayerCards(matches, { cards = new Map(), teams = [], tier
     const posMax = Math.max(1, ...(st?.pos ?? [0]));
     const teamMark = teamLogoHtml({ id: teamIdOf.get(p.account), name: p.team }, "ft-team-logo");
     const tierChip = `<span class="ft-tier">${t ? `${t.tier}<small>${t.rating}</small>` : "—"}</span>`;
-    const stat = (v, label, wide) => `<span${wide ? ' class="wide"' : ""}><b>${v}</b>${label}</span>`;
+    // The owner's layout (lib/card-layout.js): their own name, which front parts show and where,
+    // and the back's stats. Every stat is rendered; the layout picks which show, in what order.
+    const layout = equipment?.layout ?? null, cardName = layout?.name ?? p.name;
+    const nameShown = layout?.name != null ? esc(layout.name) : nameHtml ?? esc(p.name);
+    const part = (key, cls, html, tag = "span", extra = "") => {
+      const s = partState(layout, key);
+      return `<${tag} class="${cls}${s.placed ? " ft-placed" : ""}" data-part="${key}"${s.show ? "" : " hidden"}${s.style ? ` style="${s.style}"` : ""}${extra}>${html}</${tag}>`;
+    };
     const hero = (h) => `<span class="ft-hrow"><span class="ft-h">${heroImg(h.hero) ? `<img src="${esc(heroImg(h.hero))}" alt="" loading="lazy">` : ""}<b>${h.games}</b></span><span class="ft-hname">${esc(h.hero)}</span><span class="ft-hrec">${h.games}g · ${Math.round((100 * h.wins) / h.games)}%</span></span>`;
-    // Second stat row: farm and damage for cores, vision, stacks and healing for supports.
-    const second = role >= 4
-      ? `${stat(g ? `${one(st.obs)}/${one(st.sen)}` : "—", "Obs/Sen wards", true)}${stat(one(st.stack), "Stacks")}${stat(g ? kShort(avg(st.heal)) : "—", "Healing")}`
-      : `${stat(g ? Math.round(avg(st.gpm)) : "—", "GPM")}${stat(g ? Math.round(avg(st.xpm)) : "—", "XPM")}${stat(g ? kShort(avg(st.dmg)) : "—", "Hero dmg")}${stat(g ? Math.round(avg(st.lh)) : "—", "Last hits")}`;
-    const pill = role ? `<span class="ft-pos${role === slot ? " here" : ""}${set ? " set" : ""}"${set ? ` title="Role set by ${own ? "you" : esc(p.name)}"` : ""}>Pos ${role}</span>` : "";
+    // By default farm and damage for cores, vision, stacks and healing for supports.
+    const statValue = {
+      games: g, win: g ? Math.round((100 * st.wins) / g) + "%" : "—", kda,
+      gpm: g ? Math.round(avg(st.gpm)) : "—", xpm: g ? Math.round(avg(st.xpm)) : "—", dmg: g ? kShort(avg(st.dmg)) : "—",
+      lh: g ? Math.round(avg(st.lh)) : "—", wards: g ? `${one(st.obs)}/${one(st.sen)}` : "—", dewards: one(st.dew),
+      stacks: one(st.stack), heal: g ? kShort(avg(st.heal)) : "—",
+    };
+    const shown = backStats(layout, role);
+    const statsHtml = BACK_STATS.map(([key, label, wide]) => {
+      const i = shown.indexOf(key);
+      return `<span data-stat="${key}"${wide ? ' class="wide"' : ""}${i < 0 ? " hidden" : ` style="order:${i}"`}><b>${statValue[key]}</b>${label === "Hero damage" ? "Hero dmg" : label === "Win %" ? "Win" : label}</span>`;
+    }).join("");
+    const pill = role ? part("pos", `ft-pos${role === slot ? " here" : ""}${set ? " set" : ""}`, `Pos ${role}`, "span", set ? ` title="Role set by ${own ? "you" : esc(p.name)}"` : "") : "";
     // Pick buttons, front and back (the back's stays out of the tab order until it's turned up).
     // Signed out, they offer the Steam sign-in instead.
     const pickBtn = (cls, hidden) => `<button type="button" class="ft-pickbtn ${cls}"${hidden ? ' tabindex="-1"' : ""} ${locked ? 'data-act="signin">Sign in to pick' : `data-act="pick" aria-pressed="false">Pick for pos ${slot}`}</button>`;
-    return `<div class="ft-card${t ? ` t-${t.tier}` : ""}${ha ? ` ${ha.cls}` : ""}${own ? " own" : ""}${ha?.crop ? " ft-custom-crop" : ""}"${appearance}${ha ? ` data-style="${ha.style}"` : ""} data-pick="${p.account}" data-player-name="${esc(p.name)}" data-auto-hero="${HERO_META.find(([,name])=>name===top[0]?.hero)?.[0]??0}" data-card-hero="${ov?.hero??0}" data-card-art="${esc(ov?.art??'')}" data-card-style="${esc(ov?.style??'')}" data-card-pos="${ov?.pos??0}" data-card-crop="${esc(JSON.stringify(ov?.crop??null))}">
+    // The plate's parts; placed ones sit on the face itself, after the plate.
+    const plateParts = [
+      ["name", part("name", "ft-name", nameShown, "span", ` title="${esc(cardName)}"`)],
+      ["record", part("record", "ft-record", recordHtml, "span", ' aria-label="Win-loss record"')],
+      ["team", part("team", "ft-tm", `${teamMark}<span class="ft-team-name">${esc(p.team)}</span>`)],
+      ["hero", face ? part("hero", "ft-sig", `${esc(face)}${faceRec ? ` · ${faceRec.games} game${faceRec.games === 1 ? "" : "s"}` : ""}`) : ""],
+    ];
+    const onPlate = plateParts.filter(([k]) => !partState(layout, k).placed).map(([, h]) => h).join("");
+    const offPlate = plateParts.filter(([k]) => partState(layout, k).placed).map(([, h]) => h).join("");
+    return `<div class="ft-card${t ? ` t-${t.tier}` : ""}${ha ? ` ${ha.cls}` : ""}${own ? " own" : ""}${ha?.crop ? " ft-custom-crop" : ""}${layout?.back?.positions === false ? " ft-no-posbars" : ""}${layout?.back?.heroes === false ? " ft-no-heroes" : ""}"${appearance} data-role="${role ?? 0}"${layout?.name != null ? ' data-renamed="1"' : ""}${ha ? ` data-style="${ha.style}"` : ""} data-pick="${p.account}" data-player-name="${esc(p.name)}" data-auto-hero="${HERO_META.find(([,name])=>name===top[0]?.hero)?.[0]??0}" data-card-hero="${ov?.hero??0}" data-card-art="${esc(ov?.art??'')}" data-card-style="${esc(ov?.style??'')}" data-card-pos="${ov?.pos??0}" data-card-crop="${esc(JSON.stringify(ov?.crop??null))}">
       <div class="ft-tilt"><div class="ft-flip">
         <div class="ft-face ft-front" role="group" aria-label="${esc(p.name)}, ${esc(p.team)}${t ? `, tier ${t.tier}` : ""}${face ? `, ${esc(face)}` : ""}">
           <span class="ft-art" style="--grit:${gritAt(p.account)}">${art ? `<img src="${esc(art)}" alt="" loading="lazy" data-wide="${esc(wide)}">` : ""}</span>
-          ${tierChip}
+          ${part("tier", "ft-tier", t ? `${t.tier}<small>${t.rating}</small>` : "—")}
           ${pill}
           <span class="ft-plate">
-            <span class="ft-name" title="${esc(p.name)}">${nameHtml ?? esc(p.name)}</span>
-            <span class="ft-record" aria-label="Win-loss record">${recordHtml}</span>
-            <span class="ft-tm">${teamMark}<span class="ft-team-name">${esc(p.team)}</span></span>
-            ${face ? `<span class="ft-sig">${esc(face)}${faceRec ? ` · ${faceRec.games} game${faceRec.games === 1 ? "" : "s"}` : ""}</span>` : ""}
+            ${onPlate}
             ${own ? "" : pickBtn("ft-fpick")}
           </span>
+          ${offPlate}
           <span class="ft-shine"></span>
-          ${cosmeticLayers(equipment,p.name)}
+          ${cosmeticLayers(equipment,cardName)}
         </div>
         <div class="ft-face ft-back" aria-hidden="true">
-          <span class="ft-bhead">${tierChip}<span class="ft-bname"><span class="ft-name" title="${esc(p.name)}">${nameHtml ?? esc(p.name)}</span><span class="ft-tm">${teamMark}<span class="ft-team-name">${esc(p.team)}</span></span>${st?.rank ? `<span class="ft-medal">${esc(medal(st.rank))}${role ? ` · ${role >= 4 ? "Support" : "Core"}` : ""}</span>` : ""}</span></span>
-          <span class="ft-stats">
-            ${stat(g, "Games")}${stat(g ? Math.round((100 * st.wins) / g) + "%" : "—", "Win")}${stat(kda, "K/D/A", true)}
-            ${second}
-          </span>
+          <span class="ft-bhead">${tierChip}<span class="ft-bname"><span class="ft-name" title="${esc(cardName)}">${nameShown}</span><span class="ft-tm">${teamMark}<span class="ft-team-name">${esc(p.team)}</span></span>${st?.rank ? `<span class="ft-medal">${esc(medal(st.rank))}${role ? ` · ${role >= 4 ? "Support" : "Core"}` : ""}</span>` : ""}</span></span>
+          <span class="ft-stats">${statsHtml}</span>
           <span class="ft-label">Positions played</span>
           <span class="ft-posbars">${[1, 2, 3, 4, 5].map((n) => { const c = st?.pos[n - 1] ?? 0; return `<span class="${n === slot ? "here" : ""}" title="Pos ${n}: ${c} game${c === 1 ? "" : "s"}"><i style="height:${Math.round((100 * c) / posMax)}%"></i><b>${n}</b></span>`; }).join("")}</span>
           <span class="ft-label">Top heroes</span>
@@ -146,6 +166,7 @@ export function createPlayerCards(matches, { cards = new Map(), teams = [], tier
           ${own ? "" : pickBtn("ft-bpick", true)}
         </div>
       </div>
+      <button type="button" class="ft-expand" aria-label="Show ${esc(p.name)}'s card full size"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h6v2H7.4l3.3 3.3-1.4 1.4L6 7.4V10H4zm16 0v6h-2V7.4l-3.3 3.3-1.4-1.4L16.6 6H14V4zM4 20v-6h2v2.6l3.3-3.3 1.4 1.4L7.4 18H10v2zm16 0h-6v-2h2.6l-3.3-3.3 1.4-1.4 3.3 3.3V14h2z"/></svg></button>
       <button type="button" class="ft-turn" aria-label="Flip ${esc(p.name)}'s card for stats" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 0 1 13.7-5.6L20 4v6h-6l2.3-2.3A6 6 0 0 0 6 12zm16 0a8 8 0 0 1-13.7 5.6L4 20v-6h6l-2.3 2.3A6 6 0 0 0 18 12z"/></svg></button>
     </div></div>`;
   };
@@ -162,12 +183,32 @@ export function flipPlayerCard(c, on) {
   if (fp) fp.tabIndex = on ? -1 : 0;
   if (bp) bp.tabIndex = on ? 0 : -1;
 }
+// A card full size: a copy in a dialog that fills the screen, still flips, Esc or × to close.
+export function showBigCard(c) {
+  const dlg = document.createElement("dialog");
+  dlg.className = "ft-big";
+  dlg.setAttribute("aria-label", `${c.dataset.playerName ?? "Player"}'s card`);
+  const copy = c.cloneNode(true);
+  copy.classList.remove("picked", "pickup");
+  copy.removeAttribute("data-taken");
+  copy.querySelectorAll(".ft-pickbtn, .ft-expand").forEach((b) => b.remove());
+  dlg.innerHTML = `<button type="button" class="ft-big-close" aria-label="Close">×</button>`;
+  dlg.append(copy);
+  document.body.append(dlg);
+  wirePlayerCards(dlg);
+  dlg.querySelector(".ft-big-close").onclick = () => dlg.close();
+  dlg.addEventListener("click", (e) => { if (e.target === dlg) dlg.close(); });
+  dlg.addEventListener("close", () => { if (!dlg.open) dlg.remove(); });
+  dlg.showModal();
+  copy.querySelector(".ft-turn")?.focus();
+}
 const wired = new WeakSet();
 export function wirePlayerCards(host) {
   if (wired.has(host)) return;
   wired.add(host);
   host.addEventListener("click", (ev) => {
     const c = ev.target.closest(".ft-card");
+    if (c && ev.target.closest(".ft-expand")) { showBigCard(c); return; }
     if (!c || ev.target.closest("a, .ft-pickbtn, .card-autograph") || c.closest('[data-card-editor]')) return;
     flipPlayerCard(c, !c.classList.contains("flipped"));
   });

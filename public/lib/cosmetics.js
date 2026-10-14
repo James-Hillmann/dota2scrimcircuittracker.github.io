@@ -5,6 +5,7 @@ import { cardArtwork } from './card-art.js';
 import { heroById, heroImg } from './hero-meta.js';
 import { cardAppearance, selectedCardDesign } from './cosmetics-engine.js';
 import { syncPackOfferClaims } from './bonus-offers.js';
+import { applyLayout } from './card-layout.js';
 
 export const COLLECTION_API='https://steam-auth.ad2lstats.workers.dev/cosmetics';
 let account=null, state=null, pending=null;
@@ -40,6 +41,10 @@ export async function collectionAction(action,details={}) {
 export async function publicCollection(account) {
   const r=await fetch(`${COLLECTION_API}/collection/${account}`);if(!r.ok)throw new Error('Could not load this collection.');return r.json();
 }
+// Each saved design's rating counts (lib/card-ratings.js); rating one is the 'rate' action.
+export async function cardRatings(account) {
+  const r=await fetch(`${COLLECTION_API}/ratings/${account}`);if(!r.ok)throw new Error('Ratings unavailable.');return (await r.json()).cards;
+}
 export async function cosmeticAppearances() {
   const r=await fetch(`${COLLECTION_API}/appearances`);if(!r.ok)throw new Error('Collection service unavailable.');const data=await r.json();
   for(const [id,equipment] of Object.entries(data))appearances.set(id,String(account)===id&&state?.equipment?cardAppearance(state):equipment);
@@ -74,8 +79,9 @@ export function applyEquipment(card,e,name) {
       const label=card.querySelector('.ft-sig');if(label)label.textContent=heroById(hero)?.name??'';
     }
   }
+  applyLayout(card,e.layout??null,name);
   const face=card.querySelector('.ft-front');face.querySelectorAll('.card-autograph,.cosmetic-overlay,.cosmetic-emblem,.particles').forEach(n=>n.remove());
-  face.insertAdjacentHTML('beforeend',cosmeticLayers(e,name));
+  face.insertAdjacentHTML('beforeend',cosmeticLayers(e,e.layout?.name??name));
 }
 export function applyExpandedEquipment(panel,raw,name) {
   const e={...DEFAULT_EQUIPMENT,...raw},border=itemByKey(`border:${e.border}`);

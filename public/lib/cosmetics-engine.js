@@ -2,6 +2,7 @@ import { CATALOG, TIERS, PACK_ODDS, DEFAULT_EQUIPMENT, itemByKey } from './cosme
 import { heroById } from './hero-meta.js';
 import { CARD_ART } from './card-art-data.js';
 import { CARD_STYLES, validCardCrop } from './card-art.js';
+import { validLayout } from './card-layout.js';
 
 export const PACK_INTERVAL_MS=8*60*60*1000;
 export const NORMAL_PACK_CAP=3;
@@ -87,8 +88,10 @@ export function equipCosmetics(state, raw) {
     if(id!==DEFAULT_EQUIPMENT[type] && !itemByKey(`${type}:${id}`)) throw new Error('Unknown cosmetic.');
     equipment[type]=id;
   }
-  // Signatures always use the player's displayed name, never custom text.
+  // Signatures use the card's name: the player's, or the owner's own (layout.name, checked there).
   equipment.text='';
+  const layout=validLayout(raw.layout!==undefined?raw.layout:state.equipment?.layout??null);
+  if(layout)equipment.layout=layout;
   equipment.hue=raw.hue??state.equipment?.hue??0;
   if(!Number.isFinite(equipment.hue)||equipment.hue<0||equipment.hue>360)throw new Error('Choose a valid hue.');
   const base=raw.baseCard??state.equipment?.baseCard;
