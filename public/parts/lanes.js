@@ -3,6 +3,7 @@ import { hasDetails, playerKey } from "../lib/stats.js";
 import { info } from "../lib/glossary.js";
 import { isJungler, at10, laneCuts, LANE_LABEL, gameLanes, verdict, cutFor, MAP_LANE, playerLane, laneSummary, laneBoard, LANE_GROUPS } from "../lib/lanes.js";
 import { leagueSrc, fmt, heroHref, esc, portrait, playerLink, kg, heroLink, signedK, pct, dec, shortDate, floorOf, sortableTable, teamLink, weekStart, pageHead } from "../core.js";
+import { plusSlot } from "../lib/hero-levels.js";
 
 // ---------- Laning (lib/lanes.js) ----------
 // Won / draw / lost cut-offs come from the whole division, like the tier list's reference
@@ -23,7 +24,7 @@ export function gameLanesHtml(m, src, cuts) {
     const v = verdict(l.margin, cutFor(cuts, l.lane));
     const who = v === "even" ? "Draw" : v ? `${name(v === "won" ? "a" : "b")} won` : "No result";
     const side = (t, ps, role) => `<div class="ln-side ${t}"><div class="ln-role">${name(t)} · ${LANE_LABEL[role]}</div>
-      ${ps.length ? ps.map((p) => `<div class="ln-p">${portrait(p.hero)}<span>${playerLink(src, p)}<small>${p.lh10 ?? "—"}/${p.dn10 ?? "—"} LH/DN · ${kg((p.gold_t?.[10] ?? 0) + (p.xp10 ?? 0))} gold+XP</small></span></div>`).join("") : '<div class="muted">Nobody</div>'}</div>`;
+      ${ps.length ? ps.map((p) => `<div class="ln-p">${portrait(p.hero)}${plusSlot(p.account_id, p.hero, m.start_time)}<span>${playerLink(src, p)}<small>${p.lh10 ?? "—"}/${p.dn10 ?? "—"} LH/DN · ${kg((p.gold_t?.[10] ?? 0) + (p.xp10 ?? 0))} gold+XP</small></span></div>`).join("") : '<div class="muted">Nobody</div>'}</div>`;
     return `<div class="card ln-card ${v ?? ""}" style="--i:${i}">
       <div class="k">${MAP_LANE[l.lane]}</div>
       <div class="ln-verdict">${who}${l.margin == null ? "" : v !== "even" ? ` <small>by ${kg(Math.abs(l.margin))}</small>` : ` <small>${name(l.margin >= 0 ? "a" : "b")} +${kg(Math.abs(l.margin))}</small>`}</div>

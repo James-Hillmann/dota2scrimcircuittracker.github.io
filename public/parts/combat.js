@@ -6,6 +6,7 @@ import { itemName, clock } from "../lib/items.js";
 import { hitSource, heroOfSlug, firstBloodOf, RUNES, hasCombat, combatTotals, bestStreakOf, streakName, benchSummary, deathSources, MULTI, BENCH, pausesOf } from "../lib/combat.js";
 import { streakBarsHtml, deathSourcesHtml, benchHtml, streakChartHtml } from "../lib/combat-charts.js";
 import { DIVISIONS, ALL_DIVS, esc, fmt, pct, dec, portrait, playerLink, heroLink, dur } from "../core.js";
+import { plusSlot } from "../lib/hero-levels.js";
 
 // ---------- Combat (lib/combat.js, parsed replays) ----------
 // Purchases and skill builds live in each division's detail file, loaded only by the game and
@@ -69,7 +70,7 @@ export function combatTabHtml(src, matches, match, name, { hero = false } = {}) 
 export function gameCombatHtml(m, src) {
   if (!m.players.some(hasCombat)) return "";
   const chart = streakChartHtml(m, { id: `streaks-${m.id}` });
-  const who = (p) => `<td class="l who">${portrait(p.hero)}<span class="who-body"><span class="who-name">${playerLink(src, p)}</span><span class="who-sub">${heroLink(src, p.hero)}</span></span></td>`;
+  const who = (p) => `<td class="l who">${portrait(p.hero)}${plusSlot(p.account_id, p.hero, m.start_time)}<span class="who-body"><span class="who-name">${playerLink(src, p)}</span><span class="who-sub">${heroLink(src, p.hero)}</span></span></td>`;
   const multi = (p) => (p.multi ? p.multi.map((n, k) => (n ? `${n}× ${MULTI[k].replace(" kill", "")}` : "")).filter(Boolean).join(", ") || "—" : "—");
   const rows = (t) => m.players.map((p, i) => ({ p, i })).filter(({ p }) => p.team === t).map(({ p, i }) => {
     const st = bestStreakOf(m, i), runes = p.runes ? p.runes.reduce((a, b) => a + b, 0) : null;

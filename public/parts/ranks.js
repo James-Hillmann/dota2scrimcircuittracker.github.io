@@ -7,6 +7,8 @@ import { withPerGame, RANK_STATS, RANK_GROUPS, placeOf, rankStat, ordinal, forma
 import { pubPrep } from "../lib/combat.js";
 import { teamLeaderboard } from "../lib/teams.js";
 import { statRowsCache, heroRankCache, heroRowsCache, allLeagues, floorOf, PLAYER_RANKS, esc, leagueShort, inLeague, overallBadge, LEAGUE_COUNT, heroVal, portrait, heroLink, playerLink, teamLink, HERO_PLAYERS_SHOWN, pubStart, PUB_DAYS, pubStartLabel, heroHref, pct, PREP_DAYS } from "../core.js";
+import { plusSlot, plusTier, levelFrom } from "../lib/hero-levels.js";
+import { heroById } from "../lib/hero-meta.js";
 
 export const statRows = (matches) => statRowsCache.get(matches) ?? statRowsCache.set(matches, playerLeaderboard(matches).map(withPerGame)).get(matches);
 export const heroRanks = (matches, model = null, minGames = MIN_GAMES) => heroRankCache.get(matches) ?? heroRankCache.set(matches, heroRatings(matches, { model, minGames })).get(matches);
@@ -145,7 +147,7 @@ export function heroRanksHtml(src, key, h, ratings, overallOn) {
     const tier = me ? TIERS.find((t) => me.rating_exact >= t.min).tier : null;
     const place = (q, where) => (q ? `<div class="hp-place${q.end ? ` hp-p${q.rank}` : ""}"><b>${q.tied > 1 ? "=" : ""}${ordinal(q.rank)}</b><small>/${q.of} ${where}</small></div>` : "");
     return `<div class="hp-card${tier ? ` t-${tier}` : ""}${opl?.end ? " ov" : ""}" style="--i:${i}; --m:${me ? (me.rating_exact / 100).toFixed(3) : 0}">
-      <div class="hp-banner">${portrait(x.hero, "hp-img")}${tier ? `<span class="hp-tier">${tier}</span>` : ""}</div>
+      <div class="hp-banner">${portrait(x.hero, "hp-img")}${plusSlot(key, x.hero)}${tier ? `<span class="hp-tier">${tier}</span>` : ""}</div>
       <div class="hp-body">
         <div class="hp-name">${heroLink(src, x.hero)}</div>
         <div class="hp-rec"><span class="res ${x.wins * 2 >= x.games ? "w" : "l"}">${x.wins}–${x.games - x.wins}</span> · ${x.games} game${x.games === 1 ? "" : "s"} · KDA ${x.kda.toFixed(2)}</div>
@@ -160,6 +162,17 @@ export function heroRanksHtml(src, key, h, ratings, overallOn) {
     <p class="table-note wm-intro">Hero rating: the tier rating from their games on that hero only. Place: among everyone in ${league} who played it${src.ad2l ? `, and across all ${LEAGUE_COUNT} leagues` : ""}. One or two games is a small sample.</p>
     <div class="hp-grid reveal">${h.heroes.map(card).join("")}</div>`;
 }
+// Player page, Heroes tab: every hero with a Dota Plus level (STRATZ lists them from level 11),
+// highest first. `data` is the loaded hero-levels.json.
+export function plusHeroesHtml(src, data, accountId) {
+  const mine = data?.accounts?.[accountId];
+  const list = Object.entries(mine ?? {}).map(([id, l]) => ({ hero: heroById(Number(id))?.name, level: levelFrom(l) }))
+    .filter((x) => x.hero && x.level).sort((a, b) => b.level - a.level || a.hero.localeCompare(b.hero));
+  if (!list.length) return "";
+  return `<h2 id="plus-levels">Dota Plus hero levels${info("plus_level")}</h2>
+    <div class="hero-chips plus-chips">${list.map((x) => `<div class="hero-chip">${portrait(x.hero)}${plusSlot(accountId, x.hero)}<span>${heroLink(src, x.hero)}</span><b>${plusTier(x.level)[2]}</b></div>`).join("")}</div>`;
+}
+
 export function heroPlayersHtml(src, hero, list, lines, overallList) {
   if (!list.length) return "";
   const league = esc(leagueShort(src));
@@ -173,7 +186,7 @@ export function heroPlayersHtml(src, hero, list, lines, overallList) {
     return `<div class="hp-card hp-player t-${tier}${opl?.end ? " ov" : ""}" style="--i:${i}; --m:${(p.rating_exact / 100).toFixed(3)}">
       <span class="hp-tier">${tier}</span>
       <div class="hp-body">
-        <div class="hp-name">${playerLink(src, p)}</div>
+        <div class="hp-name">${playerLink(src, p)}${plusSlot(p.key, hero)}</div>
         <div class="hp-rec"><span class="res ${p.wins * 2 >= p.games ? "w" : "l"}">${p.wins}–${p.games - p.wins}</span> · ${p.games} game${p.games === 1 ? "" : "s"}${line ? ` · KDA ${line.kda.toFixed(2)}` : ""}${p.team ? ` · ${teamLink(src, p.team)}` : ""}</div>
         <div class="hp-rating"><b>${p.rating}</b><small>hero<br>rating</small></div>
         <div class="hp-places">${place(pl, `in ${league}`)}${src.ad2l ? overallList ? place(opl, "all leagues") : `<div class="hp-place"><small>All leagues: loading…</small></div>` : ""}</div>
@@ -204,11 +217,11 @@ export function pubSection(src, accountId) {
   const good = (wr) => (wr >= 0.5 ? "w" : "l");
   // Form: every game oldest -> newest, the hero with a win/loss bar under it.
   const form = [...games].reverse().map((g, i) => `<a class="pf pf-${g.won ? "w" : "l"}" href="${heroHref(src, g.hero)}" style="--i:${i}"
-      title="${esc(g.hero)} · ${g.won ? "Won" : "Lost"} · ${g.kills}/${g.deaths}/${g.assists} · ${new Date(g.time * 1000).toLocaleDateString(undefined, { month: "short", day: "numeric" })}${g.ranked ? " · ranked" : ""}">${portrait(g.hero)}${g.ranked ? '<span class="pf-r">R</span>' : ""}</a>`).join("");
+      title="${esc(g.hero)} · ${g.won ? "Won" : "Lost"} · ${g.kills}/${g.deaths}/${g.assists} · ${new Date(g.time * 1000).toLocaleDateString(undefined, { month: "short", day: "numeric" })}${g.ranked ? " · ranked" : ""}">${portrait(g.hero)}${plusSlot(accountId, g.hero, g.time)}${g.ranked ? '<span class="pf-r">R</span>' : ""}</a>`).join("");
   const heroCard = (x, i) => {
     const wr = x.wins / x.games;
     return `<div class="ph-card ph-${good(wr)}" style="--i:${i}; --m:${wr.toFixed(3)}">
-      <div class="ph-banner">${portrait(x.hero, "ph-img")}</div>
+      <div class="ph-banner">${portrait(x.hero, "ph-img")}${plusSlot(accountId, x.hero)}</div>
       <div class="ph-body">
         <div class="ph-name">${heroLink(src, x.hero)}</div>
         <div class="ph-wl">${x.wins}–${x.games - x.wins}</div>
@@ -233,14 +246,14 @@ export function pubSection(src, accountId) {
 }
 // All-time hero totals for one player (the division's draft file, decodeTotals): every public and
 // ranked game on record, and every practice-lobby game (league, scrims and inhouses together).
-export function allTimeSection(src, list) {
+export function allTimeSection(src, list, accountId = null) {
   const block = (title, tip, rows, empty) => {
     const games = rows.reduce((n, x) => n + x.games, 0), wins = rows.reduce((n, x) => n + x.wins, 0);
     if (!games) return `<h3 class="hpool-sub">${title}</h3><p class="table-note keep wm-intro">${empty}</p>`;
     const good = (wr) => (wr >= 0.5 ? "w" : "l");
     const card = (x, i) => {
       const wr = x.wins / x.games;
-      return `<div class="ph-card ph-${good(wr)}" style="--i:${i}; --m:${wr.toFixed(3)}"><div class="ph-banner">${portrait(x.hero, "ph-img")}</div>
+      return `<div class="ph-card ph-${good(wr)}" style="--i:${i}; --m:${wr.toFixed(3)}"><div class="ph-banner">${portrait(x.hero, "ph-img")}${plusSlot(accountId, x.hero)}</div>
         <div class="ph-body"><div class="ph-name">${heroLink(src, x.hero)}</div><div class="ph-wl">${x.wins}–${x.games - x.wins}</div>
         <div class="ph-sub">${pct(wr)} · ${x.games.toLocaleString()} game${x.games === 1 ? "" : "s"}</div></div><div class="ld-meter"><i></i></div></div>`;
     };

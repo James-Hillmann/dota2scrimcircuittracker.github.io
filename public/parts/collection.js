@@ -12,7 +12,7 @@ import { cardDesignState, shownNickname, RECYCLE_COST } from '../lib/cosmetics-e
 import { availablePackOffers, completedPackOffers, markPackOfferClaimed } from '../lib/bonus-offers.js';
 import { startFeedback } from '../lib/feedback.js';
 import { showProfileBackground, mountBackgroundButton, letterCaseHtml, drawLetterCase } from './profile-background.js';
-import { FRONT_PARTS, BACK_STATS, MAX_BACK_STATS, MAX_NAME, backStats, applyLayout } from '../lib/card-layout.js';
+import { FRONT_PARTS, BACK_STATS, MAX_BACK_STATS, MAX_NAME, backStats, applyLayout, shownByDefault } from '../lib/card-layout.js';
 import './pack-gifts.js'; // the "Fav sent you packs" notice
 import { SCREEN_ART } from '../lib/screen-art-data.js';
 
@@ -319,7 +319,7 @@ export async function openCollection({tab='packs',viewAccount=null,cardHtml=null
     return `<details class="card-settings card-layout-settings"><summary><strong>Card layout</strong><span>Front content and back-of-card stats</span></summary><div>
       <label>Card name <input type="text" data-layout-name maxlength="${MAX_NAME}" placeholder="${esc(name)}" value="${esc(L?.name??'')}"></label>
       <label>Name size <output data-layout-namesize-value>${L?.nameSize??100}%</output><input type="range" data-layout-namesize min="40" max="160" value="${L?.nameSize??100}"></label>
-      <fieldset class="layout-parts"><legend>Front</legend><p>Drag any text on the card to move it.</p>${FRONT_PARTS.map(([k,label])=>`<div class="layout-part"><label><input type="checkbox" data-part-show="${k}"${part(k)?.show===false?'':' checked'}> ${label}</label><input type="range" data-part-size="${k}" min="40" max="250" value="${part(k)?.size??100}" aria-label="${label} size"><button type="button" data-part-reset="${k}">Reset</button></div>`).join('')}</fieldset>
+      <fieldset class="layout-parts"><legend>Front</legend><p>Drag any text on the card to move it.</p>${FRONT_PARTS.map(([k,label])=>`<div class="layout-part"><label><input type="checkbox" data-part-show="${k}"${(part(k)?.show??shownByDefault(k))?' checked':''}> ${label}</label><input type="range" data-part-size="${k}" min="40" max="250" value="${part(k)?.size??100}" aria-label="${label} size"><button type="button" data-part-reset="${k}">Reset</button></div>`).join('')}</fieldset>
       <fieldset class="layout-back"><legend>Back</legend><div class="layout-stats">${Array.from({length:MAX_BACK_STATS},(_,i)=>statSelect(i)).join('')}</div>
       <label><input type="checkbox" data-back-section="positions"${L?.back?.positions===false?'':' checked'}> Positions played</label>
       <label><input type="checkbox" data-back-section="heroes"${L?.back?.heroes===false?'':' checked'}> Top heroes</label></fieldset>
@@ -330,10 +330,10 @@ export async function openCollection({tab='packs',viewAccount=null,cardHtml=null
     const front=card.querySelector('.ft-front'),q=sel=>body.querySelector(sel);
     q('[data-layout-name]').oninput=e=>{layoutOf().name=e.target.value.trim()||null;update();};
     q('[data-layout-namesize]').oninput=e=>{layoutOf().nameSize=Number(e.target.value);q('[data-layout-namesize-value]').textContent=`${e.target.value}%`;update();};
-    const partOf=k=>layoutOf().front[k]??={show:true,x:null,y:null,size:100};
+    const partOf=k=>layoutOf().front[k]??={show:shownByDefault(k),x:null,y:null,size:100};
     body.querySelectorAll('[data-part-show]').forEach(b=>b.onchange=()=>{partOf(b.dataset.partShow).show=b.checked;update();});
     body.querySelectorAll('[data-part-size]').forEach(r=>r.oninput=()=>{partOf(r.dataset.partSize).size=Number(r.value);update();});
-    body.querySelectorAll('[data-part-reset]').forEach(b=>b.onclick=()=>{delete layoutOf().front[b.dataset.partReset];const k=b.dataset.partReset;body.querySelector(`[data-part-show="${k}"]`).checked=true;body.querySelector(`[data-part-size="${k}"]`).value=100;update();});
+    body.querySelectorAll('[data-part-reset]').forEach(b=>b.onclick=()=>{delete layoutOf().front[b.dataset.partReset];const k=b.dataset.partReset;body.querySelector(`[data-part-show="${k}"]`).checked=shownByDefault(k);body.querySelector(`[data-part-size="${k}"]`).value=100;update();});
     const readStats=()=>{const keys=[...body.querySelectorAll('[data-back-stat]')].map(s=>s.value).filter(Boolean);layoutOf().back.stats=[...new Set(keys)];update();};
     body.querySelectorAll('[data-back-stat]').forEach(s=>s.onchange=readStats);
     body.querySelectorAll('[data-back-section]').forEach(b=>b.onchange=()=>{layoutOf().back[b.dataset.backSection]=b.checked;update();});

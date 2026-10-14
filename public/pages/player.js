@@ -14,7 +14,7 @@ import { combatTabHtml, fbCell, fbRole } from "../parts/combat.js";
 import { draftSlotHtml, rateOf } from "../parts/draft.js";
 import { playerItemsHtml, wireItemHeroes } from "../parts/items.js";
 import { loading, errorBox, laneCutsOf, lanesPageHtml } from "../parts/lanes.js";
-import { statRows, heroRanks, statRanksHtml, heroRanksHtml, pubSection, pubPrepHtml, allTimeSection, overallStats, overallHeroes } from "../parts/ranks.js";
+import { statRows, heroRanks, statRanksHtml, heroRanksHtml, pubSection, pubPrepHtml, allTimeSection, overallStats, overallHeroes, plusHeroesHtml } from "../parts/ranks.js";
 import { tierRef, tierBreakdown } from "../parts/tiers.js";
 import { compareHtml, wireCompare } from "../parts/compare.js";
 import { radarSvg, roleScores } from "../parts/radar.js";
@@ -22,6 +22,7 @@ import { tagContext, gameTags, tagsHtml, tagCells } from "../lib/gametags.js";
 import { mountProfileCollection } from '../parts/collection.js';
 import { mountProfileTickets } from '../parts/profile-tickets.js';
 import { mountGiftPanel } from '../parts/pack-gifts.js';
+import { plusSlot, startPlusLevels } from "../lib/hero-levels.js";
 
 // ---------- Player page ----------
 
@@ -89,7 +90,7 @@ export async function renderPlayer(src, key) {
     ] : []),
   ];
   const vsOf = ({ m, p }) => (p.team === "a" ? { name: m.team_b, id: m.team_b_id } : { name: m.team_a, id: m.team_a_id });
-  const bestCard = (label, g, value, i) => `<a class="card hl best-game" style="--i:${i}" href="${src.link(g.m)}" title="Open the game">${portrait(g.p.hero, "card-hero")}
+  const bestCard = (label, g, value, i) => `<a class="card hl best-game" style="--i:${i}" href="${src.link(g.m)}" title="Open the game">${portrait(g.p.hero, "card-hero")}${plusSlot(g.p.account_id, g.p.hero, g.m.start_time)}
     <div class="k">Best game · ${label}</div><div class="v">${value}</div>
     <div class="s">${esc(g.p.hero)} · vs ${esc(vsOf(g).name)} · ${g.won ? "Won" : "Lost"}</div></a>`;
 
@@ -109,6 +110,7 @@ export async function renderPlayer(src, key) {
         <div id="game-box" data-key="${esc(key)}">${gameAnalysisHtml(src, "player", h.games, 0, gameRated)}</div>`],
       ["compare", compareHtml(key)],
       ["heroes", `<div id="hero-ranks-box" data-key="${esc(key)}">${heroRanksHtml(src, key, h, ratings, null)}</div>
+        ${src.ad2l ? `<div id="plus-box" data-key="${esc(key)}"></div>` : ""}
         ${draftSlotHtml(draftSlotRecord(matches, byPlayer(key)), src, s.name, rateOf(h.games, gameRated))}
         ${src.ad2l ? `<details class="how pubs-fold"><summary>Pubs and other leagues</summary>
           ${pubSection(src, key)}${pubPrepHtml(src, key, h.games)}<div id="alltime-box" data-key="${esc(key)}"></div></details>` : ""}`],
@@ -169,6 +171,12 @@ export async function renderPlayer(src, key) {
     if (hb) hb.innerHTML = heroRanksHtml(src, key, h, ratings, oh ?? (() => []));
   });
 
+  // Dota Plus hero levels arrive on their own (lib/hero-levels.js).
+  if (src.ad2l) startPlusLevels().then((data) => {
+    const el = document.getElementById("plus-box");
+    if (el?.dataset.key === key && data) el.innerHTML = plusHeroesHtml(src, data, key);
+  });
+
   // All-time totals load from the division's draft file (not part of the main data).
   if (src.ad2l) {
     const league = roster?.team?.league ?? src.key;
@@ -176,13 +184,13 @@ export async function renderPlayer(src, key) {
       const el = document.getElementById("alltime-box");
       if (el?.dataset.key !== key || !data?.totals || !data.heroes) return;
       const list = hg.decodeTotals(data.totals[key], data.heroes);
-      if (list.pubs.length || list.lobby.length) el.innerHTML = allTimeSection(src, list);
+      if (list.pubs.length || list.lobby.length) el.innerHTML = allTimeSection(src, list, key);
     }).catch(() => {});
   }
 
   sortableTable(document.getElementById("t"), [
     ["date", "Date", (v, r) => `${when(new Date(v))} <button type="button" class="ga-go" data-analyze="${r.gi}" title="Analyze this game">Analyze</button>`, "l"],
-    ["hero", "Hero", (v) => `<span class="hero-cell">${portrait(v)}${heroLink(src, v)}</span>`, "l"],
+    ["hero", "Hero", (v, r) => `<span class="hero-cell">${portrait(v)}${plusSlot(r.acct, v, r.at)}${heroLink(src, v)}</span>`, "l"],
     ["won", "Result", (v) => `<span class="res ${v ? "w" : "l"}">${v ? "Win" : "Loss"}</span>`],
     ["tags", "Tags", (v, r) => tagsHtml(r.tag_list), "l"],
     ["vs", "Opponent", (v, r) => teamLink(src, v, r.vs_id), "l"],
@@ -196,7 +204,7 @@ export async function renderPlayer(src, key) {
     ...tagCells(gameTags(g.m, tagContext(matches), g.p.team)),
     gi, obs: g.p.obs_placed ?? null, sen: g.p.sen_placed ?? null, stacks: g.p.camps_stacked ?? null, fb: fbRole(g.m, g.p),
     dewards: g.p.obs_killed == null ? null : g.p.obs_killed + g.p.sen_killed,
-    date: g.m.createdAt ? +g.m.createdAt : 0, hero: g.p.hero, won: g.won ? 1 : 0, vs: vsOf(g).name, vs_id: vsOf(g).id ?? null,
+    date: g.m.createdAt ? +g.m.createdAt : 0, hero: g.p.hero, acct: g.p.account_id, at: g.m.start_time, won: g.won ? 1 : 0, vs: vsOf(g).name, vs_id: vsOf(g).id ?? null,
     kills: g.p.kills, deaths: g.p.deaths, assists: g.p.assists, net_worth: g.p.net_worth, gpm: g.p.gpm, xpm: g.p.xpm,
     hero_damage: g.p.hero_damage, kill_participation: g.p.kill_participation ?? null, link: src.link(g.m),
   })), "date", { toolbar: true });

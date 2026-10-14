@@ -7,7 +7,12 @@
 // centred on that point of the face, in percent.
 export const FRONT_PARTS = [
   ['tier', 'Tier'], ['pos', 'Position'], ['name', 'Name'], ['record', 'Record'], ['team', 'Team'], ['hero', 'Hero line'],
+  ['plus', 'Dota Plus hero level'],
 ];
+// Parts a card shows only once its owner turns them on: the Dota Plus badge (lib/hero-levels.js),
+// on the card's hero and beside each of the back's top heroes.
+const OFF_BY_DEFAULT = new Set(['plus']);
+export const shownByDefault = (key) => !OFF_BY_DEFAULT.has(key);
 // Back stats. Wide ones take two columns.
 export const BACK_STATS = [
   ['games', 'Games'], ['win', 'Win %'], ['kda', 'K/D/A', true], ['gpm', 'GPM'], ['xpm', 'XPM'], ['dmg', 'Hero damage'],
@@ -40,7 +45,7 @@ export function validLayout(raw) {
     const p = front[key];
     if (p == null) continue;
     if (typeof p !== 'object' || Array.isArray(p)) throw new Error('Choose a valid card layout.');
-    const part = { show: p.show !== false, x: null, y: null, size: 100 };
+    const part = { show: p.show ?? shownByDefault(key), x: null, y: null, size: 100 };
     if (p.show != null && typeof p.show !== 'boolean') throw new Error('Choose a valid card layout.');
     if (p.x != null || p.y != null) {
       if (!num(p.x, 0, 100) || !num(p.y, 0, 100)) throw new Error('Card text must stay on the card.');
@@ -50,7 +55,7 @@ export function validLayout(raw) {
       if (!num(p.size, 40, 250)) throw new Error('Choose a valid text size.');
       part.size = Math.round(p.size);
     }
-    if (!part.show || part.x != null || part.size !== 100) out.front[key] = part;
+    if (part.show !== shownByDefault(key) || part.x != null || part.size !== 100) out.front[key] = part;
   }
   const back = raw.back ?? {};
   if (typeof back !== 'object' || Array.isArray(back)) throw new Error('Choose a valid card layout.');
@@ -76,7 +81,7 @@ export function partState(layout, key) {
   const placed = p?.x != null;
   const size = key === 'name' ? (p?.size ?? 100) * (layout?.nameSize ?? 100) / 100 : (p?.size ?? 100);
   const style = `${placed ? `left:${p.x}%;top:${p.y}%;` : ''}${size !== 100 ? `--part-size:${size / 100};` : ''}`;
-  return { show: p?.show !== false, placed, style };
+  return { show: p?.show ?? shownByDefault(key), placed, style };
 }
 
 // The live editor and saved-design updates: apply a layout to a rendered card in place.
@@ -117,4 +122,5 @@ export function applyLayout(card, layout, playerName) {
   if (layout?.nameSize && layout.nameSize !== 100) card.style.setProperty('--name-size', layout.nameSize / 100); else card.style.removeProperty('--name-size');
   card.classList.toggle('ft-no-posbars', layout?.back?.positions === false);
   card.classList.toggle('ft-no-heroes', layout?.back?.heroes === false);
+  card.classList.toggle('ft-plus-on', partState(layout, 'plus').show);
 }

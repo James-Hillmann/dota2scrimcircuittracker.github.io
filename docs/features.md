@@ -268,6 +268,13 @@ Heroes, the hero pool and by draft pick stay open; recent pubs, pub practice (le
 heroes played in pubs the week before, against the rest) and all-time pubs and esports fold
 under one closed **Pubs and other leagues ▾**.
 
+**Dota Plus hero levels** (AD2L, from STRATZ through the sync): the in-game badge (tier colour,
+level on it) on the hero wherever a league player shows on one: game scoreboards, MVP and
+standouts, ratings, combat, laning, game analysis, week lineups and the player's Games table show
+the level they had in that game; hero cards, pubs, all-time heroes and a hero page's players show
+the current one. Heroes has a **Dota Plus hero levels** list of every hero with a level, highest
+first. STRATZ lists levels from 11 up; lower ones and private profiles show none.
+
 ## Heroes tab and hero pages
 
 The Heroes tab has three sub-tabs (`?tab=tiers|players|table`):
@@ -619,6 +626,9 @@ The tier list and Fantasy share player cards (`parts/player-card.js`), including
 and role choices. Every card front shows the player’s win-loss record; tier cards keep their
 selected tier model’s rating and a separate Breakdown button. The tier list uses compact
 portrait trading cards with text and controls on the cards, one row per tier; crowded rows scroll sideways. Fantasy keeps full-size cards.
+
+A card's owner can turn on its **Dota Plus hero level** (Card layout → Front): the in-game badge
+for the card's hero, under the tier shield, and beside each of the back's top heroes. Off by default.
 
 Team logos appear beside the team name on both card faces and beside each team-page title.
 The 74 playing teams use local 128px images, matched by PlayOn and in-game Dota IDs;

@@ -36,3 +36,11 @@ test('the engine (and so the Worker) saves layouts, keeps them across other edit
   assert.equal(equipCosmetics(saved,{layout:null}).equipment.layout,undefined);
   assert.throws(()=>equipCosmetics(state,{layout:{name:'<script>'}}));
 });
+test('the Dota Plus badge is off until the owner turns it on',()=>{
+  assert.equal(partState(null,'plus').show,false);
+  assert.equal(validLayout({front:{plus:{show:false}}}).front.plus,undefined); // the default, nothing stored
+  const on=validLayout({front:{plus:{show:true}}});
+  assert.deepEqual(on.front.plus,{show:true,x:null,y:null,size:100});
+  assert.equal(partState(on,'plus').show,true);
+  assert.equal(partState(validLayout({front:{plus:{size:150}}}),'plus').show,false);
+});

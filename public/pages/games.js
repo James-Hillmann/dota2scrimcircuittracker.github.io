@@ -19,6 +19,7 @@ import { SEASON } from "../lib/divisions.js";
 import { clock } from "../lib/items.js";
 import { firstBloodOf } from "../lib/combat.js";
 import { tagContext, gameTags, tagsHtml } from "../lib/gametags.js";
+import { plusSlot } from "../lib/hero-levels.js";
 import { wireStreakCharts, buildOrderHtml } from "../lib/combat-charts.js";
 import { app, pageHead, teamLink, dur, when, sortableTable, pct, scrimNames, divData, editUnlocked, missingGames, seriesOptions, unlockEdit, divUploaded, lockEdit, allMatches, esc, crumbs, floorOf, gameMvp, shortDate, portrait, playerLink, kg, fmt, heroLink, mapCard, playerTabs, draftStrip, wirePlayerTabs, wireMapCards } from "../core.js";
 import { gameCombatHtml, detailsFor } from "../parts/combat.js";
@@ -179,6 +180,7 @@ export async function renderMatch(id, src) {
   } catch { /* not enough games to rate */ }
   const rateOf = new Map(rated.map((r) => [r.key, r]));
   const mvp = gameMvp(m);
+  const plusAt = (p) => plusSlot(p.account_id, p.hero, m.start_time); // Dota Plus level then (lib/hero-levels.js)
   const teamOf = (t) => m.players.filter((p) => p.team === t);
   const nameOf = (t) => (t === "a" ? m.team_a : m.team_b);
   const linkOf = (t) => (t === "a" ? teamLink(src, m.team_a, m.team_a_id) : teamLink(src, m.team_b, m.team_b_id));
@@ -221,7 +223,7 @@ export async function renderMatch(id, src) {
   const firstRosh = (m.objectives ?? []).filter((o) => o.type === "roshan").sort((a, b) => a.time - b.time)[0];
   const fb = firstBloodOf(m), fbP = fb && m.players[fb.i];
   const facts = [
-    ["MVP", `${portrait(mvp.hero, "fact-img")}${playerLink(src, mvp)}`, `${esc(mvp.hero)} · ${mvp.kills}/${mvp.deaths}/${mvp.assists}${mvpRate ? ` · rating ${mvpRate.rating}` : ""}`, "mvp"],
+    ["MVP", `${portrait(mvp.hero, "fact-img")}${plusAt(mvp)}${playerLink(src, mvp)}`, `${esc(mvp.hero)} · ${mvp.kills}/${mvp.deaths}/${mvp.assists}${mvpRate ? ` · rating ${mvpRate.rating}` : ""}`, "mvp"],
     s && ["Biggest lead", `<span class="s-${s.lead.a.max >= s.lead.b.max ? "a" : "b"}">+${kg(Math.max(s.lead.a.max, s.lead.b.max))}</span>`,
       `${esc(nameOf(s.lead.a.max >= s.lead.b.max ? "a" : "b"))} at ${s.lead[s.lead.a.max >= s.lead.b.max ? "a" : "b"].minute}'`],
     s && [s.thrown >= BIG_LEAD ? "Comeback" : "Loser's best lead", s.thrown >= 1000 ? `<span class="s-${s.loser}">+${kg(s.thrown)}</span>` : "None",
@@ -272,7 +274,7 @@ export async function renderMatch(id, src) {
   const highlight = new Set(["kills", "net_worth", "gpm", "xpm", "hero_damage", "dmg_per_min", "dmg_per_1k_nw", "kill_participation", "hero_healing"]);
   const who = (p) => {
     const rank = rankLabel(p.rank_tier), r = rateOf.get(playerKey(p));
-    return `<td class="l who">${portrait(p.hero)}<span class="who-body"><span class="who-name">${playerLink(src, p)}${p === mvp ? ' <span class="mvp-tag">MVP</span>' : ""}</span>
+    return `<td class="l who">${portrait(p.hero)}${plusAt(p)}<span class="who-body"><span class="who-name">${playerLink(src, p)}${p === mvp ? ' <span class="mvp-tag">MVP</span>' : ""}</span>
       <span class="who-sub">${heroLink(src, p.hero)}${p.position ? ` · pos ${p.position}` : ""}${rank ? ` · ${esc(rank)}` : ""}${p.standin ? " · stand-in" : ""}</span></span>
       ${r ? `<span class="who-r t-${r.tier}" title="Game rating ${r.rating} (${r.tier})">${r.rating}</span>` : ""}</td>`;
   };
@@ -290,7 +292,7 @@ export async function renderMatch(id, src) {
   ];
   // Header cells, repeated under team B's banner so its columns read without scrolling up.
   const headCells = `<th scope="col" class="l">Player${rated.length ? " · rating" : ""}</th>${cols.map(([k, l]) => `<th scope="col">${l}${info(k)}</th>`).join("")}`;
-  const scoreHtml = `<div class="gm-standouts">${cards.map(([k, { p, v }, tip]) => `<div class="gm-stand">${portrait(p.hero, "fact-img")}
+  const scoreHtml = `<div class="gm-standouts">${cards.map(([k, { p, v }, tip]) => `<div class="gm-stand">${portrait(p.hero, "fact-img")}${plusAt(p)}
       <div><div class="k">${k}${info(tip)}</div><div class="v">${v}</div><div class="s">${playerLink(src, p)}</div></div></div>`).join("")}</div>
     <div class="table-wrap gm-board"><table>
       <thead><tr>${headCells}</tr></thead>
@@ -323,7 +325,7 @@ export async function renderMatch(id, src) {
       const tier = season.get(r.key), diff = tier ? r.rating - tier.rating : null;
       return `<li class="s-${p.team}${p === mvp ? " mvp" : ""}" style="--i:${k}">
         <span class="rt-n">${k + 1}</span>${portrait(p.hero)}
-        <span class="rt-who"><b>${playerLink(src, p)}</b><small>${esc(p.hero)} · ${esc(nameOf(p.team))}${p.position ? ` · pos ${p.position}` : ""}</small></span>
+        <span class="rt-who"><b>${plusAt(p)}${playerLink(src, p)}</b><small>${esc(p.hero)} · ${esc(nameOf(p.team))}${p.position ? ` · pos ${p.position}` : ""}</small></span>
         <span class="rt-why">${up.map((x) => `<em class="up">${label(x)}</em>`).join("")}${down.map((x) => `<em class="down">${label(x)}</em>`).join("")}</span>
         <span class="rt-season">${tier ? `<span class="rt-tier t-${tier.tier}">${tier.tier}</span> ${tier.rating}<small>${diff >= 0 ? "+" : "−"}${Math.abs(diff)} vs season</small>` : `<small>no season rating</small>`}</span>
         <span class="rt-r t-${r.tier}"><b>${r.rating}</b><small>${r.tier}</small></span>
@@ -492,7 +494,7 @@ export async function renderMatch(id, src) {
   // Build order from the division's detail file, once it loads (still this game's page?).
   if (ad2l && !m.unticketed && app.querySelector("#bo-box")) detailsFor(src).then((det) => {
     const box = document.getElementById("bo-box");
-    const html = det[m.match_id] ? buildOrderHtml(m, det[m.match_id], { playerCell: (p) => `${portrait(p.hero)} ${playerLink(src, p)}` }) : "";
+    const html = det[m.match_id] ? buildOrderHtml(m, det[m.match_id], { playerCell: (p) => `${portrait(p.hero)}${plusSlot(p.account_id, p.hero, m.start_time)} ${playerLink(src, p)}` }) : "";
     if (box?.dataset.game === m.id && html) box.innerHTML = `<h3 class="gm-h3">Build order</h3>${html}`;
   });
 }
