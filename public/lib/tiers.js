@@ -49,8 +49,8 @@ export const MIN_GAMES = 3;
 const Z_CAP = 2.5;
 
 // Scoring versions: every number that tunes the scoring. LIVE is the one the whole site uses.
-// NEXT is being tuned and only shows on the tier list's Model tab, so changes go to NEXT and
-// never to LIVE; switching over is pointing LIVE at it. A model carries its version (`model.v`).
+// The tier list keeps every version available for comparison, with LIVE selected by default.
+// A model carries its version (`model.v`).
 const PRE = {
   label: "Pre-playoff",
   // metric -> the points it's worth, out of 100 stat points per role (core/support) or per
@@ -127,8 +127,7 @@ export const VERSIONS = {
     },
   }),
 };
-export const LIVE = "pre";
-export const NEXT = "playoff";
+export const LIVE = "playoff";
 
 // A version's survival parts and range for a position: its own (survival_pos) or everyone's.
 export const survivalOf = (v, pos) => v.survival_pos?.[pos]?.weights ?? v.survival;

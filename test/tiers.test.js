@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { tierList, tierModel, tierModels, rankLabel, ratingOf, MIN_GAMES, K_PRIOR, K_SPEED, TIERS, MULT } from "../public/lib/tiers.js";
+import { tierList, tierModel, tierModels, rankLabel, ratingOf, MIN_GAMES, K_PRIOR, K_SPEED, TIERS, VERSIONS, LIVE } from "../public/lib/tiers.js";
 import { parseDuration } from "../public/lib/validate.js";
 
 const game = (id = 1) => {
@@ -12,6 +12,8 @@ const game = (id = 1) => {
 };
 // n copies of the fixture as separate games; `edit(game, i)` changes one.
 const games = (n, edit = () => {}) => [...Array(n)].map((_, i) => { const g = game(i); edit(g, i); return g; });
+const MULT = VERSIONS.pre.mult;
+const preList = (matches, options = {}) => tierList(matches, { model: tierModel(matches, { version: "pre" }), ...options });
 const byName = (list) => Object.fromEntries(list.tiers.flatMap((t) => t.players).map((p) => [p.name, p]));
 
 test("players need MIN_GAMES games to be ranked", () => {
@@ -50,13 +52,13 @@ test("replay positions override net worth", () => {
   assert.equal(p["Player 5"].role, "support");
 });
 
-test("every stat and the stat points sit on 0–100; the best season average scores 100", () => {
+test("pre-playoff: every stat and the stat points sit on 0–100; the best season average scores 100", () => {
   // Player 1 (a support by net worth) out-damages everyone in every game, so they have the
   // league's best support damage average and get all of damage's points. Their position's other
   // games are split between Player 10 and Player 11, whose averages (padded over fewer games) sit
   // closer to average than Player 1's, so 0 sits as far below average as Player 1 is above it
   // and neither drops to 0.
-  const list = tierList(games(8, (g, i) => {
+  const list = preList(games(8, (g, i) => {
     g.players[0].hero_damage += 20000; g.players[i % 5].kills += 4 * i;
     if (i >= 4) Object.assign(g.players[9], { name: "Player 11", player_key: "player 11" });
   }));
@@ -73,8 +75,8 @@ test("every stat and the stat points sit on 0–100; the best season average sco
   for (const name of ["Player 10", "Player 11"]) assert.ok(dmg(supports.find((p) => p.name === name)) > 0, `${name}: a little below average isn't a flat 0`);
 });
 
-test("series average to the season: stat points and score, weighted by games", () => {
-  const list = tierList(games(6, (g, i) => { g.series_id = Math.floor(i / 2) + (i === 5 ? 1 : 0); g.players[i % 10].kills += 4 * i; g.players[(i + 2) % 10].hero_damage += 4000 * i; if (i === 4) g.winner = "b"; }));
+test("pre-playoff: series average to the season: stat points and score, weighted by games", () => {
+  const list = preList(games(6, (g, i) => { g.series_id = Math.floor(i / 2) + (i === 5 ? 1 : 0); g.players[i % 10].kills += 4 * i; g.players[(i + 2) % 10].hero_damage += 4000 * i; if (i === 4) g.winner = "b"; }));
   for (const p of list.tiers.flatMap((t) => t.players)) {
     const ss = p.series.filter((x) => x.points != null), G = ss.reduce((t, x) => t + x.games, 0);
     assert.ok(Math.abs(ss.reduce((t, x) => t + x.games * x.points, 0) / G - p.stat_points) < 1e-9, `${p.name} points`);
@@ -134,8 +136,8 @@ test("the default rating curve keeps 50 at 50 and stretches the ends", () => {
   assert.ok(ratingOf(100) < 100 && ratingOf(0) > 0);
 });
 
-test("the score is the stat points times the four multipliers, and the stat rows add up to the stat points", () => {
-  const list = tierList(games(4, (g, i) => { g.players[i].kills += 3 * i; g.players[5 + i].deaths += i; }));
+test("pre-playoff: the score is the stat points times the four multipliers, and the stat rows add up to the stat points", () => {
+  const list = preList(games(4, (g, i) => { g.players[i].kills += 3 * i; g.players[5 + i].deaths += i; }));
   for (const p of list.tiers.flatMap((t) => t.players)) {
     const stats = p.roles.flatMap((r) => r.stats);
     assert.ok(Math.abs(stats.reduce((t, st) => t + st.points, 0) - p.stat_points) < 1e-9, p.name);
@@ -147,21 +149,21 @@ test("the score is the stat points times the four multipliers, and the stat rows
   }
 });
 
-test("winning: a better record and faster wins mean a bigger multiplier", () => {
-  const p = byName(tierList(games(4, (g, i) => { if (i === 0) g.winner = "b"; }))); // A 3–1
+test("pre-playoff: winning: a better record and faster wins mean a bigger multiplier", () => {
+  const p = byName(preList(games(4, (g, i) => { if (i === 0) g.winner = "b"; }))); // A 3–1
   assert.ok(p["Player 1"].mult.winning > 1 && p["Player 6"].mult.winning < 1);
   // 60% adjusted -> 70/100 win rate; winning = (2 × 70 + speed) / 3.
   assert.ok(Math.abs(p["Player 1"].winning - (2 * 70 + p["Player 1"].speed) / 3) < 1e-9);
 });
 
-test("opponent strength: games against a team that wins elsewhere count up, a team that loses elsewhere down", () => {
+test("pre-playoff: opponent strength: games against a team that wins elsewhere count up, a team that loses elsewhere down", () => {
   const vs = (a, b, winner, i) => { const g = game(i); g.team_a = a; g.team_b = b; g.winner = winner; g.players.forEach((p) => { p.player_key = `${p.team === "a" ? a : b}-${p.name}`; }); return g; };
   const pool = [
     ...[0, 1, 2, 3].map((i) => vs("Strong", "Weak", "a", i)), // Strong 4–0 over Weak
     ...[4, 5, 6].map((i) => vs("X", "Strong", "a", i)),
     ...[7, 8, 9].map((i) => vs("Y", "Weak", "a", i)),
   ];
-  const p = Object.fromEntries(tierList(pool).tiers.flatMap((t) => t.players).map((x) => [x.key, x]));
+  const p = Object.fromEntries(preList(pool).tiers.flatMap((t) => t.players).map((x) => [x.key, x]));
   // Strong outside games against X: 4–0 -> (4 + 3) / (4 + 6) = 70%; Weak outside Y: 0–4 -> 30%.
   assert.ok(Math.abs(p["X-Player 1"].opp_rate - 0.7) < 1e-9);
   assert.ok(Math.abs(p["Y-Player 1"].opp_rate - 0.3) < 1e-9);
@@ -199,13 +201,13 @@ test("kills and assists are scored separately and add up to kill participation",
   assert.equal(stats.assists.raw, 19);
 });
 
-test("GPM and net worth are judged against the position's line for that game length", () => {
+test("pre-playoff: GPM and net worth are judged against the position's line for that game length", () => {
   // Pool: the same game at 30 and 60 min, where every player has 100 more GPM and 10k more net
   // worth in the long one. Everyone sits the same distance from the line in both, so each
   // player's score is the same in either length.
   const pool = [...games(3, (g) => { g.duration_sec = 1800; }), ...games(3, (g) => { g.duration_sec = 3600; g.players.forEach((p) => { p.gpm += 100; p.net_worth += 10000; }); })];
-  const model = tierModel(pool);
-  const short = byName(tierList(pool.slice(0, 3), { model })), long = byName(tierList(pool.slice(3), { model }));
+  const model = tierModel(pool, { version: "pre" });
+  const short = byName(preList(pool.slice(0, 3), { model })), long = byName(preList(pool.slice(3), { model }));
   for (const n of ["Player 2", "Player 7"]) {
     const s = (x) => Object.fromEntries(x[n].roles[0].stats.map((st) => [st.metric, st]));
     assert.ok(Math.abs(s(short).gpm.score - s(long).gpm.score) < 1e-6, `${n} gpm`);
@@ -269,4 +271,20 @@ test("a swapper is listed once, by their main position, and every game counts; o
     assert.deepEqual(a.map((p) => [p.name, p.score]), b.map((p) => [p.name, p.score]), `pos ${n}`);
   }
   assert.ok(fourPlain.length && fivePlain.length);
+});
+
+
+test("playoff is the default and the pre-playoff model remains selectable", () => {
+  const pool = games(6, (g, i) => { g.series_id = Math.floor(i / 2); g.players[0].kills += 5 * i; });
+  assert.equal(LIVE, "playoff");
+  const current = tierList(pool);
+  assert.equal(current.model.version, "playoff");
+  assert.deepEqual(current, tierList(pool, { model: tierModel(pool, { version: "playoff" }) }));
+  const previous = preList(pool);
+  assert.equal(previous.model.version, "pre");
+  assert.equal(previous.eligible, current.eligible);
+  for (const p of current.tiers.flatMap((t) => t.players)) {
+    assert.ok(Math.abs(p.score - (p.stat_points * p.mult.survival * p.mult.consistency * p.mult.opponents + p.win_points + p.podium.points)) < 1e-9);
+  }
+  assert.notDeepEqual(byName(current), byName(previous));
 });

@@ -59,10 +59,10 @@ visitor counts `visits.js`; trimmed files `lite.js`. The player page's Compare t
 `parts/compare.js` (picks in the address as `?vs=key,key`).
 
 Tier scoring versions (`lib/tiers.js`, `VERSIONS`): every tunable number (points, multiplier
-ranges, padding, curve width) lives in a version. `LIVE` is what the whole site uses; `NEXT` is
-being tuned and only shows on the tier list's Model sub-tab, with its own (i) bubbles and "How
-it's scored". Change `NEXT` only. Switching over: set `LIVE` to it; to retire the tab, set `NEXT`
-to `LIVE`.
+ranges, padding, curve width) lives in a version. `LIVE` is what the whole site uses and the
+tier list selects by default (currently `playoff`). The Model selector also offers `pre`, the
+previous pre-playoff model, with its own (i) bubbles and "How it's scored". Add experimental
+models as separate versions; switching the default means setting `LIVE` to that version.
 
 Page text: no explainer prose on the pages. Explanations go in the (i) bubbles
 (`lib/glossary.js`). One rule in `style.css` hides `.table-note`, `.wm-intro`, `.wm-note`,

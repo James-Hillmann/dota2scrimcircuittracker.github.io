@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { RANK_STATS, withPerGame, rankStat, ends, placeOf, ordinal, formatStat } from "../public/lib/ranks.js";
-import { heroRatings, heroTierList, heroPowerList, K_HERO, gameRatings, tierModel, tierList, MIN_GAMES, TIERS } from "../public/lib/tiers.js";
+import { heroRatings, heroTierList, heroPowerList, ratingOf, K_HERO, gameRatings, tierModel, tierList, MIN_GAMES, TIERS } from "../public/lib/tiers.js";
 import { playerLeaderboard } from "../public/lib/stats.js";
 import { parseDuration } from "../public/lib/validate.js";
 
@@ -76,8 +76,8 @@ test("heroRatings: one list per hero, best first, on the tier curve", () => {
     for (let i = 1; i < list.length; i++) assert.ok(list[i - 1].score >= list[i].score);
     for (const p of list) assert.ok(p.rating >= 0 && p.rating <= 100);
   }
-  // Same games, same hero for everyone: the hero rating is the tier rating.
-  const tiers = Object.fromEntries(tierList(games, { model }).tiers.flatMap((t) => t.players).map((p) => [p.key, p.rating]));
+  // Same games and hero: the hero rating matches the tier score before season podium bonuses.
+  const tiers = Object.fromEntries(tierList(games, { model }).tiers.flatMap((t) => t.players).map((p) => [p.key, Math.round(ratingOf(p.score_base ?? p.score, model.curve))]));
   for (const list of byHero.values()) for (const p of list) assert.equal(p.rating, tiers[p.key]);
   assert.equal(playerLeaderboard(games).length, Object.keys(tiers).length);
 });

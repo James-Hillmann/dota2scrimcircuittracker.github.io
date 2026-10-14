@@ -3,7 +3,7 @@
 // (lib/store.js, parts/me.js). Loaded when the tab is first shown.
 import { SLOTS, GAMES_COUNTED, weekKey, TEST_WEEK, FANTASY_POINTS, playoffWeeks, testWeek, openWeek, pickable, checkPicks, scoreEntry, leaderboard, weekBoard } from "../lib/fantasy.js";
 import { createPlayerCards, PAINT_FILTER, flipPlayerCard, showBigCard } from "../parts/player-card.js";
-import { tierList, tierModel, NEXT } from "../lib/tiers.js";
+import { tierList, tierModel, LIVE } from "../lib/tiers.js";
 import { listFantasy, saveFantasy, listCards, steamAccount, steamSignOut } from "../lib/store.js";
 import { esc, playerLink, SOURCES } from "../core.js";
 import { errorBox } from "../parts/lanes.js";
@@ -64,7 +64,7 @@ export async function mountFantasy(host, viewSrc, scope = null) {
 
   // The cards. Each player's role is the one they set on their card (a role swap), else the
   // position they've played most; the art is the hero they set, else their most played.
-  const tiers = new Map(tierList(matches, { model: tierModel(matches, { version: NEXT }) }).tiers.flatMap(({ tier, players }) => players.map((p) => [p.key, { tier, rating: p.rating }])));
+  const tiers = new Map(tierList(matches, { model: tierModel(matches, { version: LIVE }) }).tiers.flatMap(({ tier, players }) => players.map((p) => [p.key, { tier, rating: p.rating }])));
   const locked = me == null;
   const { card, stats, mainPos, roleOf } = createPlayerCards(matches, { cards, teams: d.teams, tiers, locked });
   const meP = me != null ? { account: me, name: rosterName.get(me) ?? steamName(me) ?? nameOf(me), team: teamOf.get(me) ?? "" } : null;

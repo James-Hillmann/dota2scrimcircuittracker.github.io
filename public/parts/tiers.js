@@ -3,7 +3,7 @@ import { createPlayerCards, PAINT_FILTER, wirePlayerCards } from "./player-card.
 import { listCards } from "../lib/store.js";
 import { playerEquipment, applyExpandedEquipment } from '../lib/cosmetics.js';
 import { hasDetails } from "../lib/stats.js";
-import { tierModel, tierModels, METRICS, tierList, ratingOf, TIERS, VERSIONS, LIVE, NEXT, perPosition, PODIUM_STATS } from "../lib/tiers.js";
+import { tierModel, tierModels, METRICS, tierList, ratingOf, TIERS, VERSIONS, LIVE, perPosition, PODIUM_STATS } from "../lib/tiers.js";
 import { info, tierInfo } from "../lib/glossary.js";
 import { radarSvg, roleScores } from "./radar.js";
 import { leagueSrc, floorOf, pct, esc, teamLink, playerLink, allLeagues, leagueShort } from "../core.js";
@@ -15,7 +15,7 @@ let tierRole = "pos1"; // the position shown: pos1 … pos5
 // every position (the all-roles model and curve); `leagues`: every league's games too. The
 // list still only shows this league's players at the position.
 const tierVs = { roles: false, leagues: false };
-// The scoring version shown (the Model tab): LIVE, or NEXT while it's being tuned.
+// Default to the live scoring model; older models remain available on the tier list.
 let tierVer = LIVE;
 const tierOpen = new Set(); // player keys whose card is expanded
 const tierTab = new Map(); // player key -> the position tab open in their breakdown (none = all games)
@@ -287,8 +287,8 @@ export function tierSection(src, matches, model) {
     el.innerHTML = `
       <div class="tier-bar"><div class="row segs tier-pos">${[1, 2, 3, 4, 5].map((n) => tab(`pos${n}`, `Pos ${n}`)).join("")}</div>
         <div class="tier-vs" role="group" aria-label="Rate against"><span class="tier-vs-l">Rate against</span>${vsBtn("roles", "All roles")}${src.all ? "" : vsBtn("leagues", "All leagues")}</div>
-        ${NEXT && NEXT !== LIVE ? `<div class="tier-vs tier-ver" role="group" aria-label="Model"><span class="tier-vs-l">Model</span>${verBtn(LIVE)}${verBtn(NEXT)}</div>` : ""}</div>
-      ${ver !== LIVE ? `<p class="table-note keep tier-vs-note">The ${esc(VERSIONS[ver].label.toLowerCase())} model, still being tuned. Only this list uses it; player, team and game pages use the ${esc(VERSIONS[LIVE].label.toLowerCase())} model.</p>` : ""}
+        <div class="tier-vs tier-ver" role="group" aria-label="Model"><span class="tier-vs-l">Model</span>${[LIVE, ...Object.keys(VERSIONS).filter((k) => k !== LIVE)].map(verBtn).join("")}</div></div>
+      ${ver !== LIVE ? `<p class="table-note keep tier-vs-note">Viewing the ${esc(VERSIONS[ver].label.toLowerCase())} model. Player, team and game pages use the ${esc(VERSIONS[LIVE].label.toLowerCase())} model.</p>` : ""}
       ${n ? `<p class="table-note">Players whose main position is ${n}. Every game they played counts, each compared with the position they played in it; open a breakdown to see the score at each position.</p>` : ""}
       ${against ? `<p class="table-note keep tier-vs-note">${against}</p>` : ""}
       ${PAINT_FILTER}<div class="tier-board">${bands}</div>
@@ -377,7 +377,7 @@ function tierHow(model, src) {
   return `<details class="how how-tiers">
     <summary>How it's scored</summary>
     <div class="how-body">
-    ${model.version !== LIVE ? `<p><b>${esc(v.label)} model.</b> These are the numbers of the model being tuned, not the one the rest of the site uses.</p>` : ""}
+    ${model.version !== LIVE ? `<p><b>${esc(v.label)} model.</b> This is the previous scoring model. The rest of the site uses the ${esc(VERSIONS[LIVE].label.toLowerCase())} model.</p>` : ""}
     <p>Ratings use game stats only, not medals or pub records. Click a player above to see their numbers at each step.</p>
     <p class="how-formula">score = stat points (out of 100) × survival × consistency × opponents × winning<br>rating = the score on the rating curve</p>
     <p>There's no starting number. In a breakdown, the stat rows add up to the stat points, and each multiplier shows the points it adds or takes away, so the rows add up to the score.</p>
