@@ -4974,39 +4974,33 @@ td .gtags, .hist-games .gtags { margin-left: 4px; }
 .ft-case:has(.ft-captain){padding-bottom:12px}
 .ft-case-title span+span{font:12px/1.4 var(--mono);letter-spacing:.02em;text-transform:none}
 
-/* Dota Plus hero level (lib/hero-levels.js): the in-game badge, a crest in the tier's colours
-   with the level on it, tucked onto the corner of the hero portrait before it. Empty until
-   the levels load, and when the level isn't known. */
-i.plus { --pr: #6b3d1f; --pf: #c47a45; display: inline-block; position: relative; z-index: 1; flex: none; width: 19px; height: 21px; margin: 0 2px 0 -11px; vertical-align: bottom; font-style: normal; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .55)); }
+/* Dota Plus hero level (lib/hero-levels.js): Valve's badge for the tier (img/hero-badges/,
+   the art STRATZ serves) with the level on it, as in game, tucked onto the corner of the hero
+   portrait before it. A 1em square: each place sets its size with font-size. Empty until the
+   levels load, and when the level isn't known. */
+i.plus { display: inline-block; position: relative; z-index: 1; flex: none; width: 1em; height: 1em; font-size: 24px; margin: 0 1px 0 -13px; vertical-align: bottom; font-style: normal; line-height: 1; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .6)); }
 i.plus:empty { display: none; }
-i.plus svg { display: block; width: 100%; height: 100%; overflow: visible; }
-i.plus .plus-rim { fill: var(--pr); }
-i.plus .plus-face { fill: var(--pf); }
-i.plus .plus-shine { fill: #fff; opacity: .28; }
-i.plus text { font: 800 12px/1 var(--mono); text-anchor: middle; fill: #fff; stroke: rgba(0, 0, 0, .7); stroke-width: 2.4px; paint-order: stroke; letter-spacing: -.04em; }
-i.plus.t-bronze { --pr: #5e3418; --pf: #c27a44; }
-i.plus.t-silver { --pr: #5c656d; --pf: #c4ccd3; }
-i.plus.t-gold { --pr: #7d570c; --pf: #efbd45; }
-i.plus.t-platinum { --pr: #1b6d66; --pf: #66d6c8; }
-i.plus.t-master { --pr: #55237a; --pf: #be72ea; }
-i.plus.t-grandmaster { --pr: #741410; --pf: #f0503f; }
-.hero-cell i.plus { margin: 0 -8px 0 -16px; }
+i.plus img { display: block; width: 100%; height: 100%; }
+i.plus b { position: absolute; left: 0; right: 0; bottom: -.04em; text-align: center; font: 800 .46em/1 var(--body); color: #fff; letter-spacing: -.02em; text-shadow: 0 0 2px #000, 0 0 2px #000, 0 1px 1px #000; pointer-events: none; }
+.hero-cell i.plus { margin: 0 -9px 0 -17px; }
 /* Cards: the owner turns it on (layout part "plus"); it hangs under the tier shield. */
 .ft-card .ft-plus { position: absolute; z-index: 4; top: calc(clamp(36px, 17cqi, 50px) * 54 / 46 + 4px); left: calc(10% + clamp(36px, 17cqi, 50px) / 2); transform: translateX(-50%); line-height: 0; }
-.ft-card .ft-plus i.plus { width: clamp(26px, 12cqi, 38px); height: auto; aspect-ratio: 26 / 28; margin: 0; zoom: var(--part-size, 1); }
+.ft-card .ft-plus i.plus { font-size: clamp(38px, 18cqi, 56px); margin: 0; zoom: var(--part-size, 1); }
 .ft-card .ft-plus.ft-placed i.plus { zoom: 1; }
-.ft-card .ft-h i.plus { position: absolute; right: -4px; bottom: -5px; width: 7cqi; height: auto; aspect-ratio: 26 / 28; margin: 0; }
+.ft-card .ft-h i.plus { position: absolute; right: -5px; bottom: -6px; font-size: max(16px, 8cqi); margin: 0; }
 .ft-card:not(.ft-plus-on) .ft-h i.plus { display: none; }
+.ft-card .ft-h i.plus b { display: block; } /* .ft-h b (the games count) is hidden */
 /* Beside a name instead of on a portrait: the hero page's players. */
-.hp-name i.plus { margin: 0 0 0 6px; vertical-align: -4px; }
+.hp-name i.plus { margin: 0 0 0 6px; vertical-align: -5px; }
 /* In a name cell (grid rows: game ratings, the analysis ten, week lineups, game tiles). */
-.rt-who i.plus, .ga-ten-name i.plus, .lu-name i.plus, .ga-g-body i.plus { margin: 0 5px 0 0; vertical-align: -4px; }
-.ga-g-body i.plus { position: absolute; left: 50px; bottom: 4px; margin: 0; }
+.rt-who i.plus, .ga-ten-name i.plus, .lu-name i.plus, .ga-g-body i.plus { margin: 0 5px 0 0; vertical-align: -6px; }
+.ga-g-body i.plus { position: absolute; left: 50px; bottom: 4px; margin: 0; font-size: 26px; }
 /* After a portrait in a flex row: back over the row's gap onto the portrait's corner. */
-.gm-board td.who i.plus, .gm-stand i.plus, .ln-p i.plus, .gm-fact .v i.plus { align-self: flex-end; margin: 0 -5px -2px -24px; }
+.gm-board td.who i.plus, .gm-stand i.plus, .ln-p i.plus, .gm-fact .v i.plus { align-self: flex-end; margin: 0 -6px -3px -26px; }
+.gm-fact .v i.plus { font-size: 22px; }
 /* Over hero art: the bottom corner. */
-.hp-banner i.plus, .ph-banner i.plus { position: absolute; z-index: 2; right: 8px; bottom: 6px; width: 24px; height: 26px; margin: 0; }
-.ga-art i.plus { position: absolute; z-index: 2; left: 8px; bottom: 8px; width: 26px; height: 28px; margin: 0; }
-.pf i.plus { position: absolute; right: -5px; bottom: 0; width: 15px; height: 16px; margin: 0; }
-.pf i.plus text { stroke-width: 3px; }
-.card.hl i.plus { position: absolute; right: 10px; bottom: 8px; width: 22px; height: 24px; margin: 0; }
+.hp-banner i.plus, .ph-banner i.plus { position: absolute; z-index: 2; right: 6px; bottom: 4px; font-size: 32px; margin: 0; }
+.ph-banner i.plus { font-size: 28px; }
+.ga-art i.plus { position: absolute; z-index: 2; left: 6px; bottom: 6px; font-size: 34px; margin: 0; }
+.pf i.plus { position: absolute; right: -6px; bottom: 0; font-size: 18px; margin: 0; }
+.card.hl i.plus { position: absolute; right: 8px; bottom: 6px; font-size: 30px; margin: 0; }

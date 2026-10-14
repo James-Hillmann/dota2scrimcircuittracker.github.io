@@ -241,8 +241,9 @@ every Actions run is a new one, so the client waits for a slot when STRATZ says 
 - **The site** (`public/lib/hero-levels.js`): pages write an empty `plusSlot(account, hero, time)`
   and the file, loaded once after startup, fills every slot with the badge. With a game's start
   time it's the level the player had then. Tiers: Bronze 1, Silver 6, Gold 12, Platinum 18,
-  Master 25, Grandmaster 30 (the in-game badge tiers; past Gold from the original Dota Plus
-  unlock levels).
+  Master 25, Grandmaster 30 (the game's, and STRATZ's `HERO_LEVEL_STEPS`). The art is Valve's
+  badges as STRATZ serves them (`cdn.stratz.com/images/dota2/plus/hero_badge_<1-6>.png`), saved
+  as 96px WebP in `public/img/hero-badges/<tier>.webp`, with the level drawn on top.
 - **Cards**: the badge is the layout part `plus`, off until the owner turns it on in Card
   layout (`lib/card-layout.js`). The collection Worker checks layouts with the same file, so
   **redeploy the Worker** (`cd workers/steam-auth && npx wrangler deploy`) after changing it, or

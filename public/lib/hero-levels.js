@@ -1,14 +1,14 @@
 // Dota Plus hero levels (public/data/hero-levels.json, from STRATZ: scripts/stratz/hero-levels.js).
 // Pages don't wait for them: anything that shows a player on a hero writes plusSlot(...), an
 // empty <i class="plus">, and once the file loads every slot on the page (and any drawn later)
-// gets the in-game style badge: the tier's crest with the level on it, or stays empty when the
+// gets the in-game badge: the tier's art with the level on it, or stays empty when the
 // level isn't known (a private profile, no Dota Plus, or a level STRATZ doesn't list).
 // A game's slot passes its start time, so it shows the level the player had then; elsewhere
 // it's the current level.
 import { HERO_META } from "./hero-meta.js";
 
 // The game's six badge tiers (dota_english.txt DOTA_HeroLevelBadgeTier_*), from the level each
-// starts at. Grandmaster is level 30 (the Winter 2020 Dota Plus update).
+// starts at: the same steps as STRATZ (HERO_LEVEL_STEPS = [1, 6, 12, 18, 25, 30]).
 export const PLUS_TIERS = [
   [30, "grandmaster", "Grandmaster"], [25, "master", "Master"], [18, "platinum", "Platinum"],
   [12, "gold", "Gold"], [6, "silver", "Silver"], [1, "bronze", "Bronze"],
@@ -36,11 +36,11 @@ export function plusSlot(account, hero, at = null) {
   return `<i class="plus" data-pa="${a}" data-ph="${h}"${at ? ` data-pt="${Math.floor(at)}"` : ""}></i>`;
 }
 
-// The badge itself: a crest in the tier's colours with the level on it.
+// The badge itself: Valve's art for the tier (img/hero-badges/<tier>.webp, as STRATZ serves it)
+// with the level on it.
 export function plusBadge(level) {
   const t = plusTier(level);
-  if (!t) return "";
-  return `<svg viewBox="0 0 26 28" aria-hidden="true"><path class="plus-rim" d="M13 1 24 5.5v8.2c0 6.3-4.6 11-11 13.3C6.6 24.7 2 20 2 13.7V5.5Z"/><path class="plus-face" d="M13 3.6 21.6 7.1v6.6c0 5-3.6 8.8-8.6 10.7-5-1.9-8.6-5.7-8.6-10.7V7.1Z"/><path class="plus-shine" d="M13 3.6 21.6 7.1v3.4C17.5 9 8.5 9 4.4 10.5V7.1Z"/><text x="13" y="17.6">${level}</text></svg>`;
+  return t ? `<img src="img/hero-badges/${t[1]}.webp" alt="" decoding="async"><b>${level}</b>` : "";
 }
 
 function fill(slot, data) {

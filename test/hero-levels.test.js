@@ -30,6 +30,7 @@ test("slots need a Dota account and a known hero", () => {
   assert.equal(plusSlot(75379546, "Phantom Lancer", 1700000000.5), '<i class="plus" data-pa="75379546" data-ph="12" data-pt="1700000000"></i>');
   assert.equal(plusSlot("Some Scrim Name", "Phantom Lancer"), "");
   assert.equal(plusSlot(75379546, "Not A Hero"), "");
-  assert.match(plusBadge(30), /<text[^>]*>30<\/text>/);
+  assert.equal(plusBadge(30), '<img src="img/hero-badges/grandmaster.webp" alt="" decoding="async"><b>30</b>');
+  assert.match(plusBadge(12), /gold\.webp.*<b>12<\/b>/);
   assert.equal(plusBadge(0), "");
 });
