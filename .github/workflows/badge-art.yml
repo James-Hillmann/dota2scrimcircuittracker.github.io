@@ -1,0 +1,45 @@
+# One-off (claude/ branches): find the Dota Plus hero badge art STRATZ and Valve serve, and
+# print where it lives. Remove once the art is in public/img/hero-badges/.
+name: Badge art
+
+on:
+  push:
+    branches: ["claude/**"]
+    paths: [".github/workflows/badge-art.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  find:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: STRATZ front end
+        run: |
+          mkdir -p s && cd s
+          UA="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36"
+          curl -sSL -A "$UA" https://stratz.com/players/75379546 -o page.html || true
+          echo "page bytes: $(wc -c < page.html)"
+          grep -oE '(src|href)="[^"]+\.js"' page.html | sed -E 's/^(src|href)="//; s/"$//' | sort -u | head -80 > scripts.txt
+          cat scripts.txt
+          while read -r u; do case "$u" in http*) ;; //*) u="https:$u" ;; /*) u="https://stratz.com$u" ;; *) u="https://stratz.com/$u" ;; esac
+            curl -sSL -A "$UA" "$u" >> all.js || true; echo >> all.js; done < scripts.txt
+          echo "js bytes: $(wc -c < all.js)"
+          echo "--- badge / plus / level image refs"
+          cat page.html all.js | grep -oiE '[A-Za-z0-9_./:${}-]*(hero_?badge|herobadge|dota_?plus|plus/|herolevel|hero_level|badge_rank|prestige)[A-Za-z0-9_./${}-]*' | sort | uniq -c | sort -rn | head -80
+          echo "--- image hosts"
+          cat page.html all.js | grep -oE 'https://[a-z0-9.-]+/images/[A-Za-z0-9_/.-]{0,60}' | sed -E 's#(https://[^/]+/images/[^/]+/[^/]+).*#\1#' | sort | uniq -c | sort -rn | head -40
+      - name: Valve and STRATZ CDN guesses
+        run: |
+          for base in \
+            https://cdn.cloudflare.steamstatic.com/apps/dota2/images/dota_react/hero_badges \
+            https://cdn.cloudflare.steamstatic.com/apps/dota2/images/dota_react/icons/hero_badges \
+            https://cdn.cloudflare.steamstatic.com/apps/dota2/images/hero_badges \
+            https://cdn.stratz.com/images/dota2/hero_badges \
+            https://cdn.stratz.com/images/dota2/plus \
+            https://cdn.stratz.com/images/dota2/badges; do
+            for f in hero_badge_rank_0.png hero_badge_rank_5.png hero_badge_rank_0_png.png 0.png 1.png; do
+              echo "$(curl -s -o /dev/null -w '%{http_code} %{content_type}' "$base/$f") $base/$f"
+            done
+          done
