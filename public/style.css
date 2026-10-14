@@ -2711,6 +2711,11 @@ button.ga-go:hover:not(:disabled) { background: var(--accent); color: var(--on-a
 .pp-head.pbg-text :is(.kicker, .kicker a, .crumbs li::before, .crumbs [aria-current], .h1-name, .h1-name *, .pp-sub, .pp-sub *, .pp-tabs button) { color: var(--pbg-text); text-shadow: 0 1px 2px rgb(0 0 0 / .7), 0 0 10px rgb(0 0 0 / .45); }
 .pp-head.pbg-text .pp-tabs button:not([aria-selected="true"]) { opacity: .72; }
 .pp-head.pbg-text .pp-tabs button:hover { opacity: 1; }
+/* Auto text: the site's colours with a shadow, and dark ink on the pieces over bright art
+   (.pbg-ink-dark, marked by parts/profile-background.js). */
+.pp-head.pbg-auto :is(.kicker li, .h1-name, .pp-sub, .pp-tabs button) { text-shadow: 0 1px 2px rgb(0 0 0 / .6); }
+.pp-head.pbg-auto .pbg-ink-dark, .pp-head.pbg-auto .pbg-ink-dark * { color: #17141b; text-shadow: 0 0 6px rgb(255 255 255 / .45); }
+.pp-head.pbg-auto .kicker li.pbg-ink-dark::before { color: #17141b; }
 .pbg-layer.pbg-fixed::after { background: linear-gradient(rgba(var(--ink-rgb), calc(var(--pbg-dim) * .8)), rgba(var(--ink-rgb), var(--pbg-dim)) 40%, rgba(var(--ink-rgb), min(1, calc(var(--pbg-dim) + .15)))); }
 @media (max-width: 760px) {
   .pp-head .kicker::before { display: none; }
