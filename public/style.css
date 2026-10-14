@@ -2698,6 +2698,11 @@ button.ga-go:hover:not(:disabled) { background: var(--accent); color: var(--on-a
 .pbg-layer .ft-art-thumb { position: absolute; inset: 0; height: auto; border-radius: 0; background: none; }
 .pbg-layer .ft-art, .pbg-editor [data-styles] .ft-art { filter: hue-rotate(var(--art-hue, 0deg)); }
 .pbg-layer .ft-art img { transition: none; }
+/* Your signature on the background: placed by percent and sized in cqi of the background's width,
+   like a card's (lib/signatures.js). Above the dim overlay. In the editor you drag it. */
+.pbg-sig { position: absolute; inset: 0; z-index: 1; container-type: inline-size; }
+.pbg-sig .card-autograph { position: absolute; width: max-content; max-width: 90%; transform: translate(-50%, -50%) rotate(var(--placement-rotation, -7deg)); color: var(--signature-ink); text-align: center; filter: drop-shadow(0 2px 3px #000) drop-shadow(0 0 8px var(--signature-glow)); }
+.pbg-preview .pbg-sig .card-autograph { pointer-events: auto; cursor: move; }
 :is(.pbg-layer, .pbg-editor) [data-style="plain"] .ft-art img { filter: none; }
 .pbg-layer::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(var(--ink-rgb), min(1, calc(var(--pbg-dim) + .4))) 0%, rgba(var(--ink-rgb), var(--pbg-dim)) 55%, rgba(var(--ink-rgb), calc(var(--pbg-dim) * .6)) 100%); }
 .pbg-layer.pbg-fixed { position: fixed; z-index: -1; }

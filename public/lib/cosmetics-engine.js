@@ -30,12 +30,14 @@ export const shownNickname=state=>state?.showNickname&&state.nickname?state.nick
 // Your profile's background: one of your collected loading screens, or null for none. place is
 // 'head' (behind your name) or 'page' (the whole profile); x, y and zoom frame it like a card
 // crop; dim (0-90) darkens it so the page stays readable; style is a card image style (null for
-// the plain image) and hue turns its colours (0-360). A bare screen id is the defaults.
+// the plain image) and hue turns its colours (0-360). sig is your signature on it, or null: an
+// owned signature style and modifier, placed at x, y (percent of the background), size and
+// rotation like a card's. A bare screen id is the defaults.
 export const PROFILE_BG_PLACES=['head','page'];
 export function profileBackgroundOf(bg) {
   if(!bg)return null;
   const b=typeof bg==='string'?{id:bg}:bg;
-  return {id:b.id,place:b.place??'head',x:b.x??50,y:b.y??30,zoom:b.zoom??1,dim:b.dim??(b.place==='page'?70:45),style:b.style??null,hue:b.hue??0};
+  return {id:b.id,place:b.place??'head',x:b.x??50,y:b.y??30,zoom:b.zoom??1,dim:b.dim??(b.place==='page'?70:45),style:b.style??null,hue:b.hue??0,sig:b.sig?{translation:'none',x:50,y:50,size:5,rotation:-7,...b.sig}:null};
 }
 export function setProfileBackground(state,{background=null}={}) {
   if(background==null)return {...state,profileBackground:null};
@@ -47,6 +49,14 @@ export function setProfileBackground(state,{background=null}={}) {
   if(typeof bg.dim!=='number'||!Number.isFinite(bg.dim)||bg.dim<0||bg.dim>90)throw new Error('Choose a valid dim level.');
   if(bg.style!=null&&!CARD_STYLES.some(([id])=>id===bg.style))throw new Error('Choose a valid image style.');
   if(typeof bg.hue!=='number'||!Number.isFinite(bg.hue)||bg.hue<0||bg.hue>360)throw new Error('Choose a valid hue.');
+  if(bg.sig) {
+    const owns=(type,id)=>typeof id==='string'&&!!itemByKey(`${type}:${id}`)&&state.inventory?.[`${type}:${id}`]>0;
+    if(!owns('autograph',bg.sig.autograph))throw new Error('Collect this signature style before using it.');
+    if(bg.sig.translation!=='none'&&!owns('translation',bg.sig.translation))throw new Error('Collect this modifier before using it.');
+    for(const [k,min,max] of [['x',0,100],['y',0,100],['size',2,12],['rotation',-180,180]])
+      if(typeof bg.sig[k]!=='number'||!Number.isFinite(bg.sig[k])||bg.sig[k]<min||bg.sig[k]>max)throw new Error('Invalid signature position or size.');
+    const {autograph,translation,x,y,size,rotation}=bg.sig;bg.sig={autograph,translation,x,y,size,rotation};
+  }
   return {...state,profileBackground:bg};
 }
 export function saveCardDesign(state,raw,slot=state.primaryCard??0) {
