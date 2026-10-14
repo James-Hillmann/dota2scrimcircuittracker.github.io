@@ -2,12 +2,12 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {CATALOG,TIERS,PACK_ODDS,DEFAULT_EQUIPMENT} from '../public/lib/cosmetics-catalog.js';
 import {grantLogin,rollPack,recycleCards,equipCosmetics,saveCardDesign,setCardPreferences,cardDesignState,cardAppearance,selectedCardDesign} from '../public/lib/cosmetics-engine.js';
-import {japaneseName,cyrillicName,greekName,runicName,renderedName,signatureHtml} from '../public/lib/signatures.js';
+import {japaneseName,cyrillicName,greekName,runicName,koreanName,chineseName,thaiName,renderedName,signatureHtml} from '../public/lib/signatures.js';
 import {CosmeticsVault,cosmeticsRequest} from '../workers/steam-auth/src/cosmetics.js';
 
 test('approved collection has all tiers, no language samples in signature drops',()=>{
   assert.equal(new Set(CATALOG.map(i=>i.key)).size,CATALOG.length);
-  assert.equal(CATALOG.length,74);
+  assert.equal(CATALOG.length,77);
   assert.deepEqual(PACK_ODDS,{common:69,rare:17,epic:10,legendary:4});
   for(const tier of TIERS)assert.ok(CATALOG.some(i=>i.rarity===tier));
   for(const item of CATALOG.filter(i=>i.type==='autograph')) {assert.equal(item.sample,undefined);assert.equal(item.script,undefined);}
@@ -63,6 +63,11 @@ test('equipment requires ownership and bounded placement; signatures only use th
   assert.equal(cyrillicName('Scionara'),'скионара');
   assert.equal(greekName('Scionara'),'σκιοναρα');
   assert.equal(runicName('Scionara'),'ᛋᚲᛁᛟᚾᚨᚱᚨ');
+  assert.equal(koreanName('Scionara'),'시나라');
+  assert.equal(koreanName('Shane Young'),'샨 융');
+  assert.equal(chineseName('Topson'),'托普森');
+  assert.equal(thaiName('James'),'จาเมส');
+  for(const item of CATALOG.filter(i=>i.type==='translation'))assert.equal(item.preview,`Fav → ${renderedName('Fav',item.id)}`);
   assert.equal(renderedName('Scionara','none'),'Scionara');
   assert.equal(equipped.equipment.text,'');
   assert.match(signatureHtml(equipped.equipment,'Scionara'),/シオナラ/);

@@ -741,7 +741,7 @@ export const CATALOG = [
     "type": "translation",
     "rarity": "legendary",
     "description": "A legendary modifier that renders your name phonetically in Japanese katakana. Works with any collected signature style.",
-    "preview": "Aa → カナ"
+    "preview": "Fav → ファヴ"
   },
   {
     "id": "cyrillic",
@@ -750,7 +750,7 @@ export const CATALOG = [
     "type": "translation",
     "rarity": "legendary",
     "description": "A legendary modifier that recasts your name as a bold Cyrillic-style phonetic inscription.",
-    "preview": "Aa → Аа"
+    "preview": "Fav → фав"
   },
   {
     "id": "greek",
@@ -759,7 +759,7 @@ export const CATALOG = [
     "type": "translation",
     "rarity": "legendary",
     "description": "A legendary modifier that renders your name in a monumental Greek-inspired alphabet.",
-    "preview": "Aa → Αα"
+    "preview": "Fav → φαβ"
   },
   {
     "id": "runic",
@@ -768,7 +768,34 @@ export const CATALOG = [
     "type": "translation",
     "rarity": "legendary",
     "description": "A legendary modifier that carves your name into an Elder Futhark-inspired runic rendering.",
-    "preview": "Aa → ᚨᚨ"
+    "preview": "Fav → ᚠᚨᚹ"
+  },
+  {
+    "id": "korean",
+    "key": "translation:korean",
+    "name": "Hangul Brushwork",
+    "type": "translation",
+    "rarity": "legendary",
+    "description": "A legendary modifier that sounds your name out in Korean Hangul syllable blocks.",
+    "preview": "Fav → 파브"
+  },
+  {
+    "id": "chinese",
+    "key": "translation:chinese",
+    "name": "Hanzi Seal",
+    "type": "translation",
+    "rarity": "legendary",
+    "description": "A legendary modifier that renders your name with the characters used to transliterate names into Chinese.",
+    "preview": "Fav → 法夫"
+  },
+  {
+    "id": "thai",
+    "key": "translation:thai",
+    "name": "Thai Script",
+    "type": "translation",
+    "rarity": "legendary",
+    "description": "A legendary modifier that sounds your name out in flowing Thai script.",
+    "preview": "Fav → ฟัฟ"
   }
 ];
 export const PEN_MARKS = {
