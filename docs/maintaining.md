@@ -286,6 +286,12 @@ pins and notes drawn where the visitor made them, a clicked element found again 
 and a panel to step through the notes (`public/lib/feedback-review.js`, loaded on localhost only).
 A scheduled task on Jonah's PC (`check` / `emailed`) emails each new ticket and a daily digest.
 
+Tickets on profiles: `link FB-XXXXXX <account>` (or `none`) shows a ticket on that player's profile
+(`public/parts/profile-tickets.js`) as open; check the name on the ticket against the profile
+first. Tickets sent while signed in with Steam link themselves on the next `discord` run. `done`
+turns a linked ticket to implemented, which profiles show for a week. Profiles read the public
+`feedback_status` collection (ID, first note trimmed, status), which only this script writes.
+
 ## Editing and deleting uploads
 
 The league password (in `public/core.js`) is a speed bump, not security: the rules let any

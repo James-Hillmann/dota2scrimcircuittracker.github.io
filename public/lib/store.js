@@ -74,6 +74,15 @@ export async function saveFantasy(league, week, picks, name, captain) {
 // through that account's Steam session. hero: a hero id or null (their most played); pos: the role
 // they play now, 1–5, or null (their most played position). A Map account -> { hero, pos }.
 const cardColl = collection(getFirestore(fantasyApp), "scrimLeague", "data", "cards");
+// A player's feedback tickets and whether Fav has implemented them (feedback_status, written by
+// scripts/feedback.cjs). Implemented ones show for a week after they're done.
+export async function ticketStatus(account) {
+  const snap = await getDocs(query(collection(db, "scrimLeague", "data", "feedback_status"), where("account", "==", String(account)), limit(50)));
+  const week = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  return snap.docs.map((d) => d.data())
+    .filter((t) => t.status === "open" || (t.status === "implemented" && t.done?.toMillis() > week))
+    .sort((a, b) => (a.status === b.status ? b.sent?.toMillis() - a.sent?.toMillis() : a.status === "open" ? -1 : 1));
+}
 export async function listCards() {
   const snap = await getDocs(query(collection(db, "scrimLeague", "data", "cards"), limit(5000))).catch(()=>null);
   const cards=new Map((snap?.docs??[]).map((d) => [Number(d.data().account), { hero: d.data().hero ?? null, pos: d.data().pos ?? null, art: d.data().art ?? null, style: d.data().style ?? null, crop: d.data().crop ?? null }]));

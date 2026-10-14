@@ -4663,6 +4663,15 @@ td .gtags, .hist-games .gtags { margin-left: 4px; }
   border-radius: 50%; cursor: pointer; font-size: 26px; color: #f3ede3; background: rgba(12, 11, 10, .7); border: 1px solid rgba(255, 255, 255, .28);
 }
 .ft-big-close:focus-visible { outline: 2px solid var(--bone); outline-offset: 2px; }
+/* A player's feedback tickets on their profile (parts/profile-tickets.js). */
+.profile-tickets h3 { margin: 0 0 10px; }
+.profile-tickets ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.profile-tickets li { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 12px; align-items: baseline; padding: 8px 0; border-top: 1px solid var(--seam); }
+.profile-tickets li:first-child { border-top: 0; }
+.profile-tickets .pt-status { grid-row: span 2; font: 600 11px var(--mono); letter-spacing: .08em; text-transform: uppercase; padding: 3px 8px; border-radius: 4px; color: var(--dust); border: 1px solid var(--seam-2); }
+.profile-tickets li.implemented .pt-status { color: var(--on-accent); background: var(--jade); border-color: transparent; }
+.profile-tickets .pt-note { color: var(--bone); }
+.profile-tickets small { color: var(--dim); font: 500 11px var(--mono); }
 /* Layouts (lib/card-layout.js): a part's size, parts placed anywhere on the face, hidden parts and stats. */
 .ft-card [data-part] { zoom: var(--part-size, 1); }
 .ft-card .ft-bname .ft-name { zoom: var(--name-size, 1); }

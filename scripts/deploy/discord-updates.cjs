@@ -91,7 +91,9 @@ async function main() {
   if (!/^https:\/\/(canary\.|ptb\.)?discord(app)?\.com\/api\/webhooks\//.test(hook)) throw new Error("DISCORD_UPDATES_WEBHOOK isn't a Discord webhook URL.");
   const r = await fetch(hook + "?wait=true", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
   if (!r.ok) throw new Error(`Discord webhook ${r.status}: ${clip(await r.text(), 300)}`);
-  console.log(`Posted ${lines.length} update${lines.length === 1 ? "" : "s"}.`);
+  // The message ID, so the post can be edited later through the same webhook.
+  const { id } = await r.json().catch(() => ({}));
+  console.log(`Posted ${lines.length} update${lines.length === 1 ? "" : "s"}${id ? ` (message ${id})` : ""}.`);
 }
 
 main().catch((e) => { console.error("FAILED:", e.message); process.exit(1); });

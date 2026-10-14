@@ -17,6 +17,14 @@
 //                                                 record what the email task sent
 //   node scripts/feedback.cjs discord [--dry-run]  post tickets not sent yet, and the digest when due, to the
 //                                                 Discord webhook in DISCORD_FEEDBACK_WEBHOOK (.env.local)
+//   node scripts/feedback.cjs link FB-XXXXXX <account|none>
+//                                                 show the ticket on that player's profile (none: take it off)
+//
+// Ticket status on profiles: a linked ticket gets a public feedback_status document (its ID, its
+// first note trimmed, open or implemented) that the sender's profile lists. Tickets sent while
+// signed in with Steam link themselves on the next `discord` run; others need `link`. `done` marks
+// a linked ticket implemented, and profiles show that for a week; `discord` and `done` delete the
+// older ones.
 //
 // Which tickets were sent (email or Discord), the Discord message IDs (so `done` and the next
 // digest can delete them), and when the last digest went, is kept in .cache/feedback-state.json
@@ -87,7 +95,7 @@ async function tickets({ withShots = false } = {}) {
     const items = (await listAll(`${rel(d.name)}/items`, withShots ? null : ITEM_FIELDS))
       .map((it) => ({ n: Number(it.name.split("/").pop()), docName: it.name, ...plain(it) }))
       .sort((a, b) => a.n - b.n);
-    out.push({ id: displayId(docId), docId, docName: d.name, name: t.name, createdAt: t.createdAt, items });
+    out.push({ id: displayId(docId), docId, docName: d.name, name: t.name, uid: t.uid ?? null, createdAt: t.createdAt, items });
   }
   return out.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 }
@@ -117,7 +125,48 @@ const summary = (t) => ({
   })),
 });
 
+// ---------- ticket status on profiles ----------
+const STATUS = `${BASE}/feedback_status`;
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+const steamOf = (t) => /^steam:(\d{1,10})$/.exec(t.uid ?? "")?.[1] ?? null;
+async function getStatus(docId) {
+  try { return plain((await (await api()).get(`${STATUS}/${docId}`)).body); }
+  catch (e) { if (e.status === 404 || /404|not found/i.test(e.message)) return null; throw e; }
+}
+async function putStatus(t, account, status) {
+  const note = (t.items[0]?.note ?? "").replace(/\s+/g, " ").trim();
+  await (await api()).patch(`${STATUS}/${t.docId}`, { fields: {
+    id: { stringValue: t.id }, account: { stringValue: String(account) },
+    note: { stringValue: note.length > 160 ? `${note.slice(0, 157)}…` : note },
+    status: { stringValue: status }, sent: { timestampValue: t.createdAt },
+    done: status === "implemented" ? { timestampValue: new Date().toISOString() } : { nullValue: null },
+  } });
+}
+// Implemented tickets show for a week; after that their status goes.
+async function pruneStatus() {
+  const c = await api();
+  let n = 0;
+  for (const d of await listAll(STATUS)) {
+    const x = plain(d);
+    if (x.status === "implemented" && x.done && Date.now() - Date.parse(x.done) > WEEK_MS) { await c.delete(rel(d.name)); n++; }
+  }
+  return n;
+}
+async function autolink(all) {
+  let n = 0;
+  for (const t of all) { const a = steamOf(t); if (a && !(await getStatus(t.docId))) { await putStatus(t, a, "open"); n++; } }
+  return n;
+}
+
 const commands = {
+  async link(id, account) {
+    if (!id || !account || !/^(\d{1,10}|none)$/.test(account)) throw new Error("usage: link FB-XXXXXX <account id|none>");
+    const t = await findTicket(id);
+    if (account === "none") { await (await api()).delete(`${STATUS}/${t.docId}`).catch(() => {}); return console.log(`${t.id} is off profiles.`); }
+    await putStatus(t, account, "open");
+    console.log(`${t.id} (from ${t.name}) now shows as open on profile ${account}.`);
+  },
+
   async list() {
     const all = await tickets();
     if (!all.length) return console.log("No open tickets.");
@@ -150,6 +199,10 @@ const commands = {
     if (!id || !note) throw new Error('usage: done FB-XXXXXX "short summary of what was done"');
     const t = await findTicket(id);
     const c = await api();
+    // On the sender's profile it now reads implemented, for a week.
+    const linked = (await getStatus(t.docId))?.account ?? steamOf(t);
+    if (linked) await putStatus(t, linked, "implemented");
+    await pruneStatus();
     // Deleting a document doesn't delete its subcollection: items first, then the ticket.
     for (const it of t.items) await c.delete(rel(it.docName));
     await c.delete(rel(t.docName));
@@ -179,7 +232,7 @@ const commands = {
         } catch (e) { discord += `; couldn't update today's digest (${e.message}), delete it by hand`; }
       }
     }
-    console.log(`Deleted ${t.id} (${t.items.length} item${t.items.length === 1 ? "" : "s"}), logged it in docs/feedback-log.md, ${discord}.`);
+    console.log(`Deleted ${t.id} (${t.items.length} item${t.items.length === 1 ? "" : "s"}), logged it in docs/feedback-log.md, ${discord}.${linked ? ` Profile ${linked} shows it implemented for a week.` : ""}`);
   },
 
   async check() {
@@ -209,6 +262,7 @@ const commands = {
     const hook = webhookUrl();
     if (!hook && !dry) throw new Error("No DISCORD_FEEDBACK_WEBHOOK. Put it in .env.local in the project folder.");
     const all = await tickets();
+    if (!dry) { const linked = await autolink(all), pruned = await pruneStatus(); if (linked || pruned) console.log(`Profiles: linked ${linked} ticket(s), cleared ${pruned} older than a week.`); }
     const s = readState();
     const digestDue = new Date().getHours() >= DIGEST_HOUR && s.lastDigest !== today();
     const fresh = all.filter((t) => !s.emailed[t.id]).map(summary);
@@ -334,7 +388,7 @@ async function deleteWebhookMessage(url, id, tries = 3) {
 
 const [cmd, ...rest] = process.argv.slice(2);
 if (!commands[cmd]) {
-  console.error("usage: node scripts/feedback.cjs list | show FB-X | done FB-X \"summary\" | check | emailed [--new FB-A,FB-B] [--digest] | discord [--dry-run]");
+  console.error("usage: node scripts/feedback.cjs list | show FB-X | done FB-X \"summary\" | check | emailed [--new FB-A,FB-B] [--digest] | discord [--dry-run] | link FB-X <account|none>");
   process.exit(1);
 }
 commands[cmd](...rest).catch((e) => { console.error("FAILED:", e.message); process.exit(1); });

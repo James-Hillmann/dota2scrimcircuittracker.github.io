@@ -374,3 +374,10 @@
         && request.resource.data.i == (resource.data.i + 1) % 5
         && lastIsNewTicket();
     }
+
+    // Ticket status on the sender's profile (scripts/feedback.cjs writes it with admin access):
+    // the ticket ID, its first note trimmed, open or implemented. Public to read, never written here.
+    match /scrimLeague/data/feedback_status/{ticketId} {
+      allow read: if true;
+      allow write: if false;
+    }

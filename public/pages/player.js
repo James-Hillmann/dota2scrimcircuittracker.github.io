@@ -20,6 +20,7 @@ import { compareHtml, wireCompare } from "../parts/compare.js";
 import { radarSvg, roleScores } from "../parts/radar.js";
 import { tagContext, gameTags, tagsHtml, tagCells } from "../lib/gametags.js";
 import { mountProfileCollection } from '../parts/collection.js';
+import { mountProfileTickets } from '../parts/profile-tickets.js';
 
 // ---------- Player page ----------
 
@@ -148,6 +149,7 @@ export async function renderPlayer(src, key) {
     </dialog>` : ""}`;
   wirePlayerTabs();
   if(/^\d+$/.test(key)) mountProfileCollection(app,{account:Number(key),name:s.name,matches,team:roster?.team?.name??s.team,tier:tierOf}).catch(()=>{});
+  if(/^\d+$/.test(key)) mountProfileTickets(app,key).catch(()=>{});
   wireItemHeroes();
   wireCharts(app);
   wireTierModal();

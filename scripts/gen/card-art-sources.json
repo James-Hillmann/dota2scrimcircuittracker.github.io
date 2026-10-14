@@ -3236,7 +3236,8 @@
    "cls": "src-ls",
    "local": "_dev/wiki/ba16b626697f.webp",
    "original": "https://static.wikia.nocookie.net/dota2_gamepedia/images/6/6b/Fractured_Envoy_Loading_Screen_4x3.png/revision/latest/scale-to-width-down/600?cb=20160822135044"
-  }
+  },
+  {"id":"doodle:arcwarden-1","label":"Doodle 1","src":"img/card-art/arcwarden-doodle-1.webp","cls":"src-ls"}
  ],
  "Phantom Lancer": [
   {

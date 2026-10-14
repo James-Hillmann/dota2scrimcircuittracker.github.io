@@ -672,6 +672,8 @@ play the whole Heroic/Aegis game. Predict's "Your name" bar hides on this tab (F
   up to eight back stats in any order; the back's position bars and top heroes on or off.
 - **Full-size cards**: every card has an expand button under its flip button that opens it
   filling the screen; it still flips.
+- **Feedback on profiles**: a player's open feedback tickets show on their profile, and ones
+  Fav has implemented show "Implemented" for a week.
 - **Card ratings**: on a profile, each saved design shows how players rated it (common, rare,
   epic, legendary) and the community's pick. Signed in, you get one vote per card (changeable),
   never on your own. Votes belong to the design: changing the card starts it at none, and
