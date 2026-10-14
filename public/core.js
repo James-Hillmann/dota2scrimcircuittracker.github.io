@@ -303,7 +303,7 @@ export const SOURCES = {
     key: "scrim", kicker: "The ledger", load: allMatches, root: "#/scrims",
     link: (m) => `#/scrims/match/${m.id}`, base: "#/scrims/content",
     empty: `The ledger is empty. <a href="#/scrims/upload">Upload the first scrim</a>.`,
-    nav: [["#/scrims/", "standings", "Teams"], ["#/scrims/content", "week", "Content"], ["#/scrims/players", "players", "Players"], ["#/scrims/heroes", "heroes", "Heroes"], ["#/scrims/predict", "predict", "Predict"], ["#/scrims/gallery", "gallery", "Gallery"], ["#/scrims/upload", "upload", "Upload", "nav-cta"]],
+    nav: [["#/scrims/", "standings", "Teams"], ["#/scrims/content", "week", "Content"], ["#/scrims/players", "players", "Players"], ["#/scrims/heroes", "heroes", "Heroes"], ["#/scrims/predict", "predict", "Predict"], ["#/scrims/cards", "gallery", "Cards"], ["#/scrims/upload", "upload", "Upload", "nav-cta"]],
   },
 };
 // AD2L divisions: `ad2l` marks the PlayOn/OpenDota pages, `root` prefixes their routes
@@ -316,7 +316,7 @@ for (const [key, dv] of Object.entries(DIVISIONS)) {
     division: dv.name, kicker: `AD2L · ${dv.name}`, load: () => divGames(SOURCES[key]),
     link: (m) => `${root}/game/${m.id}`, base: `${root}/content`,
     empty: `No ticketed ${dv.short} games found yet.`,
-    nav: [[`${root}/`, "standings", "Teams"], [`${root}/content`, "week", "Content"], [`${root}/players`, "players", "Players"], [`${root}/heroes`, "heroes", "Heroes"], [`${root}/predict`, "predict", "Predict"], [`${root}/drafter`, "drafter", "Drafter"], [`${root}/gallery`, "gallery", "Gallery"], [`${root}/upload`, "upload", "Upload", "nav-cta"]],
+    nav: [[`${root}/`, "standings", "Teams"], [`${root}/content`, "week", "Content"], [`${root}/players`, "players", "Players"], [`${root}/heroes`, "heroes", "Heroes"], [`${root}/predict`, "predict", "Predict"], [`${root}/drafter`, "drafter", "Drafter"], [`${root}/cards`, "gallery", "Cards"], [`${root}/upload`, "upload", "Upload", "nav-cta"]],
   };
   // Sub-division views (#/heroic/a/..., #/heroic/b/...): same pages and league key, data
   // narrowed to that sub-division. Plain #/<key>/... is Combined.
@@ -371,9 +371,57 @@ SOURCES.all = {
   division: `${SEASON.name} All Divisions`, kicker: `AD2L · ${SEASON.name} · Every division`, load: allLoad,
   link: (m) => `${SOURCES[gameLeague.get(m.id)]?.root ?? "#/all"}/game/${m.id}`, base: "#/all/content",
   empty: "No ticketed games found yet.",
-  nav: [["#/all/", "standings", "Teams"], ["#/all/content", "week", "Content"], ["#/all/players", "players", "Players"], ["#/all/heroes", "heroes", "Heroes"], ["#/all/gallery", "gallery", "Gallery"]],
+  nav: [["#/all/", "standings", "Teams"], ["#/all/content", "week", "Content"], ["#/all/players", "players", "Players"], ["#/all/heroes", "heroes", "Heroes"], ["#/all/cards", "gallery", "Cards"]],
 };
 bySlug.all = "all";
+
+// ---------- Pages of rows ----------
+
+// A long list (table rows, a card grid) shows size items at a time, with page buttons under
+// it: Prev, the first and last pages, the ones around the current page, Next, and "Show all".
+// Lists up to a fifth over one page stay whole, so 27 rows never split 25 + 2. page is
+// where to start (-1 is everything); onChange(page) hears every switch, so a list redrawn by
+// its owner can come back on the same page. at is where the buttons go after (the list itself
+// by default; a table passes its scroll box).
+export const PAGE_SIZE = 25;
+export function pageList(list, { size = PAGE_SIZE, page = 0, at = list, onChange = null } = {}) {
+  if (!list) return;
+  list._pager?.remove();
+  list._pager = null;
+  const items = [...list.children], total = items.length, pages = Math.ceil(total / size);
+  items.forEach((it) => it.classList.remove("pg-off"));
+  if (total <= size * 1.2) return;
+  const nav = document.createElement("nav");
+  nav.className = "pager";
+  nav.setAttribute("aria-label", "Pages");
+  const btn = (pg, label, { on = false, off = false, cls = "" } = {}) =>
+    `<button type="button" class="${cls}${on ? " on" : ""}" data-pg="${pg}"${on ? ' aria-current="page"' : ""}${off ? " disabled" : ""}>${label}</button>`;
+  const show = (p) => {
+    page = p;
+    items.forEach((it, i) => it.classList.toggle("pg-off", p >= 0 && (i < p * size || i >= (p + 1) * size)));
+    if (p < 0) {
+      nav.innerHTML = `<span class="pg-range">All ${total}</span>${btn(0, "Show pages", { cls: "pg-all" })}`;
+      return;
+    }
+    const near = [...new Set([0, pages - 1, p - 1, p, p + 1])].filter((i) => i >= 0 && i < pages).sort((a, b) => a - b);
+    nav.innerHTML = btn(p - 1, "‹ Prev", { off: p === 0, cls: "pg-step" })
+      + near.map((i, j) => `${j && i - near[j - 1] > 1 ? '<span class="pg-gap">…</span>' : ""}${btn(i, i + 1, { on: i === p })}`).join("")
+      + btn(p + 1, "Next ›", { off: p === pages - 1, cls: "pg-step" })
+      + `<span class="pg-range">${p * size + 1}–${Math.min(total, (p + 1) * size)} of ${total}</span>${btn("all", "Show all", { cls: "pg-all" })}`;
+  };
+  nav.onclick = (e) => {
+    const b = e.target.closest("[data-pg]");
+    if (!b || b.disabled) return;
+    show(b.dataset.pg === "all" ? -1 : Number(b.dataset.pg));
+    onChange?.(page);
+    // From the buttons under a long page, bring the list's top back into view.
+    const top = (at === list ? list : at).getBoundingClientRect().top;
+    if (top < 0) (at === list ? list : at).scrollIntoView({ block: "start", behavior: "smooth" });
+  };
+  at.after(nav);
+  list._pager = nav;
+  show(Math.min(page, pages - 1));
+}
 
 // ---------- Leaderboards ----------
 
@@ -386,10 +434,11 @@ bySlug.all = "all";
 // density steps); if it still doesn't fit, the columns after the first (the name, which
 // stays put) are split into pages that each fit, with tabs to switch between them. It
 // refits when the table's width changes.
+// Long tables show PAGE_SIZE rows at a time (pageList); sorting goes back to the first page.
 // For the search tables (parts/tables.js): dir ("asc" | "desc") to start with, nullsLast (empty
 // values after every value, in either direction) and onSort(key, dir) after a change.
 export function sortableTable(el, columns, rows, sortKey, { toolbar = false, dir: startDir = "desc", nullsLast = false, onSort = null } = {}) {
-  let key = sortKey, dir = startDir === "asc" ? 1 : -1, density = 0, pages = null, page = 0;
+  let key = sortKey, dir = startDir === "asc" ? 1 : -1, density = 0, pages = null, page = 0, rowPage = 0;
   const max = Object.fromEntries(columns.filter((c) => c[4]).map(([k]) => [k, Math.max(...rows.map((r) => r[k] ?? 0)) || 1]));
   const labelOf = Object.fromEntries(columns.map(([k, l]) => [k, l]));
   const pageOf = (k) => pages?.findIndex((pg) => pg.includes(k)) ?? -1;
@@ -423,15 +472,17 @@ export function sortableTable(el, columns, rows, sortKey, { toolbar = false, dir
         aria-sort="${k === key ? (dir < 0 ? "descending" : "ascending") : "none"}">${label}${tip === false ? "" : info(tip ?? k)}<span class="sort-ico">${k === key ? (dir < 0 ? "▾" : "▴") : "↕"}</span></th>` : '<th scope="col"></th>').join("")}</tr></thead>
       <tbody>${sorted.map((r, i) => `<tr><td class="rank${i < 3 ? " lead" : ""}">${String(i + 1).padStart(2, "0")}</td>${cols.map((c) => cell(c, r)).join("")}</tr>`).join("")}</tbody>
     </table></div>`;
+    pageList(el.querySelector("tbody"), { page: rowPage, at: el.querySelector(".table-wrap"), onChange: (p) => (rowPage = p) });
     el.querySelectorAll("th.sortable").forEach((th) => (th.onclick = () => {
       if (th.dataset.k === key) dir = -dir; else { key = th.dataset.k; dir = -1; }
+      if (rowPage > 0) rowPage = 0;
       onSort?.(key, dir < 0 ? "desc" : "asc");
       draw();
     }));
     if (toolbar) {
       // Sorting by a column on another page flips to that page.
-      el.querySelector(".sort-key").onchange = (e) => { key = e.target.value; dir = -1; if (pageOf(key) >= 0) page = pageOf(key); onSort?.(key, "desc"); draw(); };
-      el.querySelector(".sort-dir").onclick = () => { dir = -dir; onSort?.(key, dir < 0 ? "desc" : "asc"); draw(); };
+      el.querySelector(".sort-key").onchange = (e) => { key = e.target.value; dir = -1; if (rowPage > 0) rowPage = 0; if (pageOf(key) >= 0) page = pageOf(key); onSort?.(key, "desc"); draw(); };
+      el.querySelector(".sort-dir").onclick = () => { dir = -dir; if (rowPage > 0) rowPage = 0; onSort?.(key, dir < 0 ? "desc" : "asc"); draw(); };
     }
     el.querySelectorAll(".cp-page").forEach((b) => (b.onclick = () => { page = +b.dataset.page; draw(); }));
     el.querySelectorAll(".cp-step").forEach((b) => (b.onclick = () => { page = Math.min(pages.length - 1, Math.max(0, page + +b.dataset.step)); draw(); }));

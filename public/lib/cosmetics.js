@@ -52,11 +52,12 @@ export async function cardRatings(account) {
 }
 // Every changed saved design in the league, with its ratings (the Gallery).
 export async function galleryCards() {
-  const r=await fetch(`${COLLECTION_API}/gallery`);if(!r.ok)throw new Error('Gallery unavailable.');return (await r.json()).cards;
+  const r=await fetch(`${COLLECTION_API}/gallery`);if(!r.ok)throw new Error('Cards unavailable.');return (await r.json()).cards;
 }
-// The newest epic and legendary pack pulls across the league, newest first (the Log tab).
-export async function pullLog() {
-  const r=await fetch(`${COLLECTION_API}/pulls`);if(!r.ok)throw new Error('Pull log unavailable.');return (await r.json()).pulls;
+// The Feed (lib/feed.js): a page of posts older than before (ms), or the single post.
+export async function feedPosts({before=null,post=null}={}) {
+  const q=post?`?post=${encodeURIComponent(post)}`:before?`?before=${before}`:'';
+  const r=await fetch(`${COLLECTION_API}/feed${q}`);if(!r.ok)throw new Error('Feed unavailable.');return r.json();
 }
 // The signed-in player's own votes, "<owner>:<design key>" → rating; empty when signed out.
 export async function myCardVotes() {

@@ -1,6 +1,6 @@
-import { esc, SOURCES, allLoad } from '../core.js';
+import { esc, SOURCES, allLoad, pageList } from '../core.js';
 import { steamAccount, steamLoginUrl, listCards } from '../lib/store.js';
-import { CATALOG, DEFAULT_EQUIPMENT, PARTICLE_FINISHES, collectionState, collectionAction, publicCollection, applyEquipment, cardRatings, galleryCards, myCardVotes, pullLog } from '../lib/cosmetics.js';
+import { CATALOG, DEFAULT_EQUIPMENT, PARTICLE_FINISHES, collectionState, collectionAction, publicCollection, applyEquipment, cardRatings, galleryCards, myCardVotes } from '../lib/cosmetics.js';
 import { RATINGS } from '../lib/card-ratings.js';
 import { TIERS, itemByKey } from '../lib/cosmetics-catalog.js';
 import { signatureHtml, renderedName } from '../lib/signatures.js';
@@ -14,6 +14,8 @@ import { startFeedback } from '../lib/feedback.js';
 import { showProfileBackground, mountBackgroundButton, letterCaseHtml, drawLetterCase } from './profile-background.js';
 import { FRONT_PARTS, BACK_STATS, MAX_BACK_STATS, MAX_NAME, backStats, applyLayout, shownByDefault } from '../lib/card-layout.js';
 import './pack-gifts.js'; // the "Fav sent you packs" notice
+import './feed-notice.js'; // the "new comments on your posts" notice
+import { drawFeed } from './feed.js';
 import { SCREEN_ART } from '../lib/screen-art-data.js';
 import { strangerNames } from '../lib/scout.js';
 
@@ -46,22 +48,24 @@ const screenDexHtml=(owned,status,hero,preview,empty='<p>No loading screens matc
   return `<article class="dex-item dex-screen ${have?'collected':'uncollected'}" style="--rarity:${SCREEN_PACK_COLOR}"><button type="button" class="dex-preview-choice" data-preview-screen="${s.id}" aria-pressed="${preview===s.id}" aria-label="Preview ${esc(s.label)}"><img src="${esc(art.src)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer"><span>Preview</span></button><small>Loading screen · ${esc(s.hero??'Any hero')}</small><strong>${esc(s.label)}</strong><span>${have?'Collected':'Not collected'}</span></article>`;
 }).join('')||empty;
 
-// The collection as a dialog, or with `page` (an element) as a full page: the Gallery tab
+// The collection as a dialog, or with `page` (an element) as a full page: the Cards tab
 // (pages/gallery.js), whose own sub-tab bar (`tabBar`, the site's tabs, [data-tab] buttons)
 // switches the sections. onTab hears each tab change so the address can follow it.
-export async function openCollection({tab='packs',viewAccount=null,cardHtml=null,name=null,adapter=null,page=null,tabBar=null,onTab=null}={}) {
+// focus: a Feed post to pin at the top (from a comment notice).
+export async function openCollection({tab='packs',viewAccount=null,cardHtml=null,name=null,adapter=null,page=null,tabBar=null,onTab=null,focus=null}={}) {
+  if(tab==='log')tab='feed'; // the Feed replaced the Log
   const own=adapter?.account??await steamAccount().catch(()=>null), target=viewAccount??own, editable=target!=null&&target===own;
   name=name??steamName(target)??'Your Name';
-  let state=editable?(adapter?.state??collectionState()):null, inventory={}, busy=false, filter='all', rarity='all', status='all', rewards=[], rewardScreens=[], rewardRevealed=[];
+  let state=editable?(adapter?.state??collectionState()):null, inventory={}, busy=false, filter='all', rarity='all', status='owned', rewards=[], rewardScreens=[], rewardRevealed=[];
   const action=adapter?.action??collectionAction;
-  let selectedSlot=state?.primaryCard??0, publicDesigns=null, previewItem=null, previewScreen=null, screenHero='all';
+  let selectedSlot=state?.primaryCard??0, publicDesigns=null, previewItem=null, previewScreen=null, screenHero='all', dexPage=0;
   const designs=()=>cardDesignState(state??publicDesigns??{equipment});
   const selectedEquipment=()=>({...DEFAULT_EQUIPMENT,...(designs().cardDesigns[selectedSlot]??state?.equipment??equipment)});
   let clockOffset=0, timerRetryAt=0;
   const dialog=document.createElement(page?'section':'dialog');dialog.className=page?'collection-dialog collection-page':'collection-dialog';dialog.setAttribute('aria-labelledby','collection-title');
   const closeView=()=>{if(!page)dialog.close();}, tabsHost=tabBar??dialog;
   const shownName=()=>shownNickname(state)??name;
-  dialog.innerHTML=`${page?'':`<div class="collection-head"><div><small>AD2L COLLECTION</small><h2 id="collection-title">Your collection</h2></div><div class="collection-head-actions"><button type="button" data-feedback title="Suggest a change: mark up the collection and say what you'd change">Feedback</button><button type="button" data-close aria-label="Close collection">×</button></div></div><nav class="collection-tabs" aria-label="Collection sections">${['packs','collection','customize','recycle','gallery','log'].map(t=>`<button type="button" data-tab="${t}">${t[0].toUpperCase()+t.slice(1)}</button>`).join('')}</nav>`}${page?'<p class="collection-message" role="status" aria-live="polite"></p><div class="collection-body"></div>':'<div class="collection-body"></div><p class="collection-message" role="status" aria-live="polite"></p>'}`;
+  dialog.innerHTML=`${page?'':`<div class="collection-head"><div><small>AD2L COLLECTION</small><h2 id="collection-title">Your collection</h2></div><div class="collection-head-actions"><button type="button" data-feedback title="Suggest a change: mark up the collection and say what you'd change">Feedback</button><button type="button" data-close aria-label="Close collection">×</button></div></div><nav class="collection-tabs" aria-label="Collection sections">${[['feed','Feed'],['gallery','Gallery'],['packs','Packs'],['collection','Collection'],['customize','Customize'],['recycle','Recycle']].map(([t,label])=>`<button type="button" data-tab="${t}">${label}</button>`).join('')}</nav>`}${page?'<p class="collection-message" role="status" aria-live="polite"></p><div class="collection-body"></div>':'<div class="collection-body"></div><p class="collection-message" role="status" aria-live="polite"></p>'}`;
   if(page)page.replaceChildren(dialog);
   else {document.querySelector('dialog.collection-dialog')?.close();document.querySelector('dialog.collection-dialog')?.remove();document.body.append(dialog);dialog.showModal();}
   const body=dialog.querySelector('.collection-body'), message=dialog.querySelector('.collection-message');
@@ -127,8 +131,10 @@ export async function openCollection({tab='packs',viewAccount=null,cardHtml=null
     body.querySelector('[data-shuffle]')?.addEventListener('change',async e=>{const enabled=e.target.checked;const data=await run('card-settings',{shuffleCards:enabled});draw();if(data)say(enabled?'Other viewers will see a shuffled saved design.':'Other viewers will see your primary card.');});
   }
   function draw() {
+    body._feedToken=null; // cancel a Feed request that finishes after another tab was chosen
+    body.dataset.collectionView=tab;
     tabsHost.querySelectorAll('[data-tab]').forEach(b=>{b.setAttribute(tabBar?'aria-selected':'aria-pressed',String(b.dataset.tab===tab));if(tabBar)b.tabIndex=b.dataset.tab===tab?0:-1;b.disabled=busy;});
-    if(tab==='packs')drawPacks();else if(tab==='collection')drawDex();else if(tab==='customize')drawEditor();else if(tab==='gallery')drawGallery(body,{viewer:own,signIn});else if(tab==='log')drawLog(body);else drawRecycle();
+    if(tab==='packs')drawPacks();else if(tab==='collection')drawDex();else if(tab==='customize')drawEditor();else if(tab==='gallery')drawGallery(body,{viewer:own,signIn});else if(tab==='feed'){drawFeed(body,{viewer:own,signIn,action,swatch,colors,typeLabel,ago,focus});focus=null;}else drawRecycle();
   }
   function drawPacks() {
     const packs=state?.packs??[],normal=packs.filter(p=>p==='common').length;
@@ -201,9 +207,13 @@ export async function openCollection({tab='packs',viewAccount=null,cardHtml=null
     body.querySelector('[data-customize-card]')?.addEventListener('click',()=>{equipment={...savedEquipment};initialEquipment=JSON.stringify(equipment);tab='customize';draw();});
     const oldStatus=body.querySelector('[data-status]');oldStatus.parentElement.innerHTML=`<span>Show only collected</span><input type="checkbox" data-status ${status==='owned'?'checked':''}>`;
     const f=body.querySelector('[data-filter]'),s=body.querySelector('[data-status]'),rr=body.querySelector('[data-rarity-filter]'),sh=body.querySelector('[data-screen-hero]');f.value=filter;f.querySelector('option[value="translation"]')?.replaceChildren('modifier');
-    if(rr){rr.value=rarity;rr.onchange=()=>{rarity=rr.value;drawDex();};}
-    if(sh){sh.value=screenHero;sh.onchange=()=>{screenHero=sh.value;drawDex();};}
-    f.onchange=()=>{filter=f.value;drawDex();};s.onchange=()=>{status=s.checked?'owned':'all';drawDex();};
+    // Three rows of designs a page, however many columns fit; a new filter starts at page 1.
+    const grid=body.querySelector('.dex-grid'),cols=getComputedStyle(grid).gridTemplateColumns.split(' ').filter(Boolean).length||4;
+    pageList(grid,{size:cols*3,page:dexPage,onChange:p=>dexPage=p});
+    const refilter=()=>{if(dexPage>0)dexPage=0;drawDex();};
+    if(rr){rr.value=rarity;rr.onchange=()=>{rarity=rr.value;refilter();};}
+    if(sh){sh.value=screenHero;sh.onchange=()=>{screenHero=sh.value;refilter();};}
+    f.onchange=()=>{filter=f.value;refilter();};s.onchange=()=>{status=s.checked?'owned':'all';refilter();};
     body.querySelectorAll('[data-equip]').forEach(b=>{b.onclick=async()=>{
       const item=itemByKey(b.dataset.equip),next={...savedEquipment,[item.type]:item.id};
       const data=await run('equip',{equipment:next});
@@ -544,24 +554,11 @@ async function drawGallery(body,{viewer,signIn}) {
   draw();
 }
 
-// The Log: who pulled which epic and legendary cards from packs, newest first. One line per card.
+// "5m ago" for the Feed (parts/feed.js).
 const ago=at=>{const m=Math.round((Date.now()-at)/60000);return m<1?'just now':m<60?`${m}m ago`:m<1440?`${Math.round(m/60)}h ago`:`${Math.round(m/1440)}d ago`;};
-async function drawLog(body) {
-  body.innerHTML='<p>Loading log…</p>';
-  let pulls,teams;
-  try {[pulls,teams]=await Promise.all([pullLog(),SOURCES.all.data().then(d=>d.teams).catch(()=>[])]);}
-  catch(e) {body.innerHTML=`<p>${esc(e.message)}</p>`;return;}
-  if(!body.isConnected)return;
-  const roster=new Map(teams.flatMap(t=>t.players.map(p=>[String(p.account_id),{name:p.name,league:t.league}])));
-  const lines=pulls.flatMap(p=>p.items.map(key=>({...p,item:itemByKey(key)}))).filter(l=>l.item);
-  body.innerHTML=`<div class="pull-log-head"><h3>Epic and legendary pulls</h3><p>Every epic or legendary card anyone has opened from a pack, newest first.</p></div>${lines.length?`<ol class="pull-log">${lines.map(l=>{
-    const r=roster.get(String(l.account)),who=esc(l.nickname??r?.name??steamName(Number(l.account))??`Player ${l.account}`);
-    return `<li style="--rarity:${colors[l.item.rarity]}"><span class="pull-swatch">${swatch(l.item,l.nickname??r?.name??'Name')}</span><span class="pull-text">${r?`<a href="${SOURCES[r.league]?.root??'#/all'}/player/${l.account}">${who}</a>`:`<b>${who}</b>`} pulled <strong>${esc(l.item.name)}</strong> <span class="pull-rarity">${l.item.rarity}</span><small>${esc(typeLabel(l.item.type))}</small></span><time datetime="${new Date(l.at).toISOString()}" title="${new Date(l.at).toLocaleString()}">${ago(l.at)}</time></li>`;
-  }).join('')}</ol>`:'<p>No epic or legendary pulls yet.</p>'}`;
-}
 
 // Your name on the site (lib/cosmetics-engine.js setNickname): a nickname, and which name shows on
-// your cards and profile. In Gallery › Customize and on your own profile. inGame is the name you
+// your cards and profile. In Cards › Customize and on your own profile. inGame is the name you
 // play under; action saves (collectionAction, or the dialog's own); onSaved gets the new state.
 export function mountNameEditor(host,{state,inGame,action=collectionAction,onSaved}) {
   if(!host||!state)return;

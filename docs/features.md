@@ -697,15 +697,16 @@ play the whole Heroic/Aegis game. Predict's "Your name" bar hides on this tab (F
   changing it back restores them. Your votes are kept by the Worker, so the button you pressed
   shows on any device.
 - **Nickname**: signed in, set a nickname and pick which name shows, it or your in-game name, in
-  Gallery › Customize or on your own profile (the Worker keeps it). Shown, it's the name on all
+  Cards › Customize or on your own profile (the Worker keeps it). Shown, it's the name on all
   your cards and signatures (a card's own name from its layout still wins on that card), on
   Gallery captions, and your profile title reads "Nickname (in-game name)". Plain text, up to 24.
-- **Gallery** (nav tab in every league, `#/<league>/gallery`): opens on **Everyone's cards**,
-  every saved card anyone in the league has changed from the default, each with its ratings and
-  the same vote buttons as the profile. The other sub-tabs (Packs, Collection, Customize,
-  Recycle; `#/<league>/gallery/<tab>`) are your own collection on a full page, the same as the
-  collection dialog; the top bar's gift button opens Gallery › Packs. The dialog still opens from
-  Fantasy and profiles, and has the gallery as its last tab. Sort by voted rarity
+- **Cards** (nav tab in every league, `#/<league>/cards`; was Gallery, `/gallery` still works):
+  opens on the **Feed**. **Gallery** (`#/<league>/cards/gallery`) is every saved card
+  anyone in the league has changed from the default, each with its ratings and the same vote
+  buttons as the profile. The other sub-tabs (Packs, Collection, Customize, Recycle;
+  `#/<league>/cards/<tab>`) are your own collection on a full page, the same as the collection
+  dialog; the top bar's gift button opens Cards › Packs. The dialog still opens from Fantasy and
+  profiles, with the same tab order. Sort by voted rarity
   (legendary first; among equals, the clearer verdict, then more votes), most votes, or player
   name. Signed in, "Not rated by me" leaves the cards you can still rate. Names link to profiles.
 - **Loading screen packs**: each contains five unowned screens and no card items. All 443 screens

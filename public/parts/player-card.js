@@ -7,6 +7,7 @@ import { teamLogoHtml } from "../lib/team-logos.js";
 import { cosmeticAttributes, cosmeticLayers, playerEquipment, playerNickname } from '../lib/cosmetics.js';
 import { BACK_STATS, backStats, partState } from '../lib/card-layout.js';
 import { plusSlot } from "../lib/hero-levels.js";
+import { tierList, tierModel, LIVE } from "../lib/tiers.js";
 
 // The cards' hero art filters. Each hero has its own art and style (lib/hero-art.js, picked by
 // Fav; styles in style.css .ft-card[data-style]). The default, stencil, is a print to match the
@@ -89,14 +90,20 @@ const MEDALS = ["Herald", "Guardian", "Crusader", "Archon", "Legend", "Ancient",
 const medal = (t) => (!t ? "—" : t >= 80 ? "Immortal" : `${MEDALS[Math.floor(t / 10) - 1] ?? "—"} ${t % 10 || ""}`.trim());
 const kShort = (n) => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(Math.round(n)));
 
-export function createPlayerCards(matches, { cards = new Map(), teams = [], tiers = new Map(), locked = true } = {}) {
+// Every player's live tier and rating from these games, as on Fantasy (key: account id string).
+export const liveTiers = (matches) => new Map(tierList(matches, { model: tierModel(matches, { version: LIVE }) }).tiers.flatMap(({ tier, players }) => players.map((p) => [p.key, { tier, rating: p.rating }])));
+
+// Without `tiers`, each card's tier comes from liveTiers(matches), worked out on first need.
+export function createPlayerCards(matches, { cards = new Map(), teams = [], tiers = null, locked = true } = {}) {
+  let tierMap = tiers;
+  const tierOf = (a) => (tierMap ??= liveTiers(matches)).get(String(a));
   const mainPos = mainPositions(matches), stats = cardStats(matches);
   const teamIdOf = new Map(teams.flatMap((t) => t.players.map((p) => [p.account_id, t.id])));
   const roleOf = (a, ov = cards.get(a)) => ov?.pos ?? mainPos.get(a);
   const card = (p, slot, { own = false, ov = cards.get(p.account), tier = null, nameHtml = null, equipmentOverride = null } = {}) => {
     const equipment=equipmentOverride??playerEquipment(p.account,ov?.cosmetics);
     if(equipment?.baseCard)ov={...ov,...equipment.baseCard};
-    const st = stats.get(p.account), t = tier ?? tiers.get(String(p.account)), top = st?.top ?? [], g = st?.games ?? 0;
+    const st = stats.get(p.account), t = tier ?? tierOf(p.account), top = st?.top ?? [], g = st?.games ?? 0;
     const face = heroById(ov?.hero)?.name ?? top[0]?.hero, faceRec = face && st?.heroes.get(face);
     const ha = face && cardArtwork(face, ov), art = ha?.src ?? (face && heroVert(face)), wide = face && heroImg(face);
     const cropStyle = ha?.crop ? `--art-x:${ha.crop.x}%;--art-y:${ha.crop.y}%;--art-zoom:${ha.crop.zoom};` : "";
@@ -207,13 +214,16 @@ export function showBigCard(c) {
   copy.querySelector(".ft-turn")?.focus();
 }
 const wired = new WeakSet();
-export function wirePlayerCards(host) {
+// openOnCard makes the card itself open the full-screen view. The normal card grids still flip
+// on a face click; the Feed uses this option because its cards are posts to inspect, not picks.
+export function wirePlayerCards(host, { openOnCard = false } = {}) {
   if (wired.has(host)) return;
   wired.add(host);
   host.addEventListener("click", (ev) => {
     const c = ev.target.closest(".ft-card");
     if (c && ev.target.closest(".ft-expand")) { showBigCard(c); return; }
     if (!c || ev.target.closest("a, .ft-pickbtn, .card-autograph") || c.closest('[data-card-editor]')) return;
+    if (openOnCard && !ev.target.closest(".ft-turn")) { showBigCard(c); return; }
     flipPlayerCard(c, !c.classList.contains("flipped"));
   });
   host.addEventListener("error", (ev) => {
