@@ -1,5 +1,5 @@
 // Cache the pack catalog's Steam artwork as site assets. Run after gen-screen-art.js.
-import {mkdir,writeFile} from 'node:fs/promises';
+import {mkdir,writeFile,access} from 'node:fs/promises';
 import sharp from 'sharp';
 import {SCREEN_ART} from '../../public/lib/screen-art-data.js';
 const directory=new URL('../../public/img/loading-screens/',import.meta.url);
@@ -8,6 +8,8 @@ let cursor=0;const failed=[];
 await Promise.all(Array.from({length:8},async()=>{
   while(cursor<SCREEN_ART.length){
     const screen=SCREEN_ART[cursor++];
+    // Already cached: keep the published file as is.
+    if(await access(new URL(`${screen.id.slice(4)}.webp`,directory)).then(()=>true,()=>false))continue;
     try {
       const response=await fetch(`https://community.fastly.steamstatic.com/economy/image/${screen.icon}`,{signal:AbortSignal.timeout(30000)});
       if(!response.ok)throw new Error(`HTTP ${response.status}`);

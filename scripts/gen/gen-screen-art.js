@@ -14,12 +14,16 @@ const scan = JSON.parse(await readFile(process.argv[2], "utf8"));
 // "Fall 2016 Battle Pass II": drop quality prefixes and the words "loading screen (of)".
 const norm = (x) => x.toLowerCase().replace(/^(genuine|autographed|inscribed|heroic|frozen|corrupted|exalted|unusual|elder|cursed|auspicious)\s+/, "").replace(/loading screen( of)?/g, "").replace(/[^a-z0-9]/g, "");
 const free = new Set(Object.values(CARD_ART).flat().map((a) => norm(a.label)));
+// Screens already published come first in every repeat check, so a new find never displaces one
+// that players may own.
+const idOf = (key) => `scr:${createHash("sha1").update(key).digest("hex").slice(0, 12)}`;
+const previous = new Set((await import("../../public/lib/screen-art-data.js").catch(() => ({ SCREEN_ART: [] }))).SCREEN_ART.map((s) => s.id));
 const icons = new Set(), screens = [];
-for (const [key, a] of Object.entries(scan.art).sort(([a], [b]) => a.localeCompare(b))) {
+for (const [key, a] of Object.entries(scan.art).sort(([a], [b]) => previous.has(idOf(b)) - previous.has(idOf(a)) || a.localeCompare(b))) {
   if (!a.icon || free.has(norm(a.name)) || icons.has(a.icon)) continue;
   icons.add(a.icon);
   const label = a.name.replace(/\s*[-:]?\s*Loading Screen$/, "").replace(/ Loading Screen - /, ": ").trim();
-  screens.push({ id: `scr:${createHash("sha1").update(key).digest("hex").slice(0, 12)}`, label, rarity: a.rarity ?? "Common", icon: a.icon });
+  screens.push({ id: idOf(key), key, label, rarity: a.rarity ?? "Common", icon: a.icon });
 }
 // Same picture under another name (a re-released team wallpaper, a "- Proximity" copy): compare
 // 64-bit difference hashes and keep the first. Distance 0 or 1 only; series that share a frame
@@ -42,6 +46,10 @@ for (let i = screens.length - 1; i >= 0; i--) {
   const h = screenHashes[i];
   if (h != null && (kept.some((k) => near(h, k)) || screenHashes.slice(0, i).some((k) => k != null && near(h, k)))) { console.log(`Same image: ${screens[i].label}`); screens.splice(i, 1); }
 }
+const lost = [...previous].filter((id) => !screens.some((s) => s.id === id));
+if (lost.length) throw new Error(`Published screens would be dropped: ${lost.join(", ")}`);
+screens.sort((a, b) => a.key.localeCompare(b.key));
+for (const s of screens) delete s.key;
 const tagsFile = new URL("screen-heroes.json", import.meta.url);
 let heroes = {};
 if (process.argv[4]) {
