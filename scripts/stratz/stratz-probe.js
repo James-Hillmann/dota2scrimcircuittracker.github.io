@@ -49,3 +49,18 @@ for (const h of hits) console.log(`  ${h}`);
 const me = await stratz(`query ($id: Long!) { player(steamAccountId: $id) { steamAccount { id name } matchCount } }`, { id: account })
   .catch((e) => ({ error: e.message }));
 console.log(`\nPlayer ${account}:`, JSON.stringify(me));
+
+// The per-player Dota Plus list: its fields, then the player's own rows with every scalar field.
+const isList = (t) => { for (; t; t = t.ofType) if (t.kind === "LIST") return true; return false; };
+const plusField = types.get("PlayerType")?.fields.find((f) => f.name === "dotaPlus");
+const plusType = types.get(named(plusField?.type));
+if (plusType) {
+  console.log(`\nPlayerType.dotaPlus is ${isList(plusField.type) ? "a list of" : "one"} ${plusType.name}:`);
+  for (const f of plusType.fields) console.log(`  ${f.name}: ${named(f.type)}${isList(f.type) ? "[]" : ""}`);
+  const scalars = plusType.fields.filter((f) => ["SCALAR", "ENUM"].includes(types.get(named(f.type))?.kind)).map((f) => f.name);
+  const rows = await stratz(`query ($id: Long!) { player(steamAccountId: $id) { dotaPlus { ${scalars.join(" ")} } } }`, { id: account })
+    .then((d) => d.player?.dotaPlus).catch((e) => ({ error: e.message }));
+  const list = Array.isArray(rows) ? rows : [rows];
+  console.log(`\n${account}'s dotaPlus rows (${list.length}, first 15):`);
+  for (const r of list.slice(0, 15)) console.log(`  ${JSON.stringify(r)}`);
+}
