@@ -5,6 +5,10 @@ main = "src/index.js"
 compatibility_date = "2026-09-01"
 workers_dev = true
 
+# Workers AI: the Feed's image filter (src/image-check.js).
+[ai]
+binding = "AI"
+
 [[durable_objects.bindings]]
 name = "COSMETICS"
 class_name = "CosmeticsVault"

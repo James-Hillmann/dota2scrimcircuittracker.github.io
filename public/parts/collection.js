@@ -48,7 +48,7 @@ const screenDexHtml=(owned,status,hero,preview,empty='<p>No loading screens matc
   return `<article class="dex-item dex-screen ${have?'collected':'uncollected'}" style="--rarity:${SCREEN_PACK_COLOR}"><button type="button" class="dex-preview-choice" data-preview-screen="${s.id}" aria-pressed="${preview===s.id}" aria-label="Preview ${esc(s.label)}"><img src="${esc(art.src)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer"><span>Preview</span></button><small>Loading screen · ${esc(s.hero??'Any hero')}</small><strong>${esc(s.label)}</strong><span>${have?'Collected':'Not collected'}</span></article>`;
 }).join('')||empty;
 
-// The collection as a dialog, or with `page` (an element) as a full page: the Cards tab
+// The collection as a dialog, or with `page` (an element) as a full page: the Gallery tab
 // (pages/gallery.js), whose own sub-tab bar (`tabBar`, the site's tabs, [data-tab] buttons)
 // switches the sections. onTab hears each tab change so the address can follow it.
 // focus: a Feed post to pin at the top (from a comment notice).
@@ -443,7 +443,9 @@ addEventListener('collection-change',e=>updateGift(e.detail.state));
 addEventListener('pack-offer-change',()=>updateGift(collectionState()));
 
 export async function mountProfileCollection(host,{account,name,matches,team,tier}) {
-  const section=document.createElement('section');section.className='profile-collection panel';section.innerHTML='<h3>Card collection</h3><p>Loading collection…</p>';host.querySelector('.page-head')?.after(section);
+  const section=document.createElement('section');section.className='profile-collection panel';section.innerHTML='<h3>Card collection</h3><p>Loading collection…</p>';
+  // On a tabbed profile it heads the Feed tab only; the scouted page (no tabs) shows it under the head.
+  const feedTab=host.querySelector('#pp-panel-feed');if(feedTab)feedTab.prepend(section);else host.querySelector('.page-head')?.after(section);
   try {
     const [data,cards]=await Promise.all([publicCollection(account).catch(()=>({inventory:{},unavailable:true})),listCards().catch(()=>new Map())]);if(!section.isConnected)return;
     if(data.equipment)cards.set(account,{...cards.get(account),cosmetics:{...data.equipment,nickname:data.nickname??null}});
@@ -506,7 +508,8 @@ async function mountRatings(section,account) {
 
 // The Gallery: every saved card anyone in the league has changed, with its rating. Sorted by the
 // community's rating (legendary first; among equals, the clearer verdict, then more votes), by
-// votes, by newest change, or by name. "Not rated by me" leaves the cards a signed-in player can still rate.
+// votes, by newest change (the default), or by name; the sort is remembered in this browser. "Not rated
+// by me" leaves the cards a signed-in player can still rate. Three rows a page.
 const PICK_RANK={legendary:4,epic:3,rare:2,common:1};
 async function drawGallery(body,{viewer,signIn}) {
   body.innerHTML='<p>Loading gallery…</p>';
@@ -526,7 +529,19 @@ async function drawGallery(body,{viewer,signIn}) {
   let lastSeen=0;
   try {lastSeen=Number(localStorage.getItem('gallery-seen'))||0;localStorage.setItem('gallery-seen',String(Date.now()));} catch {}
   const isNew=c=>c.at>lastSeen&&String(c.account)!==String(viewer);
-  let sort='rarity',unrated=false;
+  const SORTS=['newest','rarity','votes','name'];
+  let sort='newest',unrated=false,page=0;
+  try {const saved=localStorage.getItem('gallery-sort');if(SORTS.includes(saved))sort=saved;} catch {}
+  // Pages hold three rows of however many columns fit; a resize re-pages from the same first card.
+  const paginate=()=>{
+    const grid=body.querySelector('.gallery-grid');if(!grid)return;
+    const cols=Math.max(1,getComputedStyle(grid).gridTemplateColumns.split(' ').filter(Boolean).length),size=cols*3;
+    if(grid._size&&grid._size!==size&&page>=0)page=Math.floor(page*grid._size/size);
+    grid._size=size;pageList(grid,{size,page,slack:1,onChange:p=>{page=p;}});
+  };
+  let resizeTimer,width=body.clientWidth;const run=body._galleryRun={};
+  const watch=new ResizeObserver(()=>{if(!body.isConnected||body._galleryRun!==run||body.dataset.collectionView!=='gallery'){watch.disconnect();return;}if(body.clientWidth===width)return;width=body.clientWidth;clearTimeout(resizeTimer);resizeTimer=setTimeout(paginate,150);});
+  watch.observe(body);
   const draw=()=>{
     const shown=cards.filter(c=>!unrated||(String(c.account)!==String(viewer)&&votes[`${c.account}:${c.key}`]==null)).sort((a,b)=>
       (sort==='rarity'?(PICK_RANK[b.pick]??0)-(PICK_RANK[a.pick]??0)||share(b)-share(a)||b.total-a.total
@@ -534,20 +549,20 @@ async function drawGallery(body,{viewer,signIn}) {
       :sort==='newest'?(b.at??0)-(a.at??0)
       :0)||nameOf(a).localeCompare(nameOf(b))||a.slot-b.slot);
     const fresh=shown.filter(isNew).length;
-    body.innerHTML=`<div class="gallery-bar"><label>Sort <select data-gallery-sort><option value="rarity">Rarity (voted)</option><option value="votes">Most votes</option><option value="newest">Newest</option><option value="name">Player name</option></select></label>
+    body.innerHTML=`<div class="gallery-bar"><label>Sort <select data-gallery-sort><option value="newest">Newest</option><option value="rarity">Rarity (voted)</option><option value="votes">Most votes</option><option value="name">Player name</option></select></label>
       ${viewer!=null?`<label class="gallery-unrated"><input type="checkbox" data-gallery-unrated${unrated?' checked':''}> Not rated by me</label>`:'<button type="button" class="linkish" data-signin>Sign in with Steam to rate cards</button>'}
       <span class="gallery-count">${fresh?`<b class="gallery-fresh">${fresh} new</b> · `:''}${shown.length} card${shown.length===1?'':'s'}</span></div>
-      <div class="gallery-grid">${PAINT_FILTER}${shown.map(c=>{
+      ${PAINT_FILTER}<div class="gallery-grid">${shown.map(c=>{
         const r=roster.get(c.account),player={account:Number(c.account),name:nameOf(c),team:r?.team??'AD2L'};
         const link=`${SOURCES[r?.league]?.root??'#/all'}/player/${c.account}`; // every Steam player has a profile (parts/scouted.js)
         return `<figure data-gallery="${c.account}:${c.slot}"${isNew(c)?' class="gallery-new"':''}>${renderer.card(player,null,{own:true,equipmentOverride:c.design}).replace('data-pick=',`data-design-slot="${c.slot}" data-pick=`)}<figcaption>${isNew(c)?'<span class="gallery-new-tag">New</span> ':''}${link?`<a href="${link}">${esc(player.name)}</a>`:esc(player.name)} · Card ${c.slot+1}${c.primary?' · Primary':''}</figcaption></figure>`;
       }).join('')||`<p>${unrated?"You've rated every card here.":'No custom cards yet.'}</p>`}</div>`;
     body.querySelector('[data-gallery-sort]').value=sort;
-    body.querySelector('[data-gallery-sort]').onchange=e=>{sort=e.target.value;draw();};
-    body.querySelector('[data-gallery-unrated]')?.addEventListener('change',e=>{unrated=e.target.checked;draw();});
+    body.querySelector('[data-gallery-sort]').onchange=e=>{sort=e.target.value;page=0;try {localStorage.setItem('gallery-sort',sort);} catch {}draw();};
+    body.querySelector('[data-gallery-unrated]')?.addEventListener('change',e=>{unrated=e.target.checked;page=0;draw();});
     body.querySelector('[data-signin]')?.addEventListener('click',signIn);
     body.querySelectorAll('.gallery-grid figcaption a').forEach(a=>a.addEventListener('click',()=>body.closest('dialog.collection-dialog')?.close()));
-    const grid=body.querySelector('.gallery-grid');wirePlayerCards(grid);
+    const grid=body.querySelector('.gallery-grid');wirePlayerCards(grid);paginate();
     // A vote updates that card's numbers in place; the order holds until the sort or filter changes.
     for(const c of shown)mountRating(grid.querySelector(`[data-gallery="${c.account}:${c.slot}"]`),c.account,c,{viewer,votes,onVote:next=>Object.assign(c,next)});
   };
@@ -557,8 +572,23 @@ async function drawGallery(body,{viewer,signIn}) {
 // "5m ago" for the Feed (parts/feed.js).
 const ago=at=>{const m=Math.round((Date.now()-at)/60000);return m<1?'just now':m<60?`${m}m ago`:m<1440?`${Math.round(m/60)}h ago`:`${Math.round(m/1440)}d ago`;};
 
+// A profile's Feed tab (parts/feed.js with `account`): that player's posts, and on your own
+// profile your auto-post settings. box sits in the tab's panel; the feed loads the first time the
+// panel shows.
+export async function mountProfileFeed(box,account) {
+  const panel=box.closest('[hidden]')??box.closest('.pp-panel');
+  if(panel?.hidden) {
+    await new Promise(resolve=>{const watch=new MutationObserver(()=>{if(!panel.hidden){watch.disconnect();resolve();}});watch.observe(panel,{attributes:true,attributeFilter:['hidden']});});
+    if(!box.isConnected)return;
+  }
+  const body=document.createElement('div');body.className='collection-body';body.dataset.collectionView='feed';
+  const wrap=document.createElement('section');wrap.className='collection-dialog collection-page profile-feed';wrap.append(body);box.replaceChildren(wrap);
+  const viewer=await steamAccount().catch(()=>null);
+  await drawFeed(body,{viewer,signIn:startSteamSignIn,action:collectionAction,swatch,colors,typeLabel,ago,account:String(account)});
+}
+
 // Your name on the site (lib/cosmetics-engine.js setNickname): a nickname, and which name shows on
-// your cards and profile. In Cards › Customize and on your own profile. inGame is the name you
+// your cards and profile. In Gallery › Customize and on your own profile. inGame is the name you
 // play under; action saves (collectionAction, or the dialog's own); onSaved gets the new state.
 export function mountNameEditor(host,{state,inGame,action=collectionAction,onSaved}) {
   if(!host||!state)return;

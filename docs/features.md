@@ -691,24 +691,48 @@ play the whole Heroic/Aegis game. Predict's "Your name" bar hides on this tab (F
   filling the screen; it still flips.
 - **Feedback on profiles**: a player's open feedback tickets show on their profile, and ones
   Fav has implemented show "Implemented" for a week.
+- **Profile Feed**: a **Feed** tab on every player profile (a Feed section on the page of a Steam
+  player on no roster) shows only that player's posts, saved cards and pulls, with the same
+  reactions and comments. No post box there; a link goes to Gallery › Feed. On your own profile,
+  **Auto-post to my feed** chooses what the site posts for you: new card designs (on to start),
+  pack pulls by rarity (common, rare, epic, legendary; epic and legendary to start) and loading
+  screens (off to start). Changes apply to new posts; old ones stay until you delete them, and
+  you can delete any of your own there.
 - **Card ratings**: on a profile, each saved design shows how players rated it (common, rare,
   epic, legendary) and the community's pick. Signed in, you get one vote per card (changeable),
   never on your own. Votes belong to the design: changing the card starts it at none, and
   changing it back restores them. Your votes are kept by the Worker, so the button you pressed
   shows on any device.
 - **Nickname**: signed in, set a nickname and pick which name shows, it or your in-game name, in
-  Cards › Customize or on your own profile (the Worker keeps it). Shown, it's the name on all
+  Gallery › Customize or on your own profile (the Worker keeps it). Shown, it's the name on all
   your cards and signatures (a card's own name from its layout still wins on that card), on
   Gallery captions, and your profile title reads "Nickname (in-game name)". Plain text, up to 24.
-- **Cards** (nav tab in every league, `#/<league>/cards`; was Gallery, `/gallery` still works):
-  opens on the **Feed**. **Gallery** (`#/<league>/cards/gallery`) is every saved card
+- **Gallery** (nav tab in every league, `#/<league>/gallery`; `/cards` still works):
+  opens on the **Feed**: player posts, newly saved cards and pack pulls (what each player
+  auto-posts; see Profile Feed), newest first. Signed in, the post box takes text (Dota emoticon codes work), up to 4 images (pick,
+  paste or drop; shrunk in the browser), a clip link (YouTube, Twitch and Streamable play in the
+  post behind a play button; Medal and Allstar show as a link) and **Highlight a game**: one of
+  your league games, shown with hero, K/D/A, result and badges worked out from the season's data
+  (Rampage, Ultra kill, League-best and Career-high kills/KDA/GPM/damage/last hits, Deathless).
+  Delete any of your own posts, saved cards and pulls included. React to a post with a tap (hold for all the Dota emoticons) and
+  comment under it. **Comment threads**: **Reply** under any comment (one level; replying to a
+  reply joins its thread), and each comment has a small reaction button that works the same
+  way. A comment's writer hears about replies, a post's owner about new comments. The writer,
+  the post's owner or Fav can **Remove** a comment; one with replies shows "Comment removed"
+  and goes once its last reply does. **Unfollow** on anyone's post hides all their posts from your Feed;
+  the "unfollowed players" list above the feed follows them again. Moderation: posts and
+  comments go through a word filter (slurs and explicit terms, disguises undone; ordinary
+  swearing passes), images through an AI check (nudity, real gore, hate symbols), and Fav can
+  delete any post and **Ban** a player from posting, commenting and reacting for some days or
+  until lifted (list with Unban above the feed). **Gallery** sub-tab (`#/<league>/gallery/gallery`) is every saved card
   anyone in the league has changed from the default, each with its ratings and the same vote
   buttons as the profile. The other sub-tabs (Packs, Collection, Customize, Recycle;
-  `#/<league>/cards/<tab>`) are your own collection on a full page, the same as the collection
-  dialog; the top bar's gift button opens Cards › Packs. The dialog still opens from Fantasy and
-  profiles, with the same tab order. Sort by voted rarity
+  `#/<league>/gallery/<tab>`) are your own collection on a full page, the same as the collection
+  dialog; the top bar's gift button opens Gallery › Packs. The dialog still opens from Fantasy and
+  profiles, with the same tab order. Three rows of cards a page, with page buttons under
+  them (columns follow the screen width). Sort by newest (the default), voted rarity
   (legendary first; among equals, the clearer verdict, then more votes), most votes, or player
-  name. Signed in, "Not rated by me" leaves the cards you can still rate. Names link to profiles.
+  name; the sort you pick is remembered in that browser. Signed in, "Not rated by me" leaves the cards you can still rate. Names link to profiles.
 - **Loading screen packs**: each contains five unowned screens and no card items. All 443 screens
   have equal drop chances. Every Steam player receives three packs once on their next visit,
   including new sign-ups, with a "Fav sent you" notice. Normal card packs also include two

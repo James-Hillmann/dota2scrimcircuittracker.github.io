@@ -303,7 +303,7 @@ export const SOURCES = {
     key: "scrim", kicker: "The ledger", load: allMatches, root: "#/scrims",
     link: (m) => `#/scrims/match/${m.id}`, base: "#/scrims/content",
     empty: `The ledger is empty. <a href="#/scrims/upload">Upload the first scrim</a>.`,
-    nav: [["#/scrims/", "standings", "Teams"], ["#/scrims/content", "week", "Content"], ["#/scrims/players", "players", "Players"], ["#/scrims/heroes", "heroes", "Heroes"], ["#/scrims/predict", "predict", "Predict"], ["#/scrims/cards", "gallery", "Cards"], ["#/scrims/upload", "upload", "Upload", "nav-cta"]],
+    nav: [["#/scrims/", "standings", "Teams"], ["#/scrims/content", "week", "Content"], ["#/scrims/players", "players", "Players"], ["#/scrims/heroes", "heroes", "Heroes"], ["#/scrims/predict", "predict", "Predict"], ["#/scrims/gallery", "gallery", "Gallery"], ["#/scrims/upload", "upload", "Upload", "nav-cta"]],
   },
 };
 // AD2L divisions: `ad2l` marks the PlayOn/OpenDota pages, `root` prefixes their routes
@@ -316,7 +316,7 @@ for (const [key, dv] of Object.entries(DIVISIONS)) {
     division: dv.name, kicker: `AD2L · ${dv.name}`, load: () => divGames(SOURCES[key]),
     link: (m) => `${root}/game/${m.id}`, base: `${root}/content`,
     empty: `No ticketed ${dv.short} games found yet.`,
-    nav: [[`${root}/`, "standings", "Teams"], [`${root}/content`, "week", "Content"], [`${root}/players`, "players", "Players"], [`${root}/heroes`, "heroes", "Heroes"], [`${root}/predict`, "predict", "Predict"], [`${root}/drafter`, "drafter", "Drafter"], [`${root}/cards`, "gallery", "Cards"], [`${root}/upload`, "upload", "Upload", "nav-cta"]],
+    nav: [[`${root}/`, "standings", "Teams"], [`${root}/content`, "week", "Content"], [`${root}/players`, "players", "Players"], [`${root}/heroes`, "heroes", "Heroes"], [`${root}/predict`, "predict", "Predict"], [`${root}/drafter`, "drafter", "Drafter"], [`${root}/gallery`, "gallery", "Gallery"], [`${root}/upload`, "upload", "Upload", "nav-cta"]],
   };
   // Sub-division views (#/heroic/a/..., #/heroic/b/...): same pages and league key, data
   // narrowed to that sub-division. Plain #/<key>/... is Combined.
@@ -371,7 +371,7 @@ SOURCES.all = {
   division: `${SEASON.name} All Divisions`, kicker: `AD2L · ${SEASON.name} · Every division`, load: allLoad,
   link: (m) => `${SOURCES[gameLeague.get(m.id)]?.root ?? "#/all"}/game/${m.id}`, base: "#/all/content",
   empty: "No ticketed games found yet.",
-  nav: [["#/all/", "standings", "Teams"], ["#/all/content", "week", "Content"], ["#/all/players", "players", "Players"], ["#/all/heroes", "heroes", "Heroes"], ["#/all/cards", "gallery", "Cards"]],
+  nav: [["#/all/", "standings", "Teams"], ["#/all/content", "week", "Content"], ["#/all/players", "players", "Players"], ["#/all/heroes", "heroes", "Heroes"], ["#/all/gallery", "gallery", "Gallery"]],
 };
 bySlug.all = "all";
 
@@ -379,18 +379,19 @@ bySlug.all = "all";
 
 // A long list (table rows, a card grid) shows size items at a time, with page buttons under
 // it: Prev, the first and last pages, the ones around the current page, Next, and "Show all".
-// Lists up to a fifth over one page stay whole, so 27 rows never split 25 + 2. page is
+// Lists up to a fifth over one page stay whole, so 27 rows never split 25 + 2 (slack: 1 pages
+// strictly). page is
 // where to start (-1 is everything); onChange(page) hears every switch, so a list redrawn by
 // its owner can come back on the same page. at is where the buttons go after (the list itself
 // by default; a table passes its scroll box).
 export const PAGE_SIZE = 25;
-export function pageList(list, { size = PAGE_SIZE, page = 0, at = list, onChange = null } = {}) {
+export function pageList(list, { size = PAGE_SIZE, page = 0, at = list, onChange = null, slack = 1.2 } = {}) {
   if (!list) return;
   list._pager?.remove();
   list._pager = null;
   const items = [...list.children], total = items.length, pages = Math.ceil(total / size);
   items.forEach((it) => it.classList.remove("pg-off"));
-  if (total <= size * 1.2) return;
+  if (total <= size * slack) return;
   const nav = document.createElement("nav");
   nav.className = "pager";
   nav.setAttribute("aria-label", "Pages");

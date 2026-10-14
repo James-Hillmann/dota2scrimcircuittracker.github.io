@@ -4,9 +4,11 @@
 // stores it all and runs these rules; the browser only renders.
 //
 // Post ids: "c:<account>:<slot>:<first saved ms>" for a card, "p:<pull key after 'pull:'>" for a
-// pack pull (cosmetics.js pullKey). Both name the poster, who gets the comment notices.
+// pack pull (cosmetics.js pullKey), "u:<account>:<ms>" for a player's own post. All name the
+// poster, who gets the comment notices.
 
 import { DOTA_EMOTICONS, dotaEmoticonLabel, dotaEmoticonSrc } from './dota-emoticons.js';
+import { checkText } from './moderation.js';
 
 const CORE_REACTIONS = ['❤️', '🔥', '😂', '😮', '👏', '💀', '😡', '😢', '😎', '🤦', '😭', '🏳️'];
 // The larger in-game catalog uses its Dota chat code as the stored key. Keeping the original
@@ -46,11 +48,11 @@ export const REPOST_WINDOW = 30 * 60 * 1000;
 // The shortest gap between one player's comments.
 export const COMMENT_GAP = 3000;
 
-const POST_RE = /^(c:\d{1,10}:[0-2]:\d{1,15}|p:\d{15}:\d{1,10}:[\w-]{16,80})$/;
+const POST_RE = /^(c:\d{1,10}:[0-2]:\d{1,15}|u:\d{1,10}:\d{1,15}|p:\d{15}:\d{1,10}:[\w-]{16,80})$/;
 export const isPostId = (id) => typeof id === 'string' && POST_RE.test(id);
 export function postOwner(id) {
   if (!isPostId(id)) throw new Error('Choose a post.');
-  return id.split(':')[id.startsWith('c:') ? 1 : 2];
+  return id.split(':')[id.startsWith('p:') ? 2 : 1];
 }
 
 // Reactions: account → the emojis they picked. Picking one again takes it back.
@@ -85,18 +87,46 @@ export function cleanComment(text) {
   const clean = String(text ?? '').replace(/\s+/g, ' ').trim();
   if (!clean) throw new Error('Write a comment first.');
   if (clean.length > MAX_COMMENT) throw new Error(`Keep comments to ${MAX_COMMENT} characters.`);
-  return clean;
+  return checkText(clean);
 }
-export function addComment(comments, { account, text, at }) {
-  const comment = { id: `${at.toString(36)}-${account}`, account, text: cleanComment(text), at };
-  return { comments: [...(comments ?? []), comment].slice(-MAX_COMMENTS), comment };
+// Threads are one level deep: a comment may carry `reply`, the id of the top-level comment it
+// answers. Replying to a reply joins the same thread. `parent` is the comment being answered, so
+// the caller can tell its writer.
+export function addComment(comments, { account, text, at, reply = null }) {
+  const list = comments ?? [];
+  let parent = null, thread = null;
+  if (reply != null && reply !== '') {
+    parent = list.find((x) => x.id === String(reply));
+    if (!parent || parent.removed) throw new Error('That comment is gone.');
+    thread = parent.reply ?? parent.id;
+  }
+  const comment = { id: `${at.toString(36)}-${account}`, account, text: cleanComment(text), at, ...(thread ? { reply: thread } : {}) };
+  return { comments: [...list, comment].slice(-MAX_COMMENTS), comment, parent };
 }
-// The writer, the post's owner or Fav can remove a comment.
+// The writer, the post's owner or Fav can remove a comment. One with replies stays as a
+// "removed" placeholder so the thread keeps its place; it goes once its last reply does.
 export function deleteComment(comments, commentId, account, { owner, admin = false }) {
   const c = (comments ?? []).find((x) => x.id === commentId);
-  if (!c) throw new Error('That comment is gone.');
+  if (!c || c.removed) throw new Error('That comment is gone.');
   if (c.account !== account && owner !== account && !admin) throw new Error('Only the writer or the post owner can remove a comment.');
-  return comments.filter((x) => x !== c);
+  const hasReplies = (id, list) => list.some((x) => x.reply === id);
+  if (!c.reply && hasReplies(c.id, comments)) return comments.map((x) => x === c ? { id: c.id, account: c.account, at: c.at, removed: true } : x);
+  const rest = comments.filter((x) => x !== c);
+  return c.reply ? rest.filter((x) => !(x.id === c.reply && x.removed && !hasReplies(x.id, rest))) : rest;
+}
+// Comment reactions work like a post's: account → emojis, stored on the comment.
+export function reactToComment(comments, commentId, account, emoji) {
+  const c = (comments ?? []).find((x) => x.id === commentId);
+  if (!c || c.removed) throw new Error('That comment is gone.');
+  const reactions = toggleReaction(c.reactions, account, emoji);
+  return comments.map((x) => x === c ? { ...x, reactions } : x);
+}
+// The comments as threads for display: top-level comments in order, each with its replies. A
+// reply whose comment fell off the end of the list shows on its own.
+export function commentThreads(comments) {
+  const list = comments ?? [], ids = new Set(list.map((c) => c.id));
+  return list.filter((c) => !c.reply || !ids.has(c.reply))
+    .map((c) => ({ ...c, replies: c.reply ? [] : list.filter((r) => r.reply === c.id) }));
 }
 
 // Notices: the newest MAX_NOTICES, unread until the owner marks them seen.
@@ -110,3 +140,136 @@ export function cardPostId(account, slot, now, last) {
   if (last && now - last.at < REPOST_WINDOW && !last.touched) return last.id;
   return `c:${account}:${slot}:${now}`;
 }
+
+// Player posts ("u:<account>:<ms>"): text, up to MAX_IMAGES images, a clip link and a highlighted
+// league game, any mix but not empty. The Worker stores each image as its own row and serves it
+// at /cosmetics/media/<post>/<n>; the browser shrinks images first (parts/feed-compose.js).
+export const MAX_POST_TEXT = 1000;
+export const MAX_IMAGES = 4;
+// Per image, after the browser shrinks it. A GIF keeps its animation, so it is sent as is.
+export const MAX_IMAGE_BYTES = 700 * 1024;
+// The shortest gap between one player's posts.
+export const POST_GAP = 30 * 1000;
+export const userPostId = (account, at) => `u:${account}:${at}`;
+
+// Line breaks stay (three or more fold to two); spaces within a line fold to one.
+export function cleanPostText(text) {
+  const clean = String(text ?? '').replace(/\r\n?/g, '\n').split('\n').map((l) => l.replace(/[ \t\f\v]+/g, ' ').trim())
+    .join('\n').replace(/\n{3,}/g, '\n\n').trim();
+  if (clean.length > MAX_POST_TEXT) throw new Error(`Keep posts to ${MAX_POST_TEXT} characters.`);
+  return checkText(clean);
+}
+
+// Clip links: YouTube, Twitch clips and Streamable play in the post; Medal and Allstar show as a
+// link. Anything else is refused, so a post can't point at an arbitrary site.
+export function parseClip(raw) {
+  const text = String(raw ?? '').trim();
+  if (!text) return null;
+  let u;
+  try { u = new URL(/^https?:\/\//i.test(text) ? text : `https://${text}`); } catch { throw new Error('That clip link is not a web address.'); }
+  const host = u.hostname.replace(/^(www|m)\./, ''), parts = u.pathname.split('/').filter(Boolean);
+  let m;
+  if (host === 'youtu.be' && /^[\w-]{11}$/.test(parts[0] ?? '')) return { site: 'youtube', id: parts[0] };
+  if (host === 'youtube.com') {
+    const id = u.searchParams.get('v') ?? (['shorts', 'embed', 'live'].includes(parts[0]) ? parts[1] : null);
+    if (/^[\w-]{11}$/.test(id ?? '')) return { site: 'youtube', id };
+  }
+  if (host === 'clips.twitch.tv' && /^[\w-]{4,100}$/.test(parts[0] ?? '')) return { site: 'twitch', id: parts[0] };
+  if (host === 'twitch.tv' && parts[1] === 'clip' && /^[\w-]{4,100}$/.test(parts[2] ?? '')) return { site: 'twitch', id: parts[2] };
+  if (host === 'streamable.com' && /^[a-z0-9]{3,20}$/i.test((m = parts[0] === 'e' ? parts[1] : parts[0]) ?? '')) return { site: 'streamable', id: m };
+  if (['medal.tv', 'allstar.gg'].includes(host) && parts.length) return { site: host.split('.')[0], url: `https://${host}${u.pathname.replace(/[^\w\-/.]/g, '')}` };
+  throw new Error('Clips can be YouTube, Twitch, Streamable, Medal or Allstar links.');
+}
+// Where a clip plays. Twitch needs the page's own hostname as "parent".
+export function clipEmbed(clip, parent) {
+  if (clip?.site === 'youtube') return `https://www.youtube-nocookie.com/embed/${clip.id}?autoplay=1`;
+  if (clip?.site === 'twitch') return `https://clips.twitch.tv/embed?clip=${encodeURIComponent(clip.id)}&parent=${encodeURIComponent(parent)}&autoplay=true`;
+  if (clip?.site === 'streamable') return `https://streamable.com/e/${clip.id}?autoplay=1`;
+  return null;
+}
+export function clipLink(clip) {
+  if (clip?.site === 'youtube') return `https://www.youtube.com/watch?v=${clip.id}`;
+  if (clip?.site === 'twitch') return `https://clips.twitch.tv/${encodeURIComponent(clip.id)}`;
+  if (clip?.site === 'streamable') return `https://streamable.com/${clip.id}`;
+  return clip?.url ?? null;
+}
+
+// An image's real type from its first bytes; anything else (SVG, HTML…) is refused.
+export function imageType(bytes) {
+  const b = bytes ?? [];
+  if (b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return 'image/jpeg';
+  if (b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) return 'image/png';
+  if (b[0] === 0x47 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x38) return 'image/gif';
+  if (b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46 && b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50) return 'image/webp';
+  return null;
+}
+
+// The stored post, from what the browser sent. images is the decoded bytes of each image.
+export function buildUserPost({ account, at, text, clip, game, images = [] }) {
+  const body = cleanPostText(text), parsed = parseClip(clip);
+  if (images.length > MAX_IMAGES) throw new Error(`Add up to ${MAX_IMAGES} images.`);
+  const media = images.map((bytes) => {
+    const type = imageType(bytes);
+    if (!type) throw new Error('Images can be JPEG, PNG, GIF or WebP.');
+    if (bytes.length > MAX_IMAGE_BYTES) throw new Error(`Each image must be under ${Math.round(MAX_IMAGE_BYTES / 1024)} KB.`);
+    return { type, size: bytes.length };
+  });
+  const match = game == null || game === '' ? null : String(game);
+  if (match != null && !/^\d{1,20}$/.test(match)) throw new Error('Choose one of your games.');
+  if (!body && !parsed && !match && !media.length) throw new Error('Write something, or add an image, clip or game.');
+  return { kind: 'user', account, at, text: body, ...(parsed ? { clip: parsed } : {}), ...(match ? { game: match } : {}), ...(media.length ? { images: media } : {}) };
+}
+// The poster can remove any of their own posts (saved cards and pulls included); Fav can remove any post.
+export function canRemovePost(id, account, admin = false) {
+  return isPostId(id) && (admin || postOwner(id) === String(account));
+}
+
+// Auto-posts: what each player lets the Worker post for them (their profile's Feed tab). Stored on
+// their collection as `feedAuto`; changes decide future posts only. The defaults are what always
+// posted before the setting existed.
+export const PULL_RARITIES = ['common', 'rare', 'epic', 'legendary'];
+export const FEED_AUTO_DEFAULT = Object.freeze({ cards: true, rarities: Object.freeze(['epic', 'legendary']), screens: false });
+export function feedAutoOf(state) {
+  const a = state?.feedAuto ?? {};
+  return {
+    cards: typeof a.cards === 'boolean' ? a.cards : FEED_AUTO_DEFAULT.cards,
+    rarities: Array.isArray(a.rarities) ? PULL_RARITIES.filter((r) => a.rarities.includes(r)) : [...FEED_AUTO_DEFAULT.rarities],
+    screens: typeof a.screens === 'boolean' ? a.screens : FEED_AUTO_DEFAULT.screens,
+  };
+}
+export function setFeedAuto(state, { cards, rarities, screens } = {}) {
+  if (typeof cards !== 'boolean' || typeof screens !== 'boolean') throw new Error('Choose on or off for each kind.');
+  if (!Array.isArray(rarities) || rarities.some((r) => !PULL_RARITIES.includes(r))) throw new Error('Choose rarities from common, rare, epic and legendary.');
+  return { ...state, feedAuto: { cards, rarities: PULL_RARITIES.filter((r) => rarities.includes(r)), screens } };
+}
+// What a freshly opened pack posts: the cards of the rarities switched on, and the loading screens
+// when those are on. Null when there's nothing to post.
+export function pullPost(rewards, screens, auto, rarityOf) {
+  const items = (rewards ?? []).map((r) => r.key).filter((k) => auto.rarities.includes(rarityOf(k)));
+  const shown = auto.screens ? [...(screens ?? [])] : [];
+  return items.length || shown.length ? { items, ...(shown.length ? { screens: shown } : {}) } : null;
+}
+
+// Bans: Fav stops a player posting, commenting and reacting. Stored on the vault as one
+// "feed-bans" row: account → { at, until } (until null = until lifted).
+export function setBan(bans, target, banned, { at, days = null } = {}) {
+  const who = String(target ?? '');
+  if (!/^\d{1,10}$/.test(who)) throw new Error('Choose a player.');
+  const next = { ...(bans ?? {}) };
+  if (banned) next[who] = { at, until: days ? at + days * 86400000 : null }; else delete next[who];
+  return next;
+}
+export const isBanned = (bans, account, now) => { const b = bans?.[String(account)]; return !!b && (b.until == null || b.until > now); };
+
+// Following: everyone in the league is followed to start with. Unfollowing a player hides their
+// posts (their own, saved cards and pulls) from your Feed; following again brings them back.
+// Stored on your collection as `unfollowed`, newest last.
+export const MAX_UNFOLLOWED = 500;
+export function setFollow(state, account, target, follow) {
+  const who = String(target ?? '');
+  if (!/^\d{1,10}$/.test(who)) throw new Error('Choose a player.');
+  if (who === String(account)) throw new Error("You can't unfollow yourself.");
+  const rest = (state.unfollowed ?? []).filter((a) => a !== who);
+  return { ...state, unfollowed: follow ? rest : [...rest, who].slice(-MAX_UNFOLLOWED) };
+}
+export const isFollowing = (state, target) => !(state?.unfollowed ?? []).includes(String(target));

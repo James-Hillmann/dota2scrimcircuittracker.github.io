@@ -10,7 +10,7 @@ import { steamAccount } from "../lib/store.js";
 import { scout, savedScout, saveMyScout } from "../lib/scout.js";
 import { publicCollection } from "../lib/cosmetics.js";
 import { pubSection, allTimeSection } from "./ranks.js";
-import { mountProfileCollection } from "./collection.js";
+import { mountProfileCollection, mountProfileFeed } from "./collection.js";
 import { mountProfileTickets } from "./profile-tickets.js";
 import { mountGiftPanel } from "./pack-gifts.js";
 
@@ -49,9 +49,11 @@ export async function renderScoutedPlayer(src, key) {
     ${report ? `<section class="scouted">
       ${pubSection(src, key, d)}
       ${allTimeSection(src, decodeTotals(report.totals, HERO_NAMES))}
-    </section>` : `<p class="table-note keep">OpenDota didn't answer, so there's no match history to show right now. Try again in a minute.</p>`}`;
+    </section>` : `<p class="table-note keep">OpenDota didn't answer, so there's no match history to show right now. Try again in a minute.</p>`}
+    <section class="scouted-feed"><h2>Feed</h2><div class="profile-feed-box"></div></section>`;
   mountProfileCollection(app, { account: Number(key), name, matches: [], team: null, tier: null }).catch(() => {});
   mountProfileTickets(app, key).catch(() => {});
+  mountProfileFeed(app.querySelector(".profile-feed-box"), key).catch(() => {});
   mountGiftPanel(app, key, name).catch(() => {});
   return true;
 }
