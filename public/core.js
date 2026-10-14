@@ -14,7 +14,7 @@ import { listMatches } from "./lib/store.js";
 import { info } from "./lib/glossary.js";
 import { ordinal, RANK_STATS, RANK_GROUPS } from "./lib/ranks.js";
 import { routeOf, sharePath } from "./lib/share.js";
-import { withNicknames } from "./lib/nicknames.js";
+import { withNicknames, loadNicknames, displayName } from "./lib/nicknames.js";
 import { DIVISIONS as DIVISION_LIST, fullName, SEASON } from "./lib/divisions.js";
 import { teamSplits } from "./lib/combat.js";
 import { isBye } from "./lib/playoffs.js";
@@ -86,7 +86,7 @@ export function profileLinks(accountId, playonId = null, sep = " · ") {
 export const playerHref = (src, key) => `${src.root}/player/${encodeURIComponent(key)}`;
 export function playerLink(src, p, nested = false, label = null) {
   const href = playerHref(src, p.key ?? playerKey(p));
-  const text = label ?? esc(p.name);
+  const text = label ?? esc(displayName(p));
   return nested
     ? `<span class="player-link" role="link" tabindex="0" data-href="${href}">${text}</span>`
     : `<a class="player-link" href="${href}">${text}</a>`;
@@ -157,7 +157,7 @@ let matchesReady = null;
 export function allMatches(force = false) {
   if (!matchesReady || force) {
     matchesReady = Promise.all([listMatches(), divData("ad2l").catch(() => null)])
-      .then(([list, d]) => list.map((m) => withDerived(scrimNames(m, d))))
+      .then(([list, d]) => withNicknames({ games: list.map((m) => withDerived(scrimNames(m, d))) }).games)
       .catch((e) => { matchesReady = null; throw e; });
   }
   return matchesReady;
@@ -206,7 +206,8 @@ export const DIVISIONS = Object.fromEntries(DIVISION_LIST.map((d) => [d.key,
 async function loadDivision(file) {
   const res = await fetch(file, { cache: "no-cache" });
   if (!res.ok) throw new Error("The AD2L data hasn't been published yet.");
-  const d = withNicknames(await res.json());
+  const [raw] = await Promise.all([res.json(), loadNicknames()]);
+  const d = withNicknames(raw);
   d.games = d.games.filter((g) => !isRemake(g)).map((g) => withDerived({ ...g, createdAt: new Date(g.start_time * 1000) }));
   return d;
 }

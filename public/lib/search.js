@@ -3,6 +3,7 @@
 // result opens a page that exists.
 import { playerKey } from "./stats.js";
 import { listTeams, teamSlug } from "./teams.js";
+import { displayName, playerNames } from "./nicknames.js";
 
 // Lowercase, accents and case folded, so "ravenscraft" finds "Ravenscraft 天才" and "e" finds "é".
 export const fold = (s) => String(s ?? "").normalize("NFKD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
@@ -20,7 +21,7 @@ export function buildSearchIndex(leagues, scrims = null) {
     const byId = new Map(data.teams.map((t) => [t.id, t]));
     for (const t of data.teams) {
       out.push({ kind: "team", name: t.name, league: key, leagueLabel: teamLabel(t), href: `${teamRoot(t)}/teams/${t.id}`,
-        players: t.players.map((p) => p.name), terms: [t.name] });
+        players: t.players.map(displayName), terms: [t.name] });
     }
     // Rostered players, then everyone else seen in the division's games (stand-ins).
     const players = new Map();
@@ -28,19 +29,19 @@ export function buildSearchIndex(leagues, scrims = null) {
       if (p.account_id == null) continue;
       const k = String(p.account_id);
       if (players.has(k)) continue; // on two rosters: first one wins
-      players.set(k, { kind: "player", name: p.name, league: key, leagueLabel: teamLabel(t), team: t.name, teamHref: `${teamRoot(t)}/teams/${t.id}`,
-        captain: !!p.captain, standin: false, href: `${teamRoot(t)}/player/${encodeURIComponent(k)}`, terms: [p.name] });
+      players.set(k, { kind: "player", name: displayName(p), league: key, leagueLabel: teamLabel(t), team: t.name, teamHref: `${teamRoot(t)}/teams/${t.id}`,
+        captain: !!p.captain, standin: false, href: `${teamRoot(t)}/player/${encodeURIComponent(k)}`, terms: playerNames(p) });
     }
     // Newest game first, so a stand-in shows the team they last played for.
     for (const g of [...data.games].sort((a, b) => (b.start_time ?? 0) - (a.start_time ?? 0))) {
       for (const p of g.players ?? []) {
         if (junkName(p.name)) continue;
         const k = playerKey(p), e = players.get(k);
-        if (e) { if (!e.terms.includes(p.name)) e.terms.push(p.name); continue; } // in-game name differs from PlayOn's
+        if (e) { for (const name of playerNames(p)) if (!e.terms.includes(name)) e.terms.push(name); continue; } // in-game name differs from PlayOn's
         const t = byId.get(p.team === "a" ? g.team_a_id : g.team_b_id);
         const team = t?.name ?? p.team_name ?? (p.team === "a" ? g.team_a : g.team_b);
-        players.set(k, { kind: "player", name: p.name, league: key, leagueLabel: teamLabel(t), team, teamHref: t ? `${teamRoot(t)}/teams/${t.id}` : null,
-          captain: false, standin: true, href: `${teamRoot(t)}/player/${encodeURIComponent(k)}`, terms: [p.name] });
+        players.set(k, { kind: "player", name: displayName(p), league: key, leagueLabel: teamLabel(t), team, teamHref: t ? `${teamRoot(t)}/teams/${t.id}` : null,
+          captain: false, standin: true, href: `${teamRoot(t)}/player/${encodeURIComponent(k)}`, terms: playerNames(p) });
       }
     }
     out.push(...players.values());
@@ -53,7 +54,8 @@ export function buildSearchIndex(leagues, scrims = null) {
       const team = p.team_name ?? (p.team === "a" ? m.team_a : m.team_b);
       if (!team || junkName(p.name)) continue;
       const counts = seen.get(teamSlug(team)) ?? seen.set(teamSlug(team), new Map()).get(teamSlug(team));
-      counts.set(p.name, (counts.get(p.name) ?? 0) + 1);
+      const name = displayName(p);
+      counts.set(name, (counts.get(name) ?? 0) + 1);
     }
     for (const t of listTeams(matches)) {
       const names = [...(seen.get(t.slug) ?? [])].sort((a, b) => b[1] - a[1]).map(([n]) => n);
@@ -64,10 +66,10 @@ export function buildSearchIndex(leagues, scrims = null) {
       for (const p of m.players ?? []) {
         if (junkName(p.name)) continue;
         const k = playerKey(p), e = players.get(k);
-        if (e) { if (!e.terms.includes(p.name)) e.terms.push(p.name); continue; }
+        if (e) { for (const name of playerNames(p)) if (!e.terms.includes(name)) e.terms.push(name); continue; }
         const team = p.team_name ?? (p.team === "a" ? m.team_a : m.team_b);
-        players.set(k, { kind: "player", name: p.name, league: "scrim", leagueLabel: scrims.label, team, teamHref: team ? `#/scrims/teams/${teamSlug(team)}` : null,
-          captain: false, standin: !!p.standin, href: `#/scrims/player/${encodeURIComponent(k)}`, terms: [p.name] });
+        players.set(k, { kind: "player", name: displayName(p), league: "scrim", leagueLabel: scrims.label, team, teamHref: team ? `#/scrims/teams/${teamSlug(team)}` : null,
+          captain: false, standin: !!p.standin, href: `#/scrims/player/${encodeURIComponent(k)}`, terms: playerNames(p) });
       }
     }
     out.push(...players.values());

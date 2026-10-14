@@ -149,7 +149,8 @@ export async function renderPlayer(src, key) {
       <div class="tm-body">${tierBreakdown(src, tierOf)}</div>
     </dialog>` : ""}`;
   wirePlayerTabs();
-  if(/^\d+$/.test(key)) mountProfileCollection(app,{account:Number(key),name:s.name,matches,team:roster?.team?.name??s.team,tier:tierOf}).catch(()=>{});
+  const inGameName=h.games[0]?.p.inGameName??roster?.inGameName??s.name;
+  if(/^\d+$/.test(key)) mountProfileCollection(app,{account:Number(key),name:inGameName,matches,team:roster?.team?.name??s.team,tier:tierOf}).catch(()=>{});
   if(/^\d+$/.test(key)) mountProfileTickets(app,key).catch(()=>{});
   if(/^\d+$/.test(key)) mountGiftPanel(app,key,s.name).catch(()=>{});
   wireItemHeroes();

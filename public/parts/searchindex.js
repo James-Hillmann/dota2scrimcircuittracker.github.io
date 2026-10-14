@@ -3,8 +3,10 @@
 // failing the search. The header pop-up and the results page share it.
 import { DIVISIONS, SOURCES, divLite, allMatches } from "../core.js";
 import { buildSearchIndex } from "../lib/search.js";
+import { loadNicknames } from "../lib/nicknames.js";
 
 let ready = null;
+addEventListener('player-names-change', () => { ready = null; });
 export function loadSearch() {
   ready ??= Promise.all([
     Promise.all(Object.entries(DIVISIONS).map(async ([key, dv]) => {
@@ -12,6 +14,7 @@ export function loadSearch() {
       catch (e) { console.warn(`search: ${key} unavailable`, e); return null; }
     })),
     allMatches().catch((e) => { console.warn("search: scrims unavailable", e); return null; }),
+    loadNicknames(),
   ]).then(([leagues, scrims]) => buildSearchIndex(leagues.filter(Boolean), scrims && { label: "Scrims", matches: scrims }))
     .catch((e) => { ready = null; throw e; });
   return ready;

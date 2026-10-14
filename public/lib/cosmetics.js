@@ -7,6 +7,7 @@ import { cardAppearance, selectedCardDesign, shownNickname } from './cosmetics-e
 export const PARTICLE_FINISHES=Object.freeze(['inferno','blizzard','voidstorm','sandstorm','cosmic','diamond','stars','goldust','starlight']);
 import { syncPackOfferClaims } from './bonus-offers.js';
 import { applyLayout } from './card-layout.js';
+import { setPlayerNickname } from './nicknames.js';
 
 export const COLLECTION_API='https://steam-auth.ad2lstats.workers.dev/cosmetics';
 let account=null, state=null, pending=null;
@@ -36,6 +37,7 @@ export async function collectionAction(action,details={}) {
   pending=null;state=data.state;
   syncPackOfferClaims(state);
   appearances.set(String(account),cardAppearance(state));
+  setPlayerNickname(account,shownNickname(state));
   document.querySelectorAll(`.ft-card[data-pick="${account}"]`).forEach(card=>applyEquipment(card,card.dataset.designSlot!=null?(state.cardDesigns?.[Number(card.dataset.designSlot)]??state.equipment):state.equipment,shownNickname(state)??card.dataset.playerName??'Your Name'));
   document.querySelectorAll(`.fantasy-tier-chip.open[data-expanded-account="${account}"]`).forEach(panel=>applyExpandedEquipment(panel,state.equipment,panel.dataset.playerName));
   dispatchEvent(new CustomEvent('collection-change',{detail:{state,account}}));
@@ -60,7 +62,10 @@ export async function myCardVotes() {
 }
 export async function cosmeticAppearances() {
   const r=await fetch(`${COLLECTION_API}/appearances`);if(!r.ok)throw new Error('Collection service unavailable.');const data=await r.json();
-  for(const [id,equipment] of Object.entries(data))appearances.set(id,String(account)===id&&state?.equipment?cardAppearance(state):equipment);
+  for(const [id,equipment] of Object.entries(data)) {
+    const appearance=String(account)===id&&state?.equipment?cardAppearance(state):equipment;
+    appearances.set(id,appearance);setPlayerNickname(id,appearance.nickname);
+  }
   return data;
 }
 export function cosmeticAttributes(raw) {

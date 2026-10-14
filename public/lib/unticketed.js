@@ -4,6 +4,7 @@
 import { nameKey } from "./players.js";
 import { ALIASES } from "./aliases.js";
 import { levenshtein } from "./heroes.js";
+import { playerNames } from "./nicknames.js";
 
 export const teamByName = (d, n) => d?.teams.find((t) => nameKey(t.name) === nameKey(n ?? "")) ?? null;
 
@@ -12,8 +13,8 @@ export const teamByName = (d, n) => d?.teams.find((t) => nameKey(t.name) === nam
 // the game counts for the same person as their ticketed games.
 export function asAd2l(u, d) {
   const acct = new Map();
-  for (const g of d.games) for (const p of g.players) if (p.account_id) acct.set(nameKey(p.name), { name: p.name, account_id: p.account_id, rank_tier: p.rank_tier });
-  for (const t of d.teams) for (const p of t.players) acct.set(nameKey(p.name), { name: p.name, account_id: p.account_id, rank_tier: p.rank_tier });
+  for (const g of d.games) for (const p of g.players) if (p.account_id) for (const name of playerNames(p)) acct.set(nameKey(name), { name: p.name, inGameName: p.inGameName, account_id: p.account_id, rank_tier: p.rank_tier });
+  for (const t of d.teams) for (const p of t.players) for (const name of playerNames(p)) acct.set(nameKey(name), { name: p.name, inGameName: p.inGameName, account_id: p.account_id, rank_tier: p.rank_tier });
   // Known other names: counted under the roster name for that account.
   for (const [alias, id] of Object.entries(ALIASES)) {
     const k = d.teams.flatMap((t) => t.players).find((p) => String(p.account_id) === String(id));
@@ -30,11 +31,11 @@ export function asAd2l(u, d) {
       const side = p.team === "a" ? ta : tb;
       // The side's own roster first: two divisions' players can share a name (Champion has
       // two Icarus), and the division-wide lookup keeps only the last one it read.
-      const own = side?.players?.find((r) => nameKey(r.name) === nameKey(p.name));
-      const k = own ? { name: own.name, account_id: own.account_id, rank_tier: own.rank_tier } : acct.get(nameKey(p.name));
+      const own = side?.players?.find((r) => playerNames(r).some(n => nameKey(n) === nameKey(p.name)));
+      const k = own ? { name: own.name, inGameName: own.inGameName, account_id: own.account_id, rank_tier: own.rank_tier } : acct.get(nameKey(p.name));
       if (!k?.account_id) return side ? { ...p, team_name: side.name, standin: true } : p;
       return {
-        ...p, name: k.name, account_id: k.account_id, player_key: String(k.account_id), rank_tier: p.rank_tier ?? k.rank_tier ?? null,
+        ...p, name: k.name, inGameName: k.inGameName ?? p.name, account_id: k.account_id, player_key: String(k.account_id), rank_tier: p.rank_tier ?? k.rank_tier ?? null,
         team_name: side?.name ?? null, standin: home.get(String(k.account_id)) !== side?.id,
       };
     }),
@@ -82,7 +83,7 @@ export function sameTeams(d, s, a, b) {
 // If a side's name wasn't read as a division team, use the team most of that side's
 // recognised players are rostered on (3+ of 5). Changes `match` in place; returns notes.
 export function guessTeams(match, d) {
-  const rosterTeam = new Map(d.teams.flatMap((t) => t.players.map((p) => [nameKey(p.name), t])));
+  const rosterTeam = new Map(d.teams.flatMap((t) => t.players.flatMap((p) => playerNames(p).map(n => [nameKey(n), t]))));
   const notes = [];
   for (const side of ["a", "b"]) {
     const key = side === "a" ? "team_a" : "team_b";
@@ -114,8 +115,8 @@ export function aliasOf(d, name) {
 export function rosterQuestions(match, d, standins = new Set()) {
   if (!d) return [];
   const known = new Set([
-    ...d.teams.flatMap((t) => t.players.map((p) => nameKey(p.name))),
-    ...d.games.flatMap((g) => g.players.map((p) => nameKey(p.name))),
+    ...d.teams.flatMap((t) => t.players.flatMap((p) => playerNames(p).map(nameKey))),
+    ...d.games.flatMap((g) => g.players.flatMap((p) => playerNames(p).map(nameKey))),
   ]);
   const out = [];
   for (const side of ["a", "b"]) {
@@ -123,7 +124,7 @@ export function rosterQuestions(match, d, standins = new Set()) {
     if (!team) continue;
     const players = (match.players ?? []).map((p, i) => ({ p, i })).filter(({ p }) => p.team === side && nameKey(p.name));
     const here = new Set(players.map(({ p }) => nameKey(aliasOf(d, p.name) ?? p.name)));
-    const missing = team.players.filter((r) => !here.has(nameKey(r.name)));
+    const missing = team.players.filter((r) => !playerNames(r).some(n => here.has(nameKey(n))));
     if (!missing.length) continue;
     for (const { p, i } of players) {
       const k = nameKey(p.name);
