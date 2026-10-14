@@ -15,6 +15,7 @@ import { showProfileBackground, mountBackgroundButton, letterCaseHtml, drawLette
 import { FRONT_PARTS, BACK_STATS, MAX_BACK_STATS, MAX_NAME, backStats, applyLayout, shownByDefault } from '../lib/card-layout.js';
 import './pack-gifts.js'; // the "Fav sent you packs" notice
 import { SCREEN_ART } from '../lib/screen-art-data.js';
+import { strangerNames } from '../lib/scout.js';
 
 const gift=`<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M4 13h24v6H4zm2 6h20v11H6zm10-6v17M16 13C4 13 5 2 11 4c4 1 5 9 5 9zm0 0c12 0 11-11 5-9-4 1-5 9-5 9z"/></svg>`;
 const colors={common:'#abb3be',rare:'#80c4ff',epic:'#d7a3ff',legendary:'#ffd879'};
@@ -507,7 +508,9 @@ async function drawGallery(body,{viewer,signIn}) {
   if(!body.isConnected)return;
   const roster=new Map(teams.flatMap(t=>t.players.map(p=>[String(p.account_id),{name:p.name,team:t.name,league:t.league}])));
   const renderer=createPlayerCards(matches,{cards:overrides,teams});
-  const nameOf=c=>c.nickname??roster.get(c.account)?.name??steamName(Number(c.account))??c.design.layout?.name??`Player ${c.account}`;
+  // Players on no roster go by their Steam name (lib/scout.js).
+  const strangers=await strangerNames(cards.map(c=>String(c.account)).filter(a=>!roster.has(a))).catch(()=>new Map());if(!body.isConnected)return;
+  const nameOf=c=>c.nickname??roster.get(c.account)?.name??strangers.get(String(c.account))??steamName(Number(c.account))??c.design.layout?.name??`Player ${c.account}`;
   const share=c=>c.total?c.counts[c.pick]/c.total:0;
   // A card changed since this browser last opened the Gallery is new (highlighted), except your own.
   let lastSeen=0;

@@ -1,13 +1,13 @@
 // The player page for a Steam player on no league roster: their scout report (lib/scout.js) in
 // place of league stats — rank, recent pubs and all-time heroes — plus the card collection,
-// tickets and gift box every profile has. Every account that has signed in gets this page, even
-// before (or without) a scout.
+// tickets and gift box every profile has. Every account that has signed in gets this page; the
+// scout is read from OpenDota by this browser when the page opens.
 import { app, esc, crumbs, profileLinks, when, here } from "../core.js";
 import { rankLabel } from "../lib/tiers.js";
 import { HERO_META } from "../lib/hero-meta.js";
 import { decodeTotals } from "../lib/herogrid.js";
 import { steamAccount } from "../lib/store.js";
-import { scoutReport, scoutMe } from "../lib/scout.js";
+import { scout, steamPlayers } from "../lib/scout.js";
 import { publicCollection } from "../lib/cosmetics.js";
 import { pubSection, allTimeSection } from "./ranks.js";
 import { mountProfileCollection } from "./collection.js";
@@ -18,26 +18,18 @@ const HERO_NAMES = Object.fromEntries(HERO_META.map(([id, name]) => [id, name]))
 
 // An account that has used the site with Steam: the Worker keeps something for it.
 const signedIn = (c) => !!(c && (c.equipment || c.nickname || c.background || c.screens?.length || Object.keys(c.inventory ?? {}).length));
-async function steamProfileName(account) {
-  try { const r = await fetch(`https://api.opendota.com/api/players/${account}`); return r.ok ? (await r.json())?.profile?.personaname ?? null : null; } catch { return null; }
-}
 
-// Renders the page and returns true, or false for an account that never signed in and was never
-// scouted (the caller says no games found).
+// Renders the page and returns true, or false for an account that never signed in (the caller
+// says no games found).
 export async function renderScoutedPlayer(src, key) {
   const route = here(), stillHere = () => here() === route;
-  const [found, viewer, collection] = await Promise.all([scoutReport(key).catch(() => null), steamAccount().catch(() => null), publicCollection(key).catch(() => null)]);
-  let report = found;
+  const [registered, viewer, collection] = await Promise.all([steamPlayers().then((m) => m.get(key) ?? null), steamAccount().catch(() => null), publicCollection(key).catch(() => null)]);
   const own = String(viewer) === key;
-  if (!report && own) {
-    app.innerHTML = `<div class="panel empty"><strong>Scouting your profile…</strong>Reading your public match history from OpenDota.</div>`;
-    report = await scoutMe().catch((e) => (console.warn("scout", e), null));
-  }
+  if (!registered && !own && !signedIn(collection)) return false;
+  app.innerHTML = `<div class="panel empty"><strong>Scouting…</strong>Reading ${own ? "your" : "their"} public match history from OpenDota.</div>`;
+  const report = await scout(key, { refresh: own }).catch(() => null);
   if (!stillHere()) return true;
-  if (!report && !own && !signedIn(collection)) return false;
-
-  const name = report?.name ?? (await steamProfileName(key)) ?? `Player ${key}`, rank = rankLabel(report?.rank_tier);
-  if (!stillHere()) return true;
+  const name = registered?.name ?? report?.name ?? `Player ${key}`, rank = rankLabel(report?.rank_tier);
   const sub = ["Not on a league roster", rank ? esc(rank) : "", report ? `scouted ${when(new Date(report.at))}` : "", profileLinks(key)].filter(Boolean).join(" · ");
   // pubSection reads a division file's shape: the report has the same `pubs` rows.
   const d = report && { pubs: { [key]: report.pubs }, updated: new Date(report.at).toISOString() };
@@ -53,7 +45,7 @@ export async function renderScoutedPlayer(src, key) {
     ${report ? `<section class="scouted">
       ${pubSection(src, key, d)}
       ${allTimeSection(src, decodeTotals(report.totals, HERO_NAMES))}
-    </section>` : `<p class="table-note keep">Not scouted yet: their match history shows here after their next visit signed in with Steam.</p>`}`;
+    </section>` : `<p class="table-note keep">OpenDota didn't answer, so there's no match history to show right now. Try again in a minute.</p>`}`;
   mountProfileCollection(app, { account: Number(key), name, matches: [], team: null, tier: null }).catch(() => {});
   mountProfileTickets(app, key).catch(() => {});
   mountGiftPanel(app, key, name).catch(() => {});

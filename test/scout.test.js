@@ -1,11 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { scoutReport, ScoutStore } from "../workers/steam-auth/src/scout.js";
+import { scoutReport } from "../public/lib/scout-report.js";
+import { playerEntry, ScoutStore } from "../workers/steam-auth/src/scout.js";
 import worker from "../workers/steam-auth/src/index.js";
 import { pubsSince } from "../public/lib/predict.js";
 import { decodeTotals } from "../public/lib/herogrid.js";
+import { buildSearchIndex, searchIndex } from "../public/lib/search.js";
 
-const NOW = Date.UTC(2026, 9, 14) , T = NOW / 1000;
+const NOW = Date.UTC(2026, 9, 14), T = NOW / 1000;
 const fakeOpenDota = (calls) => async (path, init) => {
   calls.push([init?.method ?? "GET", path]);
   if (path.endsWith("/refresh")) return {};
@@ -21,7 +23,7 @@ const fakeOpenDota = (calls) => async (path, init) => {
 };
 
 test("scout report: pubs and all-time totals in the sync's formats", async () => {
-  const calls = [], r = await scoutReport("123", fakeOpenDota(calls), NOW);
+  const calls = [], r = await scoutReport("123", fakeOpenDota(calls), { now: NOW, refresh: true });
   assert.deepEqual(calls[0], ["POST", "/players/123/refresh"]);
   assert.equal(r.name, "Newbie");
   assert.equal(r.rank_tier, 54);
@@ -29,31 +31,51 @@ test("scout report: pubs and all-time totals in the sync's formats", async () =>
   assert.equal(r.lobby_recent, 1);
   const pubs = pubsSince({ pubs: { 123: r.pubs } }, "123", T - 14 * 86400);
   assert.deepEqual(pubs.map((g) => [g.hero, g.won, g.ranked]), [["Pudge", false, false], ["Anti-Mage", true, true]]);
-  const names = { 1: "Anti-Mage", 5: "Crystal Maiden", 14: "Pudge" };
-  const t = decodeTotals(r.totals, names);
+  const t = decodeTotals(r.totals, { 1: "Anti-Mage", 5: "Crystal Maiden", 14: "Pudge" });
   assert.deepEqual(t.pubs, [{ hero: "Pudge", games: 20, wins: 12 }, { hero: "Anti-Mage", games: 14, wins: 7 }]);
   assert.deepEqual(t.lobby, [{ hero: "Crystal Maiden", games: 3, wins: 2 }]);
 });
 
-test("scout report: OpenDota with nothing on record reads as private", async () => {
-  const r = await scoutReport("9", async (path) => (/\/players\/\d+$/.test(path) ? { profile: { personaname: "Hidden" } } : []), NOW);
-  assert.equal(r.private, true);
-  assert.deepEqual(r.pubs, []);
+test("scout report: no refresh unless asked; private history; OpenDota down gives no report", async () => {
+  const calls = [];
+  await scoutReport("1", fakeOpenDota(calls), { now: NOW });
+  assert.ok(!calls.some(([m]) => m === "POST"));
+  const hidden = await scoutReport("9", async (path) => (/\/players\/\d+$/.test(path) ? { profile: { personaname: "Hidden" } } : []), { now: NOW });
+  assert.equal(hidden.private, true);
+  assert.equal(await scoutReport("9", async () => null, { now: NOW }), null);
 });
 
-test("scout store: GET 404 before a scout; a second scout inside the gap reuses the report", async () => {
-  const kept = new Map(), store = new ScoutStore({ storage: { get: async (k) => kept.get(k), put: async (k, v) => kept.set(k, v) } });
+test("name registry: cleans the name, refuses foreign avatars, keeps old fields", () => {
+  const e = playerEntry("5", { name: "  Darth\u0007 Kokujin ", avatar: "https://avatars.steamstatic.com/abc_medium.jpg" }, null, 1);
+  assert.deepEqual(e, { account: 5, name: "Darth Kokujin", avatar: "https://avatars.steamstatic.com/abc_medium.jpg", at: 1 });
+  assert.equal(playerEntry("5", { avatar: "https://evil.example/x.jpg" }, e, 2).avatar, e.avatar);
+  assert.equal(playerEntry("5", { name: "x".repeat(200) }).name.length, 64);
+});
+
+test("name registry store: register, read one, list named players", async () => {
+  const kept = new Map([["scout:7", { account: 7, at: 1, name: null }]]); // an old empty report stays out of the list
+  const store = new ScoutStore({ storage: { get: async (k) => kept.get(k), put: async (k, v) => kept.set(k, v), list: async () => kept } });
   assert.equal((await store.fetch(new Request("https://scout/?account=1"))).status, 404);
-  kept.set("scout:1", { account: 1, at: Date.now(), name: "Kept" });
-  const r = await store.fetch(new Request("https://scout/?account=1", { method: "POST" }));
-  assert.equal((await r.json()).name, "Kept");
+  await store.fetch(new Request("https://scout/?account=1", { method: "POST", body: JSON.stringify({ name: "Kokujin" }) }));
+  assert.equal((await (await store.fetch(new Request("https://scout/?account=1"))).json()).name, "Kokujin");
+  assert.deepEqual((await (await store.fetch(new Request("https://scout/players"))).json()).map((p) => p.name), ["Kokujin"]);
 });
 
-test("scout endpoint: needs a sign-in to scout, refuses other origins", async () => {
-  const env = { SCOUT: { idFromName: () => 0, get: () => ({ fetch: async () => Response.json({ ok: true }) }) }, FIREBASE_WEB_API_KEY: "k" };
+test("scout endpoint: needs a sign-in to register, refuses other origins", async () => {
+  const env = { SCOUT: { idFromName: () => 0, get: () => ({ fetch: async () => Response.json([]) }) }, FIREBASE_WEB_API_KEY: "k" };
   assert.equal((await worker.fetch(new Request("https://w.dev/scout", { method: "POST" }), env)).status, 401);
   assert.equal((await worker.fetch(new Request("https://w.dev/scout/5", { headers: { origin: "https://evil.example" } }), env)).status, 403);
-  const r = await worker.fetch(new Request("https://w.dev/scout/5", { headers: { origin: "http://localhost:3000" } }), env);
+  const r = await worker.fetch(new Request("https://w.dev/scout/players", { headers: { origin: "http://localhost:3000" } }), env);
   assert.equal(r.status, 200);
   assert.equal(r.headers.get("access-control-allow-origin"), "http://localhost:3000");
+});
+
+test("search finds Steam players on no roster, but not twice for a rostered one", () => {
+  const data = { teams: [{ id: 1, name: "Team", players: [{ name: "Rostered", account_id: 11 }] }], games: [] };
+  const idx = buildSearchIndex([{ key: "warrior", label: "Warrior", root: "#/warrior", data }], null,
+    { label: "Not in a league", root: "#/warrior", players: [{ account: 39702330, name: "Darth Kokujin" }, { account: 11, name: "Rostered steam" }] });
+  const hit = searchIndex(idx, "kokujin")[0];
+  assert.equal(hit.href, "#/warrior/player/39702330");
+  assert.equal(hit.league, "steam");
+  assert.equal(searchIndex(idx, "rostered steam").length, 0);
 });

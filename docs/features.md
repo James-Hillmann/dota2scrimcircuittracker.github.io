@@ -642,11 +642,13 @@ play the whole Heroic/Aegis game. Predict's "Your name" bar hides on this tab (F
   Signed in, the top bar shows your Steam avatar (from OpenDota's public profile, kept a day);
   it opens your player page in the first league whose roster has you (the one you're viewing
   first), else your page in the league you're viewing (`parts/me.js`).
-- **Scouted profiles** — a Steam player on no league roster is scouted when they sign in: the
-  Worker reads their public OpenDota history (rank, last 30 days of pubs, all-time heroes in pubs
-  and practice lobbies) and keeps it, at most one fresh scout every 6 hours. Their player page
-  (`parts/scouted.js`) shows that with Recent pubs and All time, plus the card collection,
-  tickets and gift box every profile has. A private match history gets a note saying so. Sign out is on the Fantasy tab. The sign-in
+- **Profiles for everyone on Steam** — every player who has signed in with Steam has a player
+  page, on a roster or not. For one on no roster (`parts/scouted.js`) the page reads their public
+  OpenDota history when it opens (rank, last 30 days of pubs, all-time heroes in pubs and practice
+  lobbies) and shows Recent pubs and All time, plus the card collection, tickets and gift box
+  every profile has. A private match history gets a note saying so. Their sign-in registers their
+  Steam name, which names them in the Gallery and Feed and puts them in search ("Not in a
+  league"); a name not registered yet is read from OpenDota. Sign out is on the Fantasy tab. The sign-in
   sends you to Steam's own page; the Worker
   (`workers/steam-auth`, https://steam-auth.ad2lstats.workers.dev) checks Steam's reply and returns
   a Firebase sign-in for `steam:<account id>`. It runs on its own Firebase session, so the

@@ -12,8 +12,10 @@ const junkName = (n) => !n || /^account \d+$|^anonymous$/i.test(n.trim());
 // leagues: [{ key, label, root, data, views? }] — an AD2L division, its routes root ("#/warrior")
 // and its data file. `views` (Heroic/Aegis: ["a", "b"]) sends each team to its own division's
 // pages. scrims: { label, matches } — the saved scrims (private ones carry no players).
-export function buildSearchIndex(leagues, scrims = null) {
-  const out = [];
+// steam: { label, root, players: [{ account, name }] } — Steam players on no roster
+// (lib/scout.js), each opening their profile under `root`; one already in a league is skipped.
+export function buildSearchIndex(leagues, scrims = null, steam = null) {
+  const out = [], inLeague = new Set();
   for (const lg of leagues) {
     const { key, label, root, data } = lg;
     const teamRoot = (t) => (lg.views && t?.division ? `${root}/${t.division.toLowerCase()}` : root);
@@ -45,6 +47,7 @@ export function buildSearchIndex(leagues, scrims = null) {
       }
     }
     out.push(...players.values());
+    for (const k of players.keys()) inLeague.add(k);
   }
   if (scrims) {
     const matches = scrims.matches;
@@ -73,6 +76,13 @@ export function buildSearchIndex(leagues, scrims = null) {
       }
     }
     out.push(...players.values());
+  }
+  for (const p of steam?.players ?? []) {
+    const k = String(p.account);
+    if (inLeague.has(k) || junkName(p.name)) continue;
+    inLeague.add(k);
+    out.push({ kind: "player", name: displayName(p), league: "steam", leagueLabel: steam.label, team: null, teamHref: null,
+      captain: false, standin: true, href: `${steam.root}/player/${encodeURIComponent(k)}`, terms: playerNames(p) });
   }
   for (const e of out) e.folded = e.terms.map(fold);
   return out;

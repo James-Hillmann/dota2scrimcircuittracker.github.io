@@ -1,11 +1,11 @@
 // The Steam sign-in in the top bar (right, before the settings cog). Signed out: "Sign in". Signed
 // in: your Steam avatar, which opens your player page in the first league whose roster has you
-// (the league you're viewing first). A player on no roster gets a scout of their OpenDota history
-// (lib/scout.js) and their page shows that. Avatar and Steam name come from OpenDota's public
-// profile, kept in this browser for a day.
+// (the league you're viewing first). A player on no roster registers their Steam name with the
+// Worker (lib/scout.js) and their page shows a scout of their OpenDota history. Avatar and Steam
+// name come from OpenDota's public profile, kept in this browser for a day.
 import { esc, DIVISIONS, SOURCES, divLite, playerHref, navigate, here, bySlug, myTeam, setMyTeam, myTeamAutoOk } from "../core.js";
 import { steamAccount, steamLoginUrl } from "../lib/store.js";
-import { scoutMe } from "../lib/scout.js";
+import { registerMe } from "../lib/scout.js";
 
 const PROFILE_KEY = "steam-profile";
 const DAY = 864e5;
@@ -78,9 +78,9 @@ export async function mountMe() {
     return;
   }
   autoMyTeam(account).catch((e) => console.warn("my team from sign-in", e));
-  // On no roster: scout them (the Worker skips it if it did so in the last few hours).
-  myRoster(account).then((r) => r || scoutMe()).catch((e) => console.warn("scout", e));
   const p = await profileOf(account);
+  // On no roster: register their Steam name, so the Gallery, Feed and search can name them.
+  myRoster(account).then((r) => r || registerMe(p)).catch((e) => console.warn("steam name", e));
   const label = p.name ?? `Account ${account}`;
   el.innerHTML = `<a class="me-av" href="#" title="${esc(label)}: your page" aria-label="Your page (${esc(label)})">${p.avatar
     ? `<img src="${esc(p.avatar)}" alt="" width="30" height="30" referrerpolicy="no-referrer">`
