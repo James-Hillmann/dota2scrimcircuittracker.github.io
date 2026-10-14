@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { scoutReport } from "../public/lib/scout-report.js";
-import { playerEntry, ScoutStore } from "../workers/steam-auth/src/scout.js";
+import { playerEntry, cleanReport, ScoutStore } from "../workers/steam-auth/src/scout.js";
 import worker from "../workers/steam-auth/src/index.js";
 import { pubsSince } from "../public/lib/predict.js";
 import { decodeTotals } from "../public/lib/herogrid.js";
@@ -47,9 +47,22 @@ test("scout report: no refresh unless asked; private history; OpenDota down give
 
 test("name registry: cleans the name, refuses foreign avatars, keeps old fields", () => {
   const e = playerEntry("5", { name: "  Darth\u0007 Kokujin ", avatar: "https://avatars.steamstatic.com/abc_medium.jpg" }, null, 1);
-  assert.deepEqual(e, { account: 5, name: "Darth Kokujin", avatar: "https://avatars.steamstatic.com/abc_medium.jpg", at: 1 });
+  assert.deepEqual(e, { account: 5, name: "Darth Kokujin", avatar: "https://avatars.steamstatic.com/abc_medium.jpg", at: 1, report: null });
   assert.equal(playerEntry("5", { avatar: "https://evil.example/x.jpg" }, e, 2).avatar, e.avatar);
   assert.equal(playerEntry("5", { name: "x".repeat(200) }).name.length, 64);
+});
+
+test("saved report: the browser's report is kept to its shapes, and kept when a save sends none", async () => {
+  const report = await scoutReport("123", fakeOpenDota([]), { now: NOW });
+  const e = playerEntry("123", { name: "Newbie", report }, null, 5);
+  assert.deepEqual(e.report.pubs, report.pubs);
+  assert.deepEqual(e.report.totals, report.totals);
+  assert.equal(e.report.at, 5); // the Worker's clock, not the browser's
+  assert.equal(e.report.name, undefined); // only known fields
+  assert.deepEqual(playerEntry("123", { name: "Renamed" }, e, 9).report, e.report);
+  assert.deepEqual(cleanReport({ pubs: [1, "Puck", 1, 2, 3, 4, "x"], totals: { p: [1, 2, -3], l: "no" } }, 1).pubs, []);
+  assert.deepEqual(cleanReport({ totals: { p: [1, 2, -3] } }, 1).totals, { p: [], l: [] });
+  assert.equal(playerEntry("7", { name: "Old" }, { account: 7, at: 1, name: null, pubs: [] }).report, null); // the first Worker scouts' flat entries
 });
 
 test("name registry store: register, read one, list named players", async () => {

@@ -275,13 +275,15 @@ signs in with it). Only the site and the two localhost previews may receive a to
 key, firebase-adminsdk, set in the Cloudflare dashboard; never in the repo). Tests:
 `test/steam-auth.test.js`.
 
-Steam players on no roster (`src/scout.js`, Durable Object `ScoutStore`): `POST /scout` with
-the Steam session's Firebase ID token and `{ name, avatar }` registers that account's Steam name
-(`parts/me.js` sends it on sign-in); `GET /scout/players` lists them for the Gallery, Feed and
-search; `GET /scout/<account>` returns one or 404. The scout itself (rank, pubs, all-time heroes)
-runs in the visitor's browser (`lib/scout.js`, `lib/scout-report.js`): OpenDota answers the
-Worker with 429 "daily api limit exceeded", since its keyless limit is per IP and Cloudflare's
-IPs are shared. Tests: `test/scout.test.js`.
+Steam players on no roster (`src/scout.js`, Durable Object `ScoutStore`): each has an entry
+with their Steam name, avatar and scout report (rank, 30 days of pubs, all-time heroes; the
+sync's `pubs` and `totals` formats). Their own browser builds the report from OpenDota
+(`lib/scout-report.js`) on sign-in when the saved one is missing or over 6 hours old and sends
+it with `POST /scout` (Bearer Firebase ID token; the Worker keeps only the known fields and stamps
+the time); everyone else reads the saved copy with `GET /scout/<account>`. `GET /scout/players`
+lists names for the Gallery, Feed and search. The Worker can't read OpenDota itself: OpenDota
+answers it with 429 "daily api limit exceeded" (its keyless limit is per IP and Cloudflare's IPs
+are shared). Tests: `test/scout.test.js`.
 
 ```bash
 cd workers/steam-auth && npx wrangler deploy     # after changing src/index.js

@@ -1,13 +1,13 @@
 // The player page for a Steam player on no league roster: their scout report (lib/scout.js) in
 // place of league stats — rank, recent pubs and all-time heroes — plus the card collection,
 // tickets and gift box every profile has. Every account that has signed in gets this page; the
-// scout is read from OpenDota by this browser when the page opens.
+// scout is the one saved on the Worker (lib/scout.js).
 import { app, esc, crumbs, profileLinks, when, here } from "../core.js";
 import { rankLabel } from "../lib/tiers.js";
 import { HERO_META } from "../lib/hero-meta.js";
 import { decodeTotals } from "../lib/herogrid.js";
 import { steamAccount } from "../lib/store.js";
-import { scout, steamPlayers } from "../lib/scout.js";
+import { scout, savedScout, saveMyScout } from "../lib/scout.js";
 import { publicCollection } from "../lib/cosmetics.js";
 import { pubSection, allTimeSection } from "./ranks.js";
 import { mountProfileCollection } from "./collection.js";
@@ -23,13 +23,17 @@ const signedIn = (c) => !!(c && (c.equipment || c.nickname || c.background || c.
 // says no games found).
 export async function renderScoutedPlayer(src, key) {
   const route = here(), stillHere = () => here() === route;
-  const [registered, viewer, collection] = await Promise.all([steamPlayers().then((m) => m.get(key) ?? null), steamAccount().catch(() => null), publicCollection(key).catch(() => null)]);
+  const [saved, viewer, collection] = await Promise.all([savedScout(key).catch(() => null), steamAccount().catch(() => null), publicCollection(key).catch(() => null)]);
   const own = String(viewer) === key;
-  if (!registered && !own && !signedIn(collection)) return false;
-  app.innerHTML = `<div class="panel empty"><strong>Scouting…</strong>Reading ${own ? "your" : "their"} public match history from OpenDota.</div>`;
-  const report = await scout(key, { refresh: own }).catch(() => null);
+  if (!saved && !own && !signedIn(collection)) return false;
+  // The saved report; their own visit refreshes a stale one, anyone else reads OpenDota when
+  // none is saved yet.
+  let entry = saved, report = saved?.report ?? null;
+  if (own || !report) app.innerHTML = `<div class="panel empty"><strong>Scouting…</strong>Reading ${own ? "your" : "their"} public match history from OpenDota.</div>`;
+  if (own) { entry = await saveMyScout(key).catch(() => saved); report = entry?.report ?? null; }
+  if (!report) report = await scout(key).catch(() => null);
   if (!stillHere()) return true;
-  const name = registered?.name ?? report?.name ?? `Player ${key}`, rank = rankLabel(report?.rank_tier);
+  const name = entry?.name ?? report?.name ?? `Player ${key}`, rank = rankLabel(report?.rank_tier);
   const sub = ["Not on a league roster", rank ? esc(rank) : "", report ? `scouted ${when(new Date(report.at))}` : "", profileLinks(key)].filter(Boolean).join(" · ");
   // pubSection reads a division file's shape: the report has the same `pubs` rows.
   const d = report && { pubs: { [key]: report.pubs }, updated: new Date(report.at).toISOString() };
