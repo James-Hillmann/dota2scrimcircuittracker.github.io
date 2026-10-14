@@ -28,25 +28,26 @@ jobs:
           mkdir -p b && cd b && npm init -y >/dev/null && npm i -s playwright@1.56.1 >/dev/null && npx playwright install chromium >/dev/null
           cat > run.mjs <<'EOF'
           import { chromium } from "playwright";
+          import { writeFileSync, appendFileSync } from "node:fs";
           const b = await chromium.launch();
           const p = await b.newPage({ userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36", viewport: { width: 1400, height: 1000 } });
-          const imgs = new Set();
-          p.on("response", (r) => { const u = r.url(); if (/\.(png|webp|svg|jpg)(\?|$)/i.test(u) || r.headers()["content-type"]?.startsWith("image/")) imgs.add(`${r.status()} ${u}`); });
-          for (const path of ["/players/75379546", "/players/75379546/heroes", "/players/75379546/dota-plus"]) {
-            await p.goto("https://stratz.com" + path, { waitUntil: "networkidle", timeout: 60000 }).catch((e) => console.log("goto", e.message));
-            await p.waitForTimeout(4000);
-            console.log("PAGE", path, "title:", await p.title());
-          }
-          const all = [...imgs];
-          console.log("images:", all.length);
-          for (const u of all.filter((u) => !/\/heroes\/|\/items\/|abilities|avatars|steamcdn|steamstatic.*avatars/i.test(u))) console.log(u);
-          // Elements that look like hero level badges in the DOM.
-          const dom = await p.evaluate(() => [...document.querySelectorAll("img,svg,[style*='background']")].map((e) => e.getAttribute("src") || e.style?.backgroundImage || "").filter((s) => /badge|plus|level|tier|rank/i.test(s)).slice(0, 40));
-          console.log("DOM refs:", JSON.stringify([...new Set(dom)], null, 1));
-          await p.screenshot({ path: "stratz.png", fullPage: false });
+          writeFileSync("all.js", "");
+          p.on("response", async (r) => {
+            const ct = r.headers()["content-type"] ?? "";
+            if (/javascript/.test(ct)) { try { appendFileSync("all.js", (await r.text()) + "\n"); } catch {} }
+          });
+          await p.goto("https://stratz.com/players/75379546", { waitUntil: "load", timeout: 60000 }).catch((e) => console.log("goto", e.message));
+          await p.waitForTimeout(12000);
+          console.log("title:", await p.title());
+          await p.screenshot({ path: "stratz.png", fullPage: true });
           await b.close();
           EOF
           node run.mjs
+          echo "js bytes: $(wc -c < all.js)"
+          echo "--- dota2/plus paths"
+          grep -oE 'dota2/plus/[^"'"'"'` )]{0,80}' all.js | sort | uniq -c | sort -rn | head -60
+          echo "--- badge names"
+          grep -oiE '.{60}(hero_?badge|herobadge|heroLevel|dotaPlusLevel|plusLevel|badge_rank|plusTier).{80}' all.js | head -40
       - uses: actions/upload-artifact@v4
         if: always()
         with:
