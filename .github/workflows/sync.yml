@@ -51,6 +51,12 @@ jobs:
         env:
           TOTALS_PER_RUN: ${{ inputs.totals_per_run }}
         run: node scripts/sync/sync-all.js || true
+      # Dota Plus hero levels for every account the divisions list (public/data/hero-levels.json).
+      # STRATZ being down only keeps the last run's levels; it never fails the sync.
+      - name: Dota Plus hero levels (STRATZ)
+        env:
+          STRATZ_API_KEY: ${{ secrets.STRATZ_API_KEY }}
+        run: node scripts/stratz/hero-levels.js || echo "::warning::Hero levels not refreshed (STRATZ)."
       - uses: actions/cache/save@v4
         if: always()
         with:

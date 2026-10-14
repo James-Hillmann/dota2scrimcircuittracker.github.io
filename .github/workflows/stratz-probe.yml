@@ -1,5 +1,6 @@
 # Run by hand from the Actions tab: lists where STRATZ keeps Dota Plus hero levels and checks
-# the STRATZ_API_KEY secret works. Prints to the log; commits nothing.
+# the STRATZ_API_KEY secret works, then refreshes public/data/hero-levels.json on the branch it
+# ran on (main gets them from the sync, .github/workflows/sync.yml).
 # The Actions tab only offers "Run workflow" once this file is on main, so until then it also
 # runs on pushes to claude/ branches that touch the STRATZ scripts.
 name: STRATZ probe
@@ -15,12 +16,12 @@ on:
         default: ""
 
 permissions:
-  contents: read
+  contents: write # commit hero-levels.json to a claude/ branch
 
 jobs:
   probe:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     env:
       STRATZ_API_KEY: ${{ secrets.STRATZ_API_KEY }}
     steps:
@@ -34,3 +35,17 @@ jobs:
       - name: Probe STRATZ
         if: env.STRATZ_API_KEY != ''
         run: node scripts/stratz/stratz-probe.js ${{ inputs.account_id }}
+      - name: Hero levels
+        if: env.STRATZ_API_KEY != ''
+        run: node scripts/stratz/hero-levels.js
+      # main's copy comes from the sync; only a claude/ branch gets a commit from here.
+      - name: Commit hero levels to the branch
+        if: env.STRATZ_API_KEY != '' && startsWith(github.ref_name, 'claude/')
+        run: |
+          if [ -z "$(git status --porcelain -- public/data/hero-levels.json)" ]; then echo "No change."; exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/data/hero-levels.json
+          git commit -m "Dota Plus hero levels from STRATZ"
+          git pull --rebase origin "$GITHUB_REF_NAME"
+          git push origin "HEAD:$GITHUB_REF_NAME"
