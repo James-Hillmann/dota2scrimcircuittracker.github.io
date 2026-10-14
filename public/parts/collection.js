@@ -526,7 +526,7 @@ async function drawGallery(body,{viewer,signIn}) {
       <span class="gallery-count">${fresh?`<b class="gallery-fresh">${fresh} new</b> · `:''}${shown.length} card${shown.length===1?'':'s'}</span></div>
       <div class="gallery-grid">${PAINT_FILTER}${shown.map(c=>{
         const r=roster.get(c.account),player={account:Number(c.account),name:nameOf(c),team:r?.team??'AD2L'};
-        const link=r?`${SOURCES[r.league]?.root??'#/all'}/player/${c.account}`:null;
+        const link=`${SOURCES[r?.league]?.root??'#/all'}/player/${c.account}`; // every Steam player has a profile (parts/scouted.js)
         return `<figure data-gallery="${c.account}:${c.slot}"${isNew(c)?' class="gallery-new"':''}>${renderer.card(player,null,{own:true,equipmentOverride:c.design}).replace('data-pick=',`data-design-slot="${c.slot}" data-pick=`)}<figcaption>${isNew(c)?'<span class="gallery-new-tag">New</span> ':''}${link?`<a href="${link}">${esc(player.name)}</a>`:esc(player.name)} · Card ${c.slot+1}${c.primary?' · Primary':''}</figcaption></figure>`;
       }).join('')||`<p>${unrated?"You've rated every card here.":'No custom cards yet.'}</p>`}</div>`;
     body.querySelector('[data-gallery-sort]').value=sort;
