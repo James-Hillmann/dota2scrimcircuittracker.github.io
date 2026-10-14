@@ -36,10 +36,20 @@ export function showProfileBackground(raw,name) {
   head.parentElement.querySelectorAll(':scope > .pbg-layer, .pp-head > .pbg-layer').forEach(el=>el.remove());
   const bg=profileBackgroundOf(raw),art=bg&&screenArt(bg.id);
   head.classList.toggle('has-bg',!!art&&bg.place==='head');
+  textColour(head,art&&bg.text);
   if(!art)return;
   if(bg.place==='head')head.insertAdjacentHTML('afterbegin',layerHtml(bg,name));
   else head.insertAdjacentHTML('beforebegin',layerHtml(bg,name,' pbg-fixed'));
 }
+
+// The head's text in colour (CSS .pbg-text), or the site's own colours for null.
+function textColour(el,colour) {
+  el.classList.toggle('pbg-text',!!colour);
+  if(colour)el.style.setProperty('--pbg-text',colour);else el.style.removeProperty('--pbg-text');
+}
+// The text colour swatches: the site's own, then a few that read on most screens. Any other
+// colour comes from the picker after them.
+const TEXT_COLOURS=[[null,'Default'],['#ffffff','White'],['#f3e9d2','Bone'],['#f2c14e','Gold'],['#9fd8ff','Ice'],['#ff8a7a','Coral'],['#111111','Black']];
 
 // Your own profile: a button that opens the editor. state is your collection state.
 export function mountBackgroundButton(host,{state,name}) {
@@ -75,6 +85,7 @@ export function openBackgroundEditor({state,name,onSaved}) {
         <fieldset class="visual-text-options pbg-sig-options"><legend>Signature style</legend><div>${[{id:'none',name:'No signature'},...sigItems.autograph].map(i=>`<button type="button" data-sig-choice="autograph" data-choice="${i.id}"><span data-sig-preview></span><strong>${esc(i.name)}</strong></button>`).join('')}</div>${sigItems.autograph.length?'':'<p>Open packs to collect signature styles.</p>'}</fieldset>
         ${sigItems.translation.length?`<fieldset class="visual-text-options pbg-sig-options"><legend>Modifier</legend><div>${[{id:'none',name:'No modifier'},...sigItems.translation].map(i=>`<button type="button" data-sig-choice="translation" data-choice="${i.id}"><span data-sig-preview></span><strong>${esc(i.name)}</strong></button>`).join('')}</div></fieldset>${letterCaseHtml()}`:''}
         <fieldset class="pbg-framing" data-sig-sliders><legend>Signature size &amp; angle</legend><p>Drag your signature in the preview to place it.</p>${SIG_SLIDERS.map(([k,label,min,max,step])=>`<label>${label} <output data-sig-out="${k}"></output><input type="range" data-sig-slider="${k}" min="${min}" max="${max}" step="${step}"></label>`).join('')}</fieldset>
+        <fieldset class="pbg-text-colour"><legend>Text colour</legend><p>Your name, links and tabs over the background.</p><div>${TEXT_COLOURS.map(([c,label])=>`<button type="button" data-text="${c??''}" title="${label}" aria-label="${label}"${c?` style="--swatch:${c}"`:''}>${c?'':'Aa'}</button>`).join('')}<label title="Any colour"><input type="color" data-text-pick aria-label="Any colour"><span>Custom</span></label></div></fieldset>
         <fieldset class="pbg-framing"><legend>Framing &amp; colour</legend>${SLIDERS.map(([k,label,min,max,step])=>`<label>${label} <output data-out="${k}"></output><input type="range" data-slider="${k}" min="${min}" max="${max}" step="${step}"></label>`).join('')}<button type="button" data-reset>Reset framing &amp; colour</button></fieldset>
         <div class="pbg-savebar"><button type="button" data-cancel>Cancel</button><button type="button" data-save>Save background</button></div>
       </div>
@@ -85,10 +96,13 @@ export function openBackgroundEditor({state,name,onSaved}) {
   const draw=()=>{
     const shown=bg&&{...bg,place,sig};
     preview.dataset.place=place;
-    preview.innerHTML=`${place==='page'?layerHtml(shown,name):''}<div class="pbg-mock-head">${place==='head'?layerHtml(shown,name):''}<span class="pbg-mock-kicker">Players › ${esc(name)}</span><b>${esc(name)}</b><span class="pbg-mock-tabs">Stats · Heroes · Combat · Games</span></div><div class="pbg-mock-body"><i></i><i></i><i></i><i class="wide"></i></div>`;
+    preview.innerHTML=`${place==='page'?layerHtml(shown,name):''}<div class="pbg-mock-head${bg?.text?' pbg-text':''}"${bg?.text?` style="--pbg-text:${bg.text}"`:''}>${place==='head'?layerHtml(shown,name):''}<span class="pbg-mock-kicker">Players › ${esc(name)}</span><b>${esc(name)}</b><span class="pbg-mock-tabs">Stats · Heroes · Combat · Games</span></div><div class="pbg-mock-body"><i></i><i></i><i></i><i class="wide"></i></div>`;
     $$('[data-place]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.place===place)));
     $$('[data-bg]').forEach(b=>b.setAttribute('aria-pressed',String((bg?.id??'')===b.dataset.bg)));
     $$('[data-slider]').forEach(input=>{const k=input.dataset.slider;input.disabled=!bg;input.value=bg?.[k]??fresh(null)[k];$(`[data-out="${k}"]`).textContent=bg?(k==='zoom'?`${Number(bg[k]).toFixed(2)}×`:`${Math.round(bg[k])}${k==='dim'?'%':k==='hue'?'°':''}`):'';});
+    $$('[data-text]').forEach(b=>{b.disabled=!bg;b.setAttribute('aria-pressed',String((bg?.text??'')===b.dataset.text));});
+    const pick=$('[data-text-pick]'),custom=!!bg?.text&&!TEXT_COLOURS.some(([c])=>c===bg.text);
+    pick.disabled=!bg;pick.closest('label').classList.toggle('on',custom);if(bg?.text)pick.value=bg.text;
     drawStyles();drawSig();
     $('[data-reset]').disabled=!bg;
   };
@@ -132,7 +146,9 @@ export function openBackgroundEditor({state,name,onSaved}) {
   });
   $$('[data-bg]').forEach(b=>b.onclick=()=>{const id=b.dataset.bg||null;bg=id?(bg?{...bg,id}:fresh(id)):null;draw();});
   $$('[data-slider]').forEach(input=>input.oninput=()=>{if(!bg)return;bg[input.dataset.slider]=Number(input.value);draw();});
-  $('[data-reset]').onclick=()=>{if(bg){bg={...fresh(bg.id),style:bg.style};draw();}};
+  $$('[data-text]').forEach(b=>b.onclick=()=>{if(bg){bg.text=b.dataset.text||null;draw();}});
+  $('[data-text-pick]').oninput=e=>{if(bg){bg.text=e.target.value.toLowerCase();draw();}};
+  $('[data-reset]').onclick=()=>{if(bg){bg={...fresh(bg.id),style:bg.style,text:bg.text};draw();}};
   // Drag the preview: moving right shows more of the left of the image. Drag the signature to
   // move it instead.
   preview.onpointerdown=e=>{

@@ -33,12 +33,13 @@ export const shownNickname=state=>state?.showNickname&&state.nickname?state.nick
 // crop; dim (0-90) darkens it so the page stays readable; style is a card image style (null for
 // the plain image) and hue turns its colours (0-360). sig is your signature on it, or null: an
 // owned signature style and modifier, placed at x, y (percent of the background), size and
-// rotation like a card's. A bare screen id is the defaults.
+// rotation like a card's. text is the colour of the profile head's text over it ('#rrggbb'), or
+// null for the site's own colours. A bare screen id is the defaults.
 export const PROFILE_BG_PLACES=['head','page'];
 export function profileBackgroundOf(bg) {
   if(!bg)return null;
   const b=typeof bg==='string'?{id:bg}:bg;
-  return {id:b.id,place:b.place??'head',x:b.x??50,y:b.y??30,zoom:b.zoom??1,dim:b.dim??(b.place==='page'?70:45),style:b.style??null,hue:b.hue??0,sig:b.sig?{translation:'none',x:50,y:50,size:5,rotation:-7,...b.sig}:null};
+  return {id:b.id,place:b.place??'head',x:b.x??50,y:b.y??30,zoom:b.zoom??1,dim:b.dim??(b.place==='page'?70:45),style:b.style??null,hue:b.hue??0,text:b.text??null,sig:b.sig?{translation:'none',x:50,y:50,size:5,rotation:-7,...b.sig}:null};
 }
 export function setProfileBackground(state,{background=null}={}) {
   if(background==null)return {...state,profileBackground:null};
@@ -50,6 +51,8 @@ export function setProfileBackground(state,{background=null}={}) {
   if(typeof bg.dim!=='number'||!Number.isFinite(bg.dim)||bg.dim<0||bg.dim>90)throw new Error('Choose a valid dim level.');
   if(bg.style!=null&&!CARD_STYLES.some(([id])=>id===bg.style))throw new Error('Choose a valid image style.');
   if(typeof bg.hue!=='number'||!Number.isFinite(bg.hue)||bg.hue<0||bg.hue>360)throw new Error('Choose a valid hue.');
+  if(bg.text!=null&&(typeof bg.text!=='string'||!/^#[0-9a-f]{6}$/i.test(bg.text)))throw new Error('Choose a valid text colour.');
+  if(bg.text)bg.text=bg.text.toLowerCase();
   if(bg.sig) {
     const owns=(type,id)=>typeof id==='string'&&!!itemByKey(`${type}:${id}`)&&state.inventory?.[`${type}:${id}`]>0;
     if(!owns('autograph',bg.sig.autograph))throw new Error('Collect this signature style before using it.');

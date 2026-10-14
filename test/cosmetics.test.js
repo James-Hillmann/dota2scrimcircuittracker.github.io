@@ -176,8 +176,8 @@ test('border symbol can be turned off and back on; only false is stored',()=>{
 });
 test('profile background: owned screen, header or page, valid framing; null clears it',()=>{
   const state={...grantLogin(null),screens:['scr:aaa']};
-  assert.deepEqual(setProfileBackground(state,{background:{id:'scr:aaa'}}).profileBackground,{id:'scr:aaa',place:'head',x:50,y:30,zoom:1,dim:45,style:null,hue:0,sig:null});
-  assert.deepEqual(setProfileBackground(state,{background:{id:'scr:aaa',place:'page',x:10,y:90,zoom:2,dim:80,style:'ember',hue:200}}).profileBackground,{id:'scr:aaa',place:'page',x:10,y:90,zoom:2,dim:80,style:'ember',hue:200,sig:null});
+  assert.deepEqual(setProfileBackground(state,{background:{id:'scr:aaa'}}).profileBackground,{id:'scr:aaa',place:'head',x:50,y:30,zoom:1,dim:45,style:null,hue:0,text:null,sig:null});
+  assert.deepEqual(setProfileBackground(state,{background:{id:'scr:aaa',place:'page',x:10,y:90,zoom:2,dim:80,style:'ember',hue:200}}).profileBackground,{id:'scr:aaa',place:'page',x:10,y:90,zoom:2,dim:80,style:'ember',hue:200,text:null,sig:null});
   assert.equal(setProfileBackground(state,{background:null}).profileBackground,null);
   assert.throws(()=>setProfileBackground(state,{background:{id:'scr:bbb'}}),/Collect this loading screen/);
   assert.throws(()=>setProfileBackground(state,{background:{id:'scr:aaa',place:'side'}}),/header or the whole page/);
@@ -185,13 +185,15 @@ test('profile background: owned screen, header or page, valid framing; null clea
   assert.throws(()=>setProfileBackground(state,{background:{id:'scr:aaa',dim:95}}),/dim/);
   assert.throws(()=>setProfileBackground(state,{background:{id:'scr:aaa',style:'glitter'}}),/image style/);
   assert.throws(()=>setProfileBackground(state,{background:{id:'scr:aaa',hue:400}}),/hue/);
+  assert.equal(setProfileBackground(state,{background:{id:'scr:aaa',text:'#F2C14E'}}).profileBackground.text,'#f2c14e');
+  assert.throws(()=>setProfileBackground(state,{background:{id:'scr:aaa',text:'red;background:url(x)'}}),/text colour/);
   const sig=CATALOG.find(i=>i.type==='autograph'),mod=CATALOG.find(i=>i.type==='translation');
   const signer={...state,inventory:{[sig.key]:1}};
   assert.deepEqual(setProfileBackground(signer,{background:{id:'scr:aaa',sig:{autograph:sig.id,x:20,y:70,extra:1}}}).profileBackground.sig,{autograph:sig.id,translation:'none',x:20,y:70,size:5,rotation:-7});
   assert.throws(()=>setProfileBackground(state,{background:{id:'scr:aaa',sig:{autograph:sig.id}}}),/signature style/);
   assert.throws(()=>setProfileBackground(signer,{background:{id:'scr:aaa',sig:{autograph:sig.id,translation:mod.id}}}),/modifier/);
   assert.throws(()=>setProfileBackground(signer,{background:{id:'scr:aaa',sig:{autograph:sig.id,size:20}}}),/signature position/);
-  assert.deepEqual(profileBackgroundOf('scr:aaa'),{id:'scr:aaa',place:'head',x:50,y:30,zoom:1,dim:45,style:null,hue:0,sig:null});
+  assert.deepEqual(profileBackgroundOf('scr:aaa'),{id:'scr:aaa',place:'head',x:50,y:30,zoom:1,dim:45,style:null,hue:0,text:null,sig:null});
 });
 
 test('Greek and Cyrillic modifiers take lower or upper case; only upper is saved',()=>{

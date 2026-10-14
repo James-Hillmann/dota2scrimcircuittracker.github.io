@@ -2706,6 +2706,11 @@ button.ga-go:hover:not(:disabled) { background: var(--accent); color: var(--on-a
 :is(.pbg-layer, .pbg-editor) [data-style="plain"] .ft-art img { filter: none; }
 .pbg-layer::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(var(--ink-rgb), min(1, calc(var(--pbg-dim) + .4))) 0%, rgba(var(--ink-rgb), var(--pbg-dim)) 55%, rgba(var(--ink-rgb), calc(var(--pbg-dim) * .6)) 100%); }
 .pbg-layer.pbg-fixed { position: fixed; z-index: -1; }
+/* The head's text in the colour picked in the background editor (--pbg-text), with a shadow so it
+   reads over the art. Unpicked tabs stay a step fainter than the picked one. */
+.pp-head.pbg-text :is(.kicker, .kicker a, .crumbs li::before, .crumbs [aria-current], .h1-name, .h1-name *, .pp-sub, .pp-sub *, .pp-tabs button) { color: var(--pbg-text); text-shadow: 0 1px 2px rgb(0 0 0 / .7), 0 0 10px rgb(0 0 0 / .45); }
+.pp-head.pbg-text .pp-tabs button:not([aria-selected="true"]) { opacity: .72; }
+.pp-head.pbg-text .pp-tabs button:hover { opacity: 1; }
 .pbg-layer.pbg-fixed::after { background: linear-gradient(rgba(var(--ink-rgb), calc(var(--pbg-dim) * .8)), rgba(var(--ink-rgb), var(--pbg-dim)) 40%, rgba(var(--ink-rgb), min(1, calc(var(--pbg-dim) + .15)))); }
 @media (max-width: 760px) {
   .pp-head .kicker::before { display: none; }
