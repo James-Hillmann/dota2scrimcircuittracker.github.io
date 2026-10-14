@@ -21,7 +21,7 @@ permissions:
 jobs:
   probe:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     env:
       STRATZ_API_KEY: ${{ secrets.STRATZ_API_KEY }}
     steps:
@@ -34,6 +34,7 @@ jobs:
         run: echo "::warning::Add a STRATZ_API_KEY repo secret (Settings > Secrets and variables > Actions) to run the probe."
       - name: Probe STRATZ
         if: env.STRATZ_API_KEY != ''
+        continue-on-error: true
         run: node scripts/stratz/stratz-probe.js ${{ inputs.account_id }}
       - name: Hero levels
         if: env.STRATZ_API_KEY != ''

@@ -6,7 +6,7 @@
 const URL = "https://api.stratz.com/graphql";
 const GAP_MS = 350;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-let last = 0;
+let last = 0, waitedForIp = false;
 
 export function hasToken() { return Boolean(process.env.STRATZ_API_KEY); }
 
@@ -27,7 +27,21 @@ export async function stratz(query, variables = {}, tries = 5) {
       await sleep(wait);
       continue;
     }
-    if (!res.ok) throw new Error(`STRATZ HTTP ${res.status}: ${(await res.text()).slice(0, 300)}`);
+    if (!res.ok) {
+      const text = (await res.text()).slice(0, 300);
+      // A key may be used from 2 IP addresses per 15 minutes, and every Actions run is a new
+      // one. STRATZ says when one frees up ("... at 2026-10-14 19:50:22 UTC"): wait for it, once.
+      const free = res.status === 403 && /IP Address/i.test(text) && text.match(/at (\d{4}-\d\d-\d\d \d\d:\d\d:\d\d) UTC/);
+      if (free && !waitedForIp) {
+        waitedForIp = true;
+        const wait = Math.min(16 * 60e3, Math.max(0, Date.parse(`${free[1].replace(" ", "T")}Z`) - Date.now()) + 5e3);
+        console.log(`  STRATZ: this key's 2 IP addresses are in use; waiting ${Math.round(wait / 1000)}s for one to free up`);
+        await sleep(wait);
+        attempt--;
+        continue;
+      }
+      throw new Error(`STRATZ HTTP ${res.status}: ${text}`);
+    }
     const body = await res.json();
     if (body.errors?.length) throw new Error(`STRATZ: ${body.errors.map((e) => e.message).join("; ")}`);
     return body.data;
