@@ -1,5 +1,5 @@
 // Local dev server: serves public/ exactly as GitHub Pages will. No backend — the site
-// talks to Firestore directly (one dev-only exception, the hero-art picker save below).
+// talks to Firestore directly (one dev-only exception, the dev-page saves below).
 // Usage: npm start → http://localhost:3000
 // `node server.js _site` serves a deploy build instead (preview pages, trimmed data files).
 import http from "node:http";
@@ -14,17 +14,18 @@ const MIME = {
   ".json": "application/json", ".txt": "text/plain; charset=utf-8", ".xml": "application/xml", ".svg": "image/svg+xml", ".png": "image/png", ".webp": "image/webp", ".ico": "image/x-icon", ".woff2": "font/woff2",
 };
 
-// Dev only: the hero-art picker (public/_dev/cards.html) saves its choices here, so Claude can
-// read them. public/_dev/ is gitignored and never deployed.
-const HERO_ART = path.join(root, "_dev", "hero-art.json");
+// Dev only: the hero-art picker (public/_dev/cards.html) and the loading-screen sorter
+// (public/_dev/screen-sort.html) save their choices here, so Claude can read them.
+// public/_dev/ is gitignored and never deployed.
+const DEV_SAVES = new Set(["/_dev/hero-art.json", "/_dev/screen-sort.json"]);
 
 http.createServer(async (req, res) => {
   const { pathname } = new URL(req.url, "http://localhost");
-  if (req.method === "PUT" && pathname === "/_dev/hero-art.json") {
+  if (req.method === "PUT" && DEV_SAVES.has(pathname)) {
     let body = "";
     for await (const c of req) { body += c; if (body.length > 100_000) { res.writeHead(413).end(); return; } }
     try { JSON.parse(body); } catch { res.writeHead(400).end(); return; }
-    await writeFile(HERO_ART, body);
+    await writeFile(path.join(root, pathname), body);
     res.writeHead(204).end();
     return;
   }
