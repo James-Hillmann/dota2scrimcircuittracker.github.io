@@ -7,6 +7,7 @@ import { info } from "../lib/glossary.js";
 import { ordinal } from "../lib/ranks.js";
 import { pct, fmt, kg, dur, esc, portrait, shortDate, playerLink, heroLink, teamLink, when, leagueShort, allLeagues } from "../core.js";
 import { rateOf } from "./draft.js";
+import { plusSlot } from "../lib/hero-levels.js";
 
 // ---------- Game analysis (player page) ----------
 // One of the player's games in depth: a picker (every game, newest first, with its game
@@ -136,7 +137,7 @@ function gamePickerHtml(src, mode, games, gi, rated, page = Math.floor(gi / GA_P
     return `<button type="button" class="ga-g ${x.won ? "ga-w" : "ga-l"}${r ? ` t-${r.tier}` : ""}" data-gi="${k}" aria-pressed="${k === gi}" style="--i:${n}"
         title="${esc(mode === "hero" ? x.p.name : x.p.hero)} vs ${esc(them)} · ${x.won ? "Won" : "Lost"} · ${x.p.kills}/${x.p.deaths}/${x.p.assists}">
       ${portrait(x.p.hero, "ga-g-img")}
-      <span class="ga-g-body">${mode === "hero" ? `<span class="ga-g-who">${esc(x.p.name)}</span>` : ""}<span class="ga-g-vs">vs ${esc(them)}</span>
+      <span class="ga-g-body">${plusSlot(x.p.account_id, x.p.hero, x.m.start_time)}${mode === "hero" ? `<span class="ga-g-who">${esc(x.p.name)}</span>` : ""}<span class="ga-g-vs">vs ${esc(them)}</span>
         <span class="ga-g-date">${x.m.createdAt ? shortDate(new Date(x.m.createdAt)) : ""} · <b class="res ${x.won ? "w" : "l"}">${x.won ? "W" : "L"}</b></span>
         <span class="ga-g-kda">${x.p.kills}/${x.p.deaths}/${x.p.assists}</span></span>
       ${r ? `<span class="ga-g-r"><b>${r.rating}</b><small>${r.tier}</small></span>` : ""}${flag ? `<span class="ga-g-flag">${flag}</span>` : ""}
@@ -159,7 +160,7 @@ export function gameAnalysisHtml(src, mode, games, gi, rated, ctx = null) {
   const ad2lSides = src.ad2l && !m.unticketed;
 
   const head = `<div class="ga-head ${g.won ? "ga-w" : "ga-l"}">
-    <div class="ga-art">${portrait(p.hero, "ga-art-img")}</div>
+    <div class="ga-art">${portrait(p.hero, "ga-art-img")}${plusSlot(p.account_id, p.hero, m.start_time)}</div>
     <div class="ga-head-body">
       <div class="ga-result">${g.won ? "Victory" : "Defeat"}</div>
       <div class="ga-title">${mode === "hero" ? playerLink(src, p) : heroLink(src, p.hero)} <span class="muted">vs</span> ${teamLink(src, vs.name, vs.id ?? null)}</div>
@@ -192,7 +193,7 @@ export function gameAnalysisHtml(src, mode, games, gi, rated, ctx = null) {
     const ten = list.map((r, k) => {
       const q = m.players.find((x) => playerKey(x) === r.key);
       return `<li class="${r === me ? "me" : ""} s-${sideOfKey[r.key]}"><span class="ga-ten-n">${k + 1}</span>${q ? portrait(q.hero) : ""}
-        <span class="ga-ten-name">${q ? playerLink(src, q) : esc(r.name)}</span><span class="ga-ten-r t-${r.tier}">${r.rating}</span></li>`;
+        <span class="ga-ten-name">${q ? plusSlot(q.account_id, q.hero, m.start_time) + playerLink(src, q) : esc(r.name)}</span><span class="ga-ten-r t-${r.tier}">${r.rating}</span></li>`;
     }).join("");
     impact = `<div class="ga-impact">
       <div class="ga-score t-${me.tier}">

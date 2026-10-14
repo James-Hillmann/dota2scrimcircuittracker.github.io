@@ -18,6 +18,7 @@ import { renderTeams } from "./pages/teams.js";
 import { renderWeek } from "./pages/week.js";
 import { mountMe } from "./parts/me.js";
 import { mountGift } from './parts/collection.js';
+import { startPlusLevels } from "./lib/hero-levels.js";
 
 // Upload (and editing an upload) and Predictions load on first visit.
 const uploadPage = () => import("./pages/upload.js");
@@ -661,6 +662,8 @@ countVisit();
   try { seen = sessionStorage.getItem("calm") === "1"; } catch { /* storage blocked */ }
   if (seen) calm(); else setTimeout(calm, 1500);
 }
+// Dota Plus hero levels fill the badges pages left empty (lib/hero-levels.js); nothing waits on them.
+startPlusLevels();
 // Feedback mode (lib/feedback.js) and the guided tour (lib/tour.js) load after the first page
 // starts drawing, so they don't hold it up.
 // Feedback: the Feedback button in the top bar.

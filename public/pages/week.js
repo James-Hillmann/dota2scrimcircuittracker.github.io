@@ -10,6 +10,7 @@ import { fbOf, hitText } from "../parts/combat.js";
 import { bestLaner, loading, errorBox, weekOfFn } from "../parts/lanes.js";
 import { upNextHtml } from "./standings.js";
 import { tagContext, gameTags, tagsHtml } from "../lib/gametags.js";
+import { plusSlot } from "../lib/hero-levels.js";
 
 function weekHighlights(games, src, league = games) {
   const all = games.flatMap((m) => m.players.map((p) => ({ p, m })));
@@ -60,7 +61,7 @@ function gamePanel(m, src, label, cuts = null, tagCtx = null) {
   };
   const lineup = (t) => m.players.filter((p) => p.team === t).map((p) => `
     <li class="${p === mvp ? "mvp" : ""}">${portrait(p.hero)}
-      <span class="lu-name">${playerLink(src, p)}${p === mvp ? ' <span class="mvp-tag">MVP</span>' : ""}${laneTag(p)}</span>
+      <span class="lu-name">${plusSlot(p.account_id, p.hero, m.start_time)}${playerLink(src, p)}${p === mvp ? ' <span class="mvp-tag">MVP</span>' : ""}${laneTag(p)}</span>
       <span class="lu-kda">${p.kills}/${p.deaths}/${p.assists}</span>
       <span class="lu-nw">${fmt(p.net_worth)}</span>
     </li>`).join("");

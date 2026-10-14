@@ -6,6 +6,7 @@ import { cardArtwork } from "../lib/card-art.js";
 import { teamLogoHtml } from "../lib/team-logos.js";
 import { cosmeticAttributes, cosmeticLayers, playerEquipment, playerNickname } from '../lib/cosmetics.js';
 import { BACK_STATS, backStats, partState } from '../lib/card-layout.js';
+import { plusSlot } from "../lib/hero-levels.js";
 
 // The cards' hero art filters. Each hero has its own art and style (lib/hero-art.js, picked by
 // Fav; styles in style.css .ft-card[data-style]). The default, stencil, is a print to match the
@@ -118,7 +119,7 @@ export function createPlayerCards(matches, { cards = new Map(), teams = [], tier
       const s = partState(layout, key);
       return `<${tag} class="${cls}${s.placed ? " ft-placed" : ""}" data-part="${key}"${s.show ? "" : " hidden"}${s.style ? ` style="${s.style}"` : ""}${extra}>${html}</${tag}>`;
     };
-    const hero = (h) => `<span class="ft-hrow"><span class="ft-h">${heroImg(h.hero) ? `<img src="${esc(heroImg(h.hero))}" alt="" loading="lazy">` : ""}<b>${h.games}</b></span><span class="ft-hname">${esc(h.hero)}</span><span class="ft-hrec">${h.games}g · ${Math.round((100 * h.wins) / h.games)}%</span></span>`;
+    const hero = (h) => `<span class="ft-hrow"><span class="ft-h">${heroImg(h.hero) ? `<img src="${esc(heroImg(h.hero))}" alt="" loading="lazy">` : ""}<b>${h.games}</b>${plusSlot(p.account, h.hero)}</span><span class="ft-hname">${esc(h.hero)}</span><span class="ft-hrec">${h.games}g · ${Math.round((100 * h.wins) / h.games)}%</span></span>`;
     // By default farm and damage for cores, vision, stacks and healing for supports.
     const statValue = {
       games: g, win: g ? Math.round((100 * st.wins) / g) + "%" : "—", kda,
@@ -144,12 +145,13 @@ export function createPlayerCards(matches, { cards = new Map(), teams = [], tier
     ];
     const onPlate = plateParts.filter(([k]) => !partState(layout, k).placed).map(([, h]) => h).join("");
     const offPlate = plateParts.filter(([k]) => partState(layout, k).placed).map(([, h]) => h).join("");
-    return `<div class="ft-card${t ? ` t-${t.tier}` : ""}${ha ? ` ${ha.cls}` : ""}${own ? " own" : ""}${ha?.crop ? " ft-custom-crop" : ""}${layout?.back?.positions === false ? " ft-no-posbars" : ""}${layout?.back?.heroes === false ? " ft-no-heroes" : ""}"${appearance} data-role="${role ?? 0}"${layout?.name != null ? ' data-renamed="1"' : ""}${ha ? ` data-style="${ha.style}"` : ""} data-pick="${p.account}" data-player-name="${esc(p.name)}" data-auto-hero="${HERO_META.find(([,name])=>name===top[0]?.hero)?.[0]??0}" data-card-hero="${ov?.hero??0}" data-card-art="${esc(ov?.art??'')}" data-card-style="${esc(ov?.style??'')}" data-card-pos="${ov?.pos??0}" data-card-crop="${esc(JSON.stringify(ov?.crop??null))}">
+    return `<div class="ft-card${t ? ` t-${t.tier}` : ""}${ha ? ` ${ha.cls}` : ""}${own ? " own" : ""}${ha?.crop ? " ft-custom-crop" : ""}${layout?.back?.positions === false ? " ft-no-posbars" : ""}${layout?.back?.heroes === false ? " ft-no-heroes" : ""}${partState(layout, "plus").show ? " ft-plus-on" : ""}"${appearance} data-role="${role ?? 0}"${layout?.name != null ? ' data-renamed="1"' : ""}${ha ? ` data-style="${ha.style}"` : ""} data-pick="${p.account}" data-player-name="${esc(p.name)}" data-auto-hero="${HERO_META.find(([,name])=>name===top[0]?.hero)?.[0]??0}" data-card-hero="${ov?.hero??0}" data-card-art="${esc(ov?.art??'')}" data-card-style="${esc(ov?.style??'')}" data-card-pos="${ov?.pos??0}" data-card-crop="${esc(JSON.stringify(ov?.crop??null))}">
       <div class="ft-tilt"><div class="ft-flip">
         <div class="ft-face ft-front" role="group" aria-label="${esc(p.name)}, ${esc(p.team)}${t ? `, tier ${t.tier}` : ""}${face ? `, ${esc(face)}` : ""}">
           <span class="ft-art" style="--grit:${gritAt(p.account)}">${art ? `<img src="${esc(art)}" alt="" loading="lazy" data-wide="${esc(wide)}">` : ""}</span>
           ${part("tier", "ft-tier", t ? `${t.tier}<small>${t.rating}</small>` : "—")}
           ${pill}
+          ${face ? part("plus", "ft-plus", plusSlot(p.account, face)) : ""}
           <span class="ft-plate">
             ${onPlate}
             ${own ? "" : pickBtn("ft-fpick")}

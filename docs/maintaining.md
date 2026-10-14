@@ -224,6 +224,33 @@ Backfills refill a field for games already synced, from the cached OpenDota matc
 - **Ward maps** are drawn on `public/img/minimap.webp`, lined up by its two fountains against where
   players stand before the horn (both axes 4.25 px per map unit).
 
+## STRATZ (Dota Plus hero levels)
+
+OpenDota and the Steam Web API have no Dota Plus hero levels; STRATZ's GraphQL API does
+(`scripts/stratz/stratz.js`, `player.dotaPlus`: one dated row per level reached on a hero). It
+needs a token from stratz.com/api: the `STRATZ_API_KEY` repository secret in Actions, or
+`STRATZ_API_KEY=... node ...` locally. A key may be used from 2 IP addresses per 15 minutes and
+every Actions run is a new one, so the client waits for a slot when STRATZ says it's full.
+
+- **The sync** runs `scripts/stratz/hero-levels.js` after the divisions: every rostered account,
+  every account in a league game and every account with pubs, written to
+  `public/data/hero-levels.json` (`accounts[id][heroId] = [level, unix hour, ...]`, one line
+  per account so the timestamp-only check still works). STRATZ failing keeps the last levels.
+- **STRATZ lists levels from 11 up** (almost every hero's first row is 11), so lower levels show
+  no badge; private or anonymous profiles neither.
+- **The site** (`public/lib/hero-levels.js`): pages write an empty `plusSlot(account, hero, time)`
+  and the file, loaded once after startup, fills every slot with the badge. With a game's start
+  time it's the level the player had then. Tiers: Bronze 1, Silver 6, Gold 12, Platinum 18,
+  Master 25, Grandmaster 30 (the game's, and STRATZ's `HERO_LEVEL_STEPS`). The art is Valve's
+  badges as STRATZ serves them (`cdn.stratz.com/images/dota2/plus/hero_badge_<1-6>.png`), saved
+  as 96px WebP in `public/img/hero-badges/<tier>.webp`, with the level drawn on top.
+- **Cards**: the badge is the layout part `plus`, off until the owner turns it on in Card
+  layout (`lib/card-layout.js`). The collection Worker checks layouts with the same file, so
+  **redeploy the Worker** (`cd workers/steam-auth && npx wrangler deploy`) after changing it, or
+  it drops the setting when a card is saved.
+- `scripts/stratz/stratz-probe.js` (the **STRATZ probe** workflow) lists the schema's Dota Plus
+  fields and checks the key; on a `claude/` branch it also refreshes `hero-levels.json` there.
+
 ## Firebase key
 
 `public/firebase-config.js` is not committed. The Pages workflow writes it from the
