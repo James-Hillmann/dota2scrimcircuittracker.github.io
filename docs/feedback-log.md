@@ -12,3 +12,9 @@ Completed feedback tickets: ID · date · what was done. Names stay out (this re
 - FB-TRT14B · 2026-10-13 · Card backs under 200px wide use two stat columns, so K/D/A and other stats fit on phones
 - FB-3T1F2G · 2026-10-13 · Card layout settings: hide, resize or move any front text, including everything but the tier
 - FB-IDYMEY · 2026-10-13 · Card layout settings: your own card name (24 characters) and a name size slider
+- FB-JJHHRC · 2026-10-14 · Feedback button on every pop-up, plus faster screenshots
+- FB-EUHOMB · 2026-10-14 · Leaderboard in the phone More menu; compact leaderboard table
+- FB-CY1E47 · 2026-10-14 · Collected filter is now a 'Show only collected' checkbox
+- FB-IYAOSA · 2026-10-14 · Thanks, nothing to build
+- FB-FLW0UX · 2026-10-14 · Thanks, nothing to build
+- FB-8BCROX · 2026-10-14 · Thanks, nothing to build

@@ -435,7 +435,7 @@ export async function mountProfileCollection(host,{account,name,matches,team,tie
   try {
     const [data,cards]=await Promise.all([publicCollection(account).catch(()=>({inventory:{},unavailable:true})),listCards().catch(()=>new Map())]);if(!section.isConnected)return;
     if(data.equipment)cards.set(account,{...cards.get(account),cosmetics:{...data.equipment,nickname:data.nickname??null}});
-    profileTitle(data.nickname,name);showProfileBackground(data.background);
+    profileTitle(data.nickname,name);showProfileBackground(data.background,data.nickname??name);
     const count=CATALOG.filter(i=>data.inventory[i.key]>0).length+new Set(data.screens??[]).size,renderer=createPlayerCards(matches,{cards,tiers:new Map(tier?[[String(account),tier]]:[])});
     const preferences=cardDesignState(data),player={account,name,team:team??'AD2L'};
     const cardHtml=PAINT_FILTER+renderer.card(player,null,{own:true,equipmentOverride:preferences.cardDesigns[preferences.primaryCard]});
@@ -494,7 +494,7 @@ async function mountRatings(section,account) {
 
 // The Gallery: every saved card anyone in the league has changed, with its rating. Sorted by the
 // community's rating (legendary first; among equals, the clearer verdict, then more votes), by
-// votes, or by name. "Not rated by me" leaves the cards a signed-in player can still rate.
+// votes, by newest change, or by name. "Not rated by me" leaves the cards a signed-in player can still rate.
 const PICK_RANK={legendary:4,epic:3,rare:2,common:1};
 async function drawGallery(body,{viewer,signIn}) {
   body.innerHTML='<p>Loading gallery…</p>';
@@ -508,19 +508,25 @@ async function drawGallery(body,{viewer,signIn}) {
   const renderer=createPlayerCards(matches,{cards:overrides,teams});
   const nameOf=c=>c.nickname??roster.get(c.account)?.name??steamName(Number(c.account))??c.design.layout?.name??`Player ${c.account}`;
   const share=c=>c.total?c.counts[c.pick]/c.total:0;
+  // A card changed since this browser last opened the Gallery is new (highlighted), except your own.
+  let lastSeen=0;
+  try {lastSeen=Number(localStorage.getItem('gallery-seen'))||0;localStorage.setItem('gallery-seen',String(Date.now()));} catch {}
+  const isNew=c=>c.at>lastSeen&&String(c.account)!==String(viewer);
   let sort='rarity',unrated=false;
   const draw=()=>{
     const shown=cards.filter(c=>!unrated||(String(c.account)!==String(viewer)&&votes[`${c.account}:${c.key}`]==null)).sort((a,b)=>
       (sort==='rarity'?(PICK_RANK[b.pick]??0)-(PICK_RANK[a.pick]??0)||share(b)-share(a)||b.total-a.total
       :sort==='votes'?b.total-a.total||(PICK_RANK[b.pick]??0)-(PICK_RANK[a.pick]??0)
+      :sort==='newest'?(b.at??0)-(a.at??0)
       :0)||nameOf(a).localeCompare(nameOf(b))||a.slot-b.slot);
-    body.innerHTML=`<div class="gallery-bar"><label>Sort <select data-gallery-sort><option value="rarity">Rarity (voted)</option><option value="votes">Most votes</option><option value="name">Player name</option></select></label>
+    const fresh=shown.filter(isNew).length;
+    body.innerHTML=`<div class="gallery-bar"><label>Sort <select data-gallery-sort><option value="rarity">Rarity (voted)</option><option value="votes">Most votes</option><option value="newest">Newest</option><option value="name">Player name</option></select></label>
       ${viewer!=null?`<label class="gallery-unrated"><input type="checkbox" data-gallery-unrated${unrated?' checked':''}> Not rated by me</label>`:'<button type="button" class="linkish" data-signin>Sign in with Steam to rate cards</button>'}
-      <span class="gallery-count">${shown.length} card${shown.length===1?'':'s'}</span></div>
+      <span class="gallery-count">${fresh?`<b class="gallery-fresh">${fresh} new</b> · `:''}${shown.length} card${shown.length===1?'':'s'}</span></div>
       <div class="gallery-grid">${PAINT_FILTER}${shown.map(c=>{
         const r=roster.get(c.account),player={account:Number(c.account),name:nameOf(c),team:r?.team??'AD2L'};
         const link=r?`${SOURCES[r.league]?.root??'#/all'}/player/${c.account}`:null;
-        return `<figure data-gallery="${c.account}:${c.slot}">${renderer.card(player,null,{own:true,equipmentOverride:c.design}).replace('data-pick=',`data-design-slot="${c.slot}" data-pick=`)}<figcaption>${link?`<a href="${link}">${esc(player.name)}</a>`:esc(player.name)} · Card ${c.slot+1}${c.primary?' · Primary':''}</figcaption></figure>`;
+        return `<figure data-gallery="${c.account}:${c.slot}"${isNew(c)?' class="gallery-new"':''}>${renderer.card(player,null,{own:true,equipmentOverride:c.design}).replace('data-pick=',`data-design-slot="${c.slot}" data-pick=`)}<figcaption>${isNew(c)?'<span class="gallery-new-tag">New</span> ':''}${link?`<a href="${link}">${esc(player.name)}</a>`:esc(player.name)} · Card ${c.slot+1}${c.primary?' · Primary':''}</figcaption></figure>`;
       }).join('')||`<p>${unrated?"You've rated every card here.":'No custom cards yet.'}</p>`}</div>`;
     body.querySelector('[data-gallery-sort]').value=sort;
     body.querySelector('[data-gallery-sort]').onchange=e=>{sort=e.target.value;draw();};

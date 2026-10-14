@@ -39,7 +39,7 @@ export class CosmeticsVault {
         prefs.cardDesigns.forEach((design,slot)=>{
           if(!design||designKey({...DEFAULT_EQUIPMENT,...design})===plain)return;
           const key=designKey(design);
-          cards.push({account,slot,key,design,primary:slot===prefs.primaryCard,nickname:shownNickname(state),...tally(votes.get(`votes:${account}:${key}`))});
+          cards.push({account,slot,key,design,primary:slot===prefs.primaryCard,at:state.cardSavedAt?.[slot]??null,nickname:shownNickname(state),...tally(votes.get(`votes:${account}:${key}`))});
         });
       }
       return json({cards});
@@ -113,7 +113,13 @@ export class CosmeticsVault {
           result={state:{...saved,packs:[...(saved.packs??[]),'common'],bonusPackClaims:claims},source:body.source};
         }
         else if(body.action==='recycle') result=recycleCards(saved,body.selections);
-        else if(body.action==='equip') result={state:saveCardDesign(saved,body.equipment,body.cardSlot)};
+        // cardSavedAt: when each card's design last changed (the Gallery's Newest sort).
+        else if(body.action==='equip') {
+          const slot=body.cardSlot??saved.primaryCard??0,before=cardDesignState(saved).cardDesigns[slot];
+          const next=saveCardDesign(saved,body.equipment,body.cardSlot),savedAt=[...(saved.cardSavedAt??[null,null,null])];
+          if(!before||designKey(before)!==designKey(next.cardDesigns[slot]))savedAt[slot]=Date.now();
+          result={state:{...next,cardSavedAt:savedAt}};
+        }
         else if(body.action==='card-settings')result={state:setCardPreferences(saved,body)};
         else if(body.action==='nickname')result={state:setNickname(saved,body)};
         else if(body.action==='profile-background')result={state:setProfileBackground(saved,body)};
