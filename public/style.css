@@ -2693,7 +2693,12 @@ button.ga-go:hover:not(:disabled) { background: var(--accent); color: var(--on-a
 .pp-head.has-bg { position: relative; isolation: isolate; padding: 22px 22px 0; border-radius: 10px; overflow: hidden; }
 @media (max-width: 760px) { .pp-head.has-bg { padding: 14px 12px 0; } }
 .pbg-layer { position: absolute; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
-.pbg-layer img { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* The art is a card-editor thumbnail (.ft-art-thumb) stretched over the layer, so the card image
+   styles apply; "plain" is no style. Hue turns the art like a card's --art-hue. */
+.pbg-layer .ft-art-thumb { position: absolute; inset: 0; height: auto; border-radius: 0; background: none; }
+.pbg-layer .ft-art, .pbg-editor [data-styles] .ft-art { filter: hue-rotate(var(--art-hue, 0deg)); }
+.pbg-layer .ft-art img { transition: none; }
+:is(.pbg-layer, .pbg-editor) [data-style="plain"] .ft-art img { filter: none; }
 .pbg-layer::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(var(--ink-rgb), min(1, calc(var(--pbg-dim) + .4))) 0%, rgba(var(--ink-rgb), var(--pbg-dim)) 55%, rgba(var(--ink-rgb), calc(var(--pbg-dim) * .6)) 100%); }
 .pbg-layer.pbg-fixed { position: fixed; z-index: -1; }
 .pbg-layer.pbg-fixed::after { background: linear-gradient(rgba(var(--ink-rgb), calc(var(--pbg-dim) * .8)), rgba(var(--ink-rgb), var(--pbg-dim)) 40%, rgba(var(--ink-rgb), min(1, calc(var(--pbg-dim) + .15)))); }

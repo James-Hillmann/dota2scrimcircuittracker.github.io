@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {CATALOG,TIERS,PACK_ODDS,DEFAULT_EQUIPMENT} from '../public/lib/cosmetics-catalog.js';
-import {grantLogin,rollPack,recycleCards,equipCosmetics,saveCardDesign,setCardPreferences,cardDesignState,cardAppearance,selectedCardDesign} from '../public/lib/cosmetics-engine.js';
+import {grantLogin,rollPack,recycleCards,equipCosmetics,saveCardDesign,setCardPreferences,cardDesignState,cardAppearance,selectedCardDesign,setProfileBackground,profileBackgroundOf} from '../public/lib/cosmetics-engine.js';
 import {japaneseName,cyrillicName,greekName,runicName,koreanName,chineseName,thaiName,renderedName,signatureHtml} from '../public/lib/signatures.js';
 import {CosmeticsVault,cosmeticsRequest} from '../workers/steam-auth/src/cosmetics.js';
 
@@ -173,4 +173,17 @@ test('border symbol can be turned off and back on; only false is stored',()=>{
   assert.equal(equipCosmetics(off,{}).equipment.emblem,false);
   assert.equal('emblem' in equipCosmetics(off,{emblem:true}).equipment,false);
   assert.throws(()=>equipCosmetics(state,{emblem:'no'}),/border symbol/);
+});
+test('profile background: owned screen, header or page, valid framing; null clears it',()=>{
+  const state={...grantLogin(null),screens:['scr:aaa']};
+  assert.deepEqual(setProfileBackground(state,{background:{id:'scr:aaa'}}).profileBackground,{id:'scr:aaa',place:'head',x:50,y:30,zoom:1,dim:45,style:null,hue:0});
+  assert.deepEqual(setProfileBackground(state,{background:{id:'scr:aaa',place:'page',x:10,y:90,zoom:2,dim:80,style:'ember',hue:200}}).profileBackground,{id:'scr:aaa',place:'page',x:10,y:90,zoom:2,dim:80,style:'ember',hue:200});
+  assert.equal(setProfileBackground(state,{background:null}).profileBackground,null);
+  assert.throws(()=>setProfileBackground(state,{background:{id:'scr:bbb'}}),/Collect this loading screen/);
+  assert.throws(()=>setProfileBackground(state,{background:{id:'scr:aaa',place:'side'}}),/header or the whole page/);
+  assert.throws(()=>setProfileBackground(state,{background:{id:'scr:aaa',zoom:5}}),/framing/);
+  assert.throws(()=>setProfileBackground(state,{background:{id:'scr:aaa',dim:95}}),/dim/);
+  assert.throws(()=>setProfileBackground(state,{background:{id:'scr:aaa',style:'glitter'}}),/image style/);
+  assert.throws(()=>setProfileBackground(state,{background:{id:'scr:aaa',hue:400}}),/hue/);
+  assert.deepEqual(profileBackgroundOf('scr:aaa'),{id:'scr:aaa',place:'head',x:50,y:30,zoom:1,dim:45,style:null,hue:0});
 });

@@ -27,6 +27,28 @@ export function setNickname(state,{nickname=null,showNickname=false}={}) {
   return {...state,nickname:name||null,showNickname};
 }
 export const shownNickname=state=>state?.showNickname&&state.nickname?state.nickname:null;
+// Your profile's background: one of your collected loading screens, or null for none. place is
+// 'head' (behind your name) or 'page' (the whole profile); x, y and zoom frame it like a card
+// crop; dim (0-90) darkens it so the page stays readable; style is a card image style (null for
+// the plain image) and hue turns its colours (0-360). A bare screen id is the defaults.
+export const PROFILE_BG_PLACES=['head','page'];
+export function profileBackgroundOf(bg) {
+  if(!bg)return null;
+  const b=typeof bg==='string'?{id:bg}:bg;
+  return {id:b.id,place:b.place??'head',x:b.x??50,y:b.y??30,zoom:b.zoom??1,dim:b.dim??(b.place==='page'?70:45),style:b.style??null,hue:b.hue??0};
+}
+export function setProfileBackground(state,{background=null}={}) {
+  if(background==null)return {...state,profileBackground:null};
+  if(typeof background!=='object'||Array.isArray(background))throw new Error('Choose a valid background.');
+  const bg=profileBackgroundOf(background);
+  if(!(state.screens??[]).includes(bg.id))throw new Error('Collect this loading screen before using it as your background.');
+  if(!PROFILE_BG_PLACES.includes(bg.place))throw new Error('Choose the header or the whole page.');
+  if(!validCardCrop({x:bg.x,y:bg.y,zoom:bg.zoom}))throw new Error('Choose a valid framing.');
+  if(typeof bg.dim!=='number'||!Number.isFinite(bg.dim)||bg.dim<0||bg.dim>90)throw new Error('Choose a valid dim level.');
+  if(bg.style!=null&&!CARD_STYLES.some(([id])=>id===bg.style))throw new Error('Choose a valid image style.');
+  if(typeof bg.hue!=='number'||!Number.isFinite(bg.hue)||bg.hue<0||bg.hue>360)throw new Error('Choose a valid hue.');
+  return {...state,profileBackground:bg};
+}
 export function saveCardDesign(state,raw,slot=state.primaryCard??0) {
   if(!Number.isInteger(slot)||slot<0||slot>2)throw new Error('Choose one of your three cards.');
   const preferences=cardDesignState(state);

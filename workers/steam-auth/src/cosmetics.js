@@ -1,4 +1,4 @@
-import { grantLogin, applyPackGrants, rollPack, recycleCards, saveCardDesign, setCardPreferences, cardAppearance, cardDesignState, setNickname, shownNickname } from '../../../public/lib/cosmetics-engine.js';
+import { grantLogin, applyPackGrants, rollPack, recycleCards, saveCardDesign, setCardPreferences, cardAppearance, cardDesignState, setNickname, shownNickname, setProfileBackground } from '../../../public/lib/cosmetics-engine.js';
 import { designKey, castVote, tally } from '../../../public/lib/card-ratings.js';
 import { DEFAULT_EQUIPMENT, itemByKey } from '../../../public/lib/cosmetics-catalog.js';
 import { isAdmin, giftPacks, clearGifts } from '../../../public/lib/pack-gifts.js';
@@ -81,7 +81,7 @@ export class CosmeticsVault {
     }
     if(req.method==='GET') {
       const state=await this.ctx.storage.get(`user:${account}`);
-      return json({inventory:state?.inventory??{},screens:state?.screens??[],equipment:state?.equipment??null,nickname:shownNickname(state),...(state?cardDesignState(state):{})});
+      return json({inventory:state?.inventory??{},screens:state?.screens??[],equipment:state?.equipment??null,nickname:shownNickname(state),background:state?.profileBackground??null,...(state?cardDesignState(state):{})});
     }
     let body;try {body=await req.json();} catch {return json({error:'Invalid request.'},400);}
     // Which designs this player has rated, and how: "<owner>:<design key>" → rating. A read, so
@@ -116,6 +116,7 @@ export class CosmeticsVault {
         else if(body.action==='equip') result={state:saveCardDesign(saved,body.equipment,body.cardSlot)};
         else if(body.action==='card-settings')result={state:setCardPreferences(saved,body)};
         else if(body.action==='nickname')result={state:setNickname(saved,body)};
+        else if(body.action==='profile-background')result={state:setProfileBackground(saved,body)};
         else if(body.action==='gift') {
           // Fav only: packs, card items or a loading screen into another player's collection, with a
           // notice they see next visit.

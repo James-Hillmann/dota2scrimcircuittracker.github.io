@@ -11,6 +11,7 @@ import { cardArtOptions, CARD_STYLES, defaultCardCrop, cardArtwork, screenArt, S
 import { cardDesignState, shownNickname, RECYCLE_COST } from '../lib/cosmetics-engine.js';
 import { availablePackOffers, completedPackOffers, markPackOfferClaimed } from '../lib/bonus-offers.js';
 import { startFeedback } from '../lib/feedback.js';
+import { showProfileBackground, mountBackgroundButton } from './profile-background.js';
 import { FRONT_PARTS, BACK_STATS, MAX_BACK_STATS, MAX_NAME, backStats, applyLayout } from '../lib/card-layout.js';
 import './pack-gifts.js'; // the "Fav sent you packs" notice
 import { SCREEN_ART } from '../lib/screen-art-data.js';
@@ -208,15 +209,17 @@ export async function openCollection({tab='packs',viewAccount=null,cardHtml=null
       if(data){previewItem=null;equipment=selectedEquipment();initialEquipment=JSON.stringify(equipment);drawDex();say(`${item.name} equipped. Card saved.`);}
     };});
   }
-  function select(type,defaultName) {
-    return `<label>${type==='autograph'?'Signature style':type==='translation'?'Modifier':type}<select data-equipment="${type}"><option value="${DEFAULT_EQUIPMENT[type]}">${defaultName}</option>${CATALOG.filter(i=>i.type===type&&inventory[i.key]>0).map(i=>`<option value="${i.id}">${esc(i.name)}</option>`).join('')}</select></label>`;
+  function visualStyleChoices(type) {
+    const fallback=type==='border'?{id:DEFAULT_EQUIPMENT.border,name:'Default grey',type,rarity:'standard',texture:'metal',a:'#92969c',b:'#41454c'}:{id:DEFAULT_EQUIPMENT.finish,name:'No finish',type,rarity:'standard',texture:'metal',a:'#536282',b:'#151a29'};
+    const items=[fallback,...CATALOG.filter(i=>i.type===type&&inventory[i.key]>0)];
+    return `<fieldset class="visual-style-options"><legend>${type==='border'?'Border':'Finish'}</legend><p>${type==='border'?'Choose the frame around your card.':'Choose the animated surface treatment.'}</p><div class="visual-style-strip">${items.map(item=>`<button type="button" data-style-choice="${type}" data-choice="${item.id}" aria-pressed="${equipment[type]===item.id}" ${editable?'':'disabled'}>${swatch(item,name)}<strong>${esc(item.name)}</strong><small data-choice-status>${equipment[type]===item.id?'Selected':esc(item.rarity)}</small></button>`).join('')}</div></fieldset>`;
   }
   function visualTextChoices(type) {
     const items=[{id:DEFAULT_EQUIPMENT[type],name:type==='autograph'?'No signature':'No modifier'},...CATALOG.filter(i=>i.type===type&&inventory[i.key]>0)];
     return `<fieldset class="visual-text-options"><legend>${type==='autograph'?'Signature style':'Modifier'}</legend><div>${items.map(item=>`<button type="button" data-text-choice="${type}" data-choice="${item.id}" aria-pressed="${equipment[type]===item.id}" ${editable?'':'disabled'}><span data-text-choice-preview></span><strong>${esc(item.name)}</strong><small data-choice-status>${equipment[type]===item.id?'Selected':'Select'}</small></button>`).join('')}</div></fieldset>`;
   }
   function drawEditor() {
-    const imageOpen=body.querySelector('.card-settings:last-of-type')?.open??false;
+    const imageOpen=body.querySelector('[data-image-settings]')?.open??false;
     if(!equipment.baseCard) {
       const template=document.createElement('template');template.innerHTML=cardHtml;
       const card=template.content.querySelector('.ft-card');
@@ -227,8 +230,7 @@ export async function openCollection({tab='packs',viewAccount=null,cardHtml=null
     const template=document.createElement('template');template.innerHTML=cardHtml;
     const effectiveHero=base.hero||Number(template.content.querySelector('.ft-card').dataset.autoHero);
     const artOptions=cardArtOptions(effectiveHero,state?.screens??(String(base.art??'').startsWith('scr:')?[base.art]:[]));
-    body.innerHTML=`${editable?'<div data-name-editor></div>':''}${cardSlotsHtml()}<div class="card-editor"><div data-card-editor>${cardHtml}<p>Drag the artwork to adjust its framing. Drag the signature separately; arrow keys move the focused signature one step.</p></div><div class="card-editor-controls">${select('border','Default grey')}${select('finish','No finish')}<label class="emblem-toggle"><input type="checkbox" data-emblem ${equipment.emblem===false?'':'checked'} ${editable?'':'disabled'}> Show border symbol</label><details class="card-settings" open><summary>Text settings</summary><div>${visualTextChoices('autograph')}${visualTextChoices('translation')}<p>Signatures use your player name.</p><details class="image-adjustments"><summary>Signature positioning</summary><div>${[['x','Horizontal',0,100],['y','Vertical',0,100],['size','Size',5,30],['rotation','Rotation',-180,180]].map(([k,label,min,max])=>`<label>${label} <output data-value="${k}">${Math.round(equipment[k])}</output><input type="range" data-position="${k}" min="${min}" max="${max}" value="${equipment[k]}"></label>`).join('')}<button type="button" data-reset>Reset signature placement</button></div></details></div></details><details class="card-settings" ${imageOpen?'open':''}><summary>Image settings</summary><div><label>Hero<select data-base="hero"><option value="">Most played hero</option>${[...HERO_META].sort((a,b)=>a[1].localeCompare(b[1])).map(([id,name])=>`<option value="${id}">${esc(name)}</option>`).join('')}</select></label><div data-image-gallery></div><details class="image-adjustments"><summary>Hue &amp; positioning</summary><div><label>Hue <output data-hue-value>${equipment.hue??0}</output><input type="range" data-hue min="0" max="360" value="${equipment.hue??0}"></label>${[['x','Image horizontal',0,100,1],['y','Image vertical',0,100,1],['zoom','Image zoom',1,3,.01]].map(([key,label,min,max,step])=>`<label>${label}<input type="range" data-crop="${key}" min="${min}" max="${max}" step="${step}" value="${(base.crop??defaultCardCrop(cardArtwork(effectiveHero,base)))[key]}"></label>`).join('')}</div></details></div></details>${layoutControlsHtml()}<button type="button" data-save>Save my card</button></div></div>`;
-    body.querySelector('[data-save]').insertAdjacentHTML('beforebegin',`<label class="particle-speed-control">Particle speed <output data-particle-speed-value>${equipment.particleSpeed}%</output><input type="range" data-particle-speed min="50" max="200" step="10" value="${equipment.particleSpeed}" ${editable?'':'disabled'}></label>`);
+    body.innerHTML=`${editable?'<div data-name-editor></div>':''}${cardSlotsHtml()}<div class="card-editor"><div data-card-editor><div class="editor-preview-heading"><strong>Live preview</strong><span>Changes stay local until you save.</span></div>${cardHtml}<p>Drag the artwork to adjust its framing. Drag the signature separately; arrow keys move the focused signature one step.</p></div><div class="card-editor-controls"><section class="appearance-settings"><header><div><small>Card treatment</small><h3>Appearance</h3></div><span>Only your collected styles appear here.</span></header><div class="appearance-choice-columns">${visualStyleChoices('border')}${visualStyleChoices('finish')}</div><label class="emblem-toggle"><input type="checkbox" data-emblem ${equipment.emblem===false?'':'checked'} ${editable?'':'disabled'}> Show border symbol</label></section><details class="card-settings" open><summary><strong>Text &amp; signature</strong><span>Name style, modifier, and placement</span></summary><div>${visualTextChoices('autograph')}${visualTextChoices('translation')}<p>Signatures use your player name.</p><details class="image-adjustments"><summary>Signature positioning</summary><div>${[['x','Horizontal',0,100],['y','Vertical',0,100],['size','Size',5,30],['rotation','Rotation',-180,180]].map(([k,label,min,max])=>`<label>${label} <output data-value="${k}">${Math.round(equipment[k])}</output><input type="range" data-position="${k}" min="${min}" max="${max}" value="${equipment[k]}"></label>`).join('')}<button type="button" data-reset>Reset signature placement</button></div></details></div></details><details class="card-settings" data-image-settings ${imageOpen?'open':''}><summary><strong>Artwork</strong><span>Hero, background, crop, and color</span></summary><div><label>Hero<select data-base="hero"><option value="">Most played hero</option>${[...HERO_META].sort((a,b)=>a[1].localeCompare(b[1])).map(([id,name])=>`<option value="${id}">${esc(name)}</option>`).join('')}</select></label><div data-image-gallery></div><details class="image-adjustments"><summary>Hue &amp; positioning</summary><div><label>Hue <output data-hue-value>${equipment.hue??0}</output><input type="range" data-hue min="0" max="360" value="${equipment.hue??0}"></label>${[['x','Image horizontal',0,100,1],['y','Image vertical',0,100,1],['zoom','Image zoom',1,3,.01]].map(([key,label,min,max,step])=>`<label>${label}<input type="range" data-crop="${key}" min="${min}" max="${max}" step="${step}" value="${(base.crop??defaultCardCrop(cardArtwork(effectiveHero,base)))[key]}"></label>`).join('')}</div></details></div></details>${layoutControlsHtml()}<div class="editor-savebar"><label class="particle-speed-control">Particle speed <output data-particle-speed-value>${equipment.particleSpeed}%</output><input type="range" data-particle-speed min="50" max="200" step="10" value="${equipment.particleSpeed}" ${editable?'':'disabled'}></label><button type="button" data-save>Save card ${selectedSlot+1}</button></div></div></div>`;
     wireCardSlots();
     if(editable)mountNameEditor(body.querySelector('[data-name-editor]'),{state,inGame:name,action,onSaved:next=>{state=next;draw();say(shownNickname(next)?`Showing ${shownNickname(next)} on your cards and profile.`:'Showing your in-game name.');}});
     const card=body.querySelector('.ft-card');card.dataset.designSlot=selectedSlot;card.classList.remove('flipped');
@@ -247,6 +249,9 @@ export async function openCollection({tab='packs',viewAccount=null,cardHtml=null
     });
     body.querySelectorAll('[data-text-choice]').forEach(button=>button.onclick=()=>{equipment[button.dataset.textChoice]=button.dataset.choice;refreshTextChoices();update();});
     refreshTextChoices();
+    const refreshStyleChoices=()=>body.querySelectorAll('[data-style-choice]').forEach(button=>{const type=button.dataset.styleChoice,selected=equipment[type]===button.dataset.choice;button.setAttribute('aria-pressed',String(selected));button.querySelector('[data-choice-status]').textContent=selected?'Selected':itemByKey(`${type}:${button.dataset.choice}`)?.rarity??'standard';});
+    body.querySelectorAll('[data-style-choice]').forEach(button=>button.onclick=()=>{equipment[button.dataset.styleChoice]=button.dataset.choice;refreshStyleChoices();syncParticleControl();update();});
+    refreshStyleChoices();
     function drawImageGallery() {
       const host=body.querySelector('[data-image-gallery]'),scrolls=[...host.querySelectorAll('.image-choice-strip')].map(el=>el.scrollLeft);
       const currentArt=cardArtwork(effectiveHero,base);
@@ -261,7 +266,6 @@ export async function openCollection({tab='packs',viewAccount=null,cardHtml=null
       });
     }
     drawImageGallery();
-    body.querySelectorAll('[data-equipment]').forEach(s=>{s.value=equipment[s.dataset.equipment];s.disabled=!editable;s.onchange=()=>{equipment[s.dataset.equipment]=s.value;syncParticleControl();update();};});
     body.querySelectorAll('[data-base]').forEach(s=>{
       const key=s.dataset.base;s.value=base[key]??'';
       s.onchange=()=>{base[key]=key==='hero'?(Number(s.value)||null):(s.value||null);if(key==='hero'){base.art=null;base.crop=null;drawEditor();}else {if(key==='art'){if(base.art&&!base.hero)base.hero=effectiveHero;base.crop=null;}update();}};
@@ -311,7 +315,7 @@ export async function openCollection({tab='packs',viewAccount=null,cardHtml=null
     const L=equipment.layout,role=Number(new DOMParser().parseFromString(cardHtml,'text/html').querySelector('.ft-card')?.dataset.role)||0;
     const stats=backStats(L,role),part=k=>L?.front?.[k];
     const statSelect=i=>`<select data-back-stat="${i}" aria-label="Back stat ${i+1}"><option value="">Empty</option>${BACK_STATS.map(([k,label])=>`<option value="${k}"${stats[i]===k?' selected':''}>${esc(label)}</option>`).join('')}</select>`;
-    return `<details class="card-settings card-layout-settings"><summary>Layout settings</summary><div>
+    return `<details class="card-settings card-layout-settings"><summary><strong>Card layout</strong><span>Front content and back-of-card stats</span></summary><div>
       <label>Card name <input type="text" data-layout-name maxlength="${MAX_NAME}" placeholder="${esc(name)}" value="${esc(L?.name??'')}"></label>
       <label>Name size <output data-layout-namesize-value>${L?.nameSize??100}%</output><input type="range" data-layout-namesize min="40" max="160" value="${L?.nameSize??100}"></label>
       <fieldset class="layout-parts"><legend>Front</legend><p>Drag any text on the card to move it.</p>${FRONT_PARTS.map(([k,label])=>`<div class="layout-part"><label><input type="checkbox" data-part-show="${k}"${part(k)?.show===false?'':' checked'}> ${label}</label><input type="range" data-part-size="${k}" min="40" max="250" value="${part(k)?.size??100}" aria-label="${label} size"><button type="button" data-part-reset="${k}">Reset</button></div>`).join('')}</fieldset>
@@ -431,7 +435,7 @@ export async function mountProfileCollection(host,{account,name,matches,team,tie
   try {
     const [data,cards]=await Promise.all([publicCollection(account).catch(()=>({inventory:{},unavailable:true})),listCards().catch(()=>new Map())]);if(!section.isConnected)return;
     if(data.equipment)cards.set(account,{...cards.get(account),cosmetics:{...data.equipment,nickname:data.nickname??null}});
-    profileTitle(data.nickname,name);
+    profileTitle(data.nickname,name);showProfileBackground(data.background);
     const count=CATALOG.filter(i=>data.inventory[i.key]>0).length+new Set(data.screens??[]).size,renderer=createPlayerCards(matches,{cards,tiers:new Map(tier?[[String(account),tier]]:[])});
     const preferences=cardDesignState(data),player={account,name,team:team??'AD2L'};
     const cardHtml=PAINT_FILTER+renderer.card(player,null,{own:true,equipmentOverride:preferences.cardDesigns[preferences.primaryCard]});
@@ -445,6 +449,7 @@ export async function mountProfileCollection(host,{account,name,matches,team,tie
       const state=collectionState()??(await collectionAction('session')).state;
       const host=document.createElement('div');section.lastElementChild.append(host);
       mountNameEditor(host,{state,inGame:name,onSaved:next=>profileTitle(next.showNickname?next.nickname:null,name)});
+      const bg=document.createElement('div');section.lastElementChild.append(bg);mountBackgroundButton(bg,{state,name:shownNickname(state)??name});
     }).catch(()=>{});
   } catch {if(section.isConnected)section.innerHTML='<h3>Card collection</h3><p>Collection service is unavailable. Try again shortly.</p><button type="button">View designs</button>';section.querySelector('button')?.addEventListener('click',()=>openCollection({tab:'collection',viewAccount:account,name}));}
 }
