@@ -193,3 +193,22 @@ test('profile background: owned screen, header or page, valid framing; null clea
   assert.throws(()=>setProfileBackground(signer,{background:{id:'scr:aaa',sig:{autograph:sig.id,size:20}}}),/signature position/);
   assert.deepEqual(profileBackgroundOf('scr:aaa'),{id:'scr:aaa',place:'head',x:50,y:30,zoom:1,dim:45,style:null,hue:0,sig:null});
 });
+
+test('Greek and Cyrillic modifiers take lower or upper case; only upper is saved',()=>{
+  assert.equal(renderedName('Fav','greek'),'φαβ');
+  assert.equal(renderedName('Fav','greek','upper'),'ΦΑΒ');
+  assert.equal(renderedName('Jonas','greek'),'τζονας');
+  assert.equal(renderedName('Fav','cyrillic','upper'),'ФАВ');
+  assert.equal(renderedName('Fav','runic','upper'),'ᚠᚨᚹ');
+  assert.equal(renderedName('Fav','none','upper'),'Fav');
+  const sig=CATALOG.find(i=>i.type==='autograph'),state={...grantLogin(null),inventory:{[sig.key]:1,'translation:greek':1}};
+  const upper=equipCosmetics(state,{autograph:sig.id,translation:'greek',letterCase:'upper'}).equipment;
+  assert.equal(upper.letterCase,'upper');
+  assert.match(signatureHtml(upper,'Fav'),/ΦΑΒ/);
+  assert.equal(equipCosmetics({...state,equipment:upper},{...upper,letterCase:'lower'}).equipment.letterCase,undefined);
+  assert.equal(equipCosmetics({...state,equipment:upper},{autograph:sig.id}).equipment.letterCase,'upper');
+  assert.throws(()=>equipCosmetics(state,{letterCase:'title'}),/upper case/);
+  const bg={...state,screens:['scr:aaa']};
+  assert.equal(setProfileBackground(bg,{background:{id:'scr:aaa',sig:{autograph:sig.id,translation:'greek',letterCase:'upper'}}}).profileBackground.sig.letterCase,'upper');
+  assert.throws(()=>setProfileBackground(bg,{background:{id:'scr:aaa',sig:{autograph:sig.id,letterCase:1}}}),/upper case/);
+});

@@ -749,7 +749,7 @@ export const CATALOG = [
     "name": "Cyrillic Etching",
     "type": "translation",
     "rarity": "legendary",
-    "description": "A legendary modifier that recasts your name as a bold Cyrillic-style phonetic inscription.",
+    "description": "A legendary modifier that recasts your name as a bold Cyrillic-style phonetic inscription. Choose lower or upper case.",
     "preview": "Fav → фав"
   },
   {
@@ -758,7 +758,7 @@ export const CATALOG = [
     "name": "Olympian Script",
     "type": "translation",
     "rarity": "legendary",
-    "description": "A legendary modifier that renders your name in a monumental Greek-inspired alphabet.",
+    "description": "A legendary modifier that renders your name in a monumental Greek-inspired alphabet. Choose lower or upper case.",
     "preview": "Fav → φαβ"
   },
   {

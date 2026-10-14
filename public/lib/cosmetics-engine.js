@@ -5,6 +5,7 @@ import { SCREEN_ART } from './screen-art-data.js';
 const screenHero=new Map(SCREEN_ART.map(s=>[s.id,s.hero??null]));
 import { CARD_STYLES, validCardCrop } from './card-art.js';
 import { validLayout, MAX_NAME } from './card-layout.js';
+import { LETTER_CASES } from './signatures.js';
 
 export const PACK_INTERVAL_MS=8*60*60*1000;
 export const NORMAL_PACK_CAP=3;
@@ -55,7 +56,9 @@ export function setProfileBackground(state,{background=null}={}) {
     if(bg.sig.translation!=='none'&&!owns('translation',bg.sig.translation))throw new Error('Collect this modifier before using it.');
     for(const [k,min,max] of [['x',0,100],['y',0,100],['size',2,12],['rotation',-180,180]])
       if(typeof bg.sig[k]!=='number'||!Number.isFinite(bg.sig[k])||bg.sig[k]<min||bg.sig[k]>max)throw new Error('Invalid signature position or size.');
-    const {autograph,translation,x,y,size,rotation}=bg.sig;bg.sig={autograph,translation,x,y,size,rotation};
+    const {autograph,translation,x,y,size,rotation,letterCase='lower'}=bg.sig;bg.sig={autograph,translation,x,y,size,rotation};
+    if(!LETTER_CASES.includes(letterCase))throw new Error('Choose lower or upper case.');
+    if(letterCase==='upper')bg.sig.letterCase='upper';
   }
   return {...state,profileBackground:bg};
 }
@@ -159,6 +162,10 @@ export function equipCosmetics(state, raw) {
   if(!Number.isFinite(equipment.hue)||equipment.hue<0||equipment.hue>360)throw new Error('Choose a valid hue.');
   equipment.particleSpeed=raw.particleSpeed??state.equipment?.particleSpeed??DEFAULT_EQUIPMENT.particleSpeed;
   if(!Number.isInteger(equipment.particleSpeed)||equipment.particleSpeed<50||equipment.particleSpeed>200)throw new Error('Choose a particle speed from 50% to 200%.');
+  // Lower or upper case for modifiers with capitals (lib/signatures.js); only upper is stored.
+  const letterCase=raw.letterCase??state.equipment?.letterCase??'lower';
+  if(!LETTER_CASES.includes(letterCase))throw new Error('Choose lower or upper case.');
+  if(letterCase==='upper')equipment.letterCase='upper';
   // The border's corner symbol shows unless the owner turns it off; only false is stored.
   const emblem=raw.emblem??state.equipment?.emblem??true;
   if(typeof emblem!=='boolean')throw new Error('Choose whether to show the border symbol.');

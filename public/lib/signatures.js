@@ -69,11 +69,19 @@ export const thaiName=text=>soundOut(text,c=>c!=='r',({c,v,coda})=>{
   return (coda?closed:open)[v]+end;
 },' ');
 const renderers={japanese:japaneseName,cyrillic:cyrillicName,greek:greekName,runic:runicName,korean:koreanName,chinese:chineseName,thai:thaiName};
-export const renderedName=(text,translation='none')=>(renderers[translation]??(value=>value))(text);
+// Modifiers whose alphabet has capitals; the player picks lower (the default) or upper case.
+export const CASED_MODIFIERS=['greek','cyrillic'];
+export const LETTER_CASES=['lower','upper'];
+const finalSigma=text=>text.replace(/σ(?![\p{L}])/gu,'ς');
+export function renderedName(text,translation='none',letterCase='lower') {
+  const out=(renderers[translation]??(value=>value))(text);
+  if(!CASED_MODIFIERS.includes(translation))return out;
+  return letterCase==='upper'?out.toUpperCase():translation==='greek'?finalSigma(out):out;
+}
 export const writingOf=text=>/[\u3040-\u30ff]/u.test(text)?'ja':/[\uac00-\ud7af]/u.test(text)?'ko':/[\u3400-\u9fff]/u.test(text)?'zh':/[\u0400-\u04ff]/u.test(text)?'cyrl':/[\u0370-\u03ff]/u.test(text)?'greek':/[\u16a0-\u16ff]/u.test(text)?'runic':/[฀-๿]/u.test(text)?'thai':'latin';
 export function signatureHtml(equipment,name) {
   const item=itemByKey(`autograph:${equipment.autograph}`);if(!item)return '';
-  const text=renderedName(name,equipment.translation);
+  const text=renderedName(name,equipment.translation,equipment.letterCase);
   const glyphs=item.rough?[...text].map((c,i)=>`<span class="signature-glyph" style="--glyph-lift:${(i%3)-1}px;--glyph-tilt:${(i%5-2)*2}deg">${escape(c)}</span>`).join(''):escape(text);
   const paths=(PEN_MARKS[item.flourish]??PEN_MARKS.simple).map(d=>`<path d="${d}"/>`).join('');
   const size=Math.min(equipment.size,140/Math.max(8,[...text].length));

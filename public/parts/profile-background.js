@@ -7,7 +7,16 @@ import { screenArt, CARD_STYLES } from '../lib/card-art.js';
 import { profileBackgroundOf } from '../lib/cosmetics-engine.js';
 import { PAINT_FILTER } from './player-card.js';
 import { CATALOG } from '../lib/cosmetics-catalog.js';
-import { signatureHtml, renderedName } from '../lib/signatures.js';
+import { signatureHtml, renderedName, CASED_MODIFIERS, LETTER_CASES } from '../lib/signatures.js';
+
+// Lower or upper case, for the modifiers whose alphabet has capitals (Greek, Cyrillic). Shared
+// with the card editor (parts/collection.js); each button shows your name in that case.
+export const letterCaseHtml=(enabled=true)=>`<fieldset class="letter-case" data-letter-case-wrap hidden><legend>Letter case</legend><div>${LETTER_CASES.map(c=>`<button type="button" data-letter-case="${c}" ${enabled?'':'disabled'}></button>`).join('')}</div></fieldset>`;
+export function drawLetterCase(root,translation,letterCase='lower',name) {
+  const wrap=root.querySelector('[data-letter-case-wrap]');if(!wrap)return;
+  wrap.hidden=!CASED_MODIFIERS.includes(translation);if(wrap.hidden)return;
+  wrap.querySelectorAll('[data-letter-case]').forEach(b=>{const c=b.dataset.letterCase;b.setAttribute('aria-pressed',String(c===letterCase));b.className=`name-rendering-preview ${translation}`;b.textContent=renderedName(name,translation,c);b.title=c==='upper'?'Upper case':'Lower case';});
+}
 
 // A screen as the card editor's thumbnails draw it: style is a card image style, or "plain".
 const artHtml=(art,style,imgStyle='')=>`<span class="ft-art-thumb ${esc(art.cls)}" data-style="${esc(style??'plain')}"><span class="ft-art"><img src="${esc(art.src)}" alt="" decoding="async"${imgStyle}></span></span>`;
@@ -64,7 +73,7 @@ export function openBackgroundEditor({state,name,onSaved}) {
         <fieldset class="pbg-place"><legend>Where</legend><div><button type="button" data-place="head">Behind your name</button><button type="button" data-place="page">Whole page</button></div></fieldset>
         <fieldset class="image-choice-group"><legend>Image style</legend><div class="image-choice-strip" data-styles></div></fieldset>
         <fieldset class="visual-text-options pbg-sig-options"><legend>Signature style</legend><div>${[{id:'none',name:'No signature'},...sigItems.autograph].map(i=>`<button type="button" data-sig-choice="autograph" data-choice="${i.id}"><span data-sig-preview></span><strong>${esc(i.name)}</strong></button>`).join('')}</div>${sigItems.autograph.length?'':'<p>Open packs to collect signature styles.</p>'}</fieldset>
-        ${sigItems.translation.length?`<fieldset class="visual-text-options pbg-sig-options"><legend>Modifier</legend><div>${[{id:'none',name:'No modifier'},...sigItems.translation].map(i=>`<button type="button" data-sig-choice="translation" data-choice="${i.id}"><span data-sig-preview></span><strong>${esc(i.name)}</strong></button>`).join('')}</div></fieldset>`:''}
+        ${sigItems.translation.length?`<fieldset class="visual-text-options pbg-sig-options"><legend>Modifier</legend><div>${[{id:'none',name:'No modifier'},...sigItems.translation].map(i=>`<button type="button" data-sig-choice="translation" data-choice="${i.id}"><span data-sig-preview></span><strong>${esc(i.name)}</strong></button>`).join('')}</div></fieldset>${letterCaseHtml()}`:''}
         <fieldset class="pbg-framing" data-sig-sliders><legend>Signature size &amp; angle</legend><p>Drag your signature in the preview to place it.</p>${SIG_SLIDERS.map(([k,label,min,max,step])=>`<label>${label} <output data-sig-out="${k}"></output><input type="range" data-sig-slider="${k}" min="${min}" max="${max}" step="${step}"></label>`).join('')}</fieldset>
         <fieldset class="pbg-framing"><legend>Framing &amp; colour</legend>${SLIDERS.map(([k,label,min,max,step])=>`<label>${label} <output data-out="${k}"></output><input type="range" data-slider="${k}" min="${min}" max="${max}" step="${step}"></label>`).join('')}<button type="button" data-reset>Reset framing &amp; colour</button></fieldset>
         <div class="pbg-savebar"><button type="button" data-cancel>Cancel</button><button type="button" data-save>Save background</button></div>
@@ -102,8 +111,9 @@ export function openBackgroundEditor({state,name,onSaved}) {
       const type=b.dataset.sigChoice,id=b.dataset.choice,current=sig?.[type]??'none',preview=b.querySelector('[data-sig-preview]');
       b.setAttribute('aria-pressed',String(current===id));b.disabled=!bg||(type==='translation'&&!sig);
       if(type==='autograph')preview.innerHTML=id==='none'?'<span class="no-signature-preview">—</span>':`<span class="collection-swatch signature-sample">${signatureHtml({translation:sig?.translation??'none',x:50,y:50,size:15,rotation:-7,autograph:id},name).replace('card-autograph','collection-signature')}</span>`;
-      else {preview.className=`name-rendering-preview ${id}`;preview.textContent=renderedName(name,id);}
+      else {preview.className=`name-rendering-preview ${id}`;preview.textContent=renderedName(name,id,sig?.letterCase);}
     });
+    drawLetterCase(dialog,sig?.translation,sig?.letterCase,name);
     $('[data-sig-sliders]').hidden=!sig;
     $$('[data-sig-slider]').forEach(input=>{const k=input.dataset.sigSlider;input.disabled=!bg;input.value=sig?.[k]??0;$(`[data-sig-out="${k}"]`).textContent=sig?`${sig[k]}${k==='rotation'?'°':''}`:'';});
   }
@@ -113,6 +123,7 @@ export function openBackgroundEditor({state,name,onSaved}) {
     else if(sig)sig.translation=id;
     draw();
   });
+  $$('[data-letter-case]').forEach(b=>b.onclick=()=>{if(!sig)return;if(b.dataset.letterCase==='upper')sig.letterCase='upper';else delete sig.letterCase;draw();});
   $$('[data-sig-slider]').forEach(input=>input.oninput=()=>{if(sig){sig[input.dataset.sigSlider]=Number(input.value);draw();}});
   $$('[data-place]').forEach(b=>b.onclick=()=>{
     // Dim follows the place's default until you change it yourself.
