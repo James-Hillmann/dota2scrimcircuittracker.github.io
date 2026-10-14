@@ -9,3 +9,6 @@ Completed feedback tickets: ID · date · what was done. Names stay out (this re
 - FB-LWOHYV · 2026-10-09 · WOT can you do v Berry's War Council showed 0-0 because PlayOn hadn't scored it. Sync now scores a played series from its games when PlayOn is at 0-0; the series is 2-0 on the site.
 - FB-7HZDKG · 2026-10-11 · Tier list feedback, all 7 notes: a playoff scoring model on the tier list's Model tab with points per position (economy no longer counted three times; damage taken share and ward uptime added), consistency as series in the top 40% at the position, winning as flat points, gentler survival for initiators, opponent strength from a team rating, and a stat podium for cores and supports; a Compare tab on player pages; saved feedback notes can be edited.
 - FB-9O0UQN · 2026-10-13 · Test ticket, removed
+- FB-TRT14B · 2026-10-13 · Card backs under 200px wide use two stat columns, so K/D/A and other stats fit on phones
+- FB-3T1F2G · 2026-10-13 · Card layout settings: hide, resize or move any front text, including everything but the tier
+- FB-IDYMEY · 2026-10-13 · Card layout settings: your own card name (24 characters) and a name size slider
