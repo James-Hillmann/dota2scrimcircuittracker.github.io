@@ -469,6 +469,22 @@ export const CATALOG = [
     "key": "finish:blizzard"
   },
   {
+    "id": "voidstorm",
+    "name": "Immersive Void",
+    "rarity": "legendary",
+    "description": "Violet shards spiral through a pulsing pocket of darkness.",
+    "type": "finish",
+    "key": "finish:voidstorm"
+  },
+  {
+    "id": "sandstorm",
+    "name": "Immersive Dust Storm",
+    "rarity": "legendary",
+    "description": "Layered sand and glowing grit tear sideways across the card.",
+    "type": "finish",
+    "key": "finish:sandstorm"
+  },
+  {
     "id": "cosmic",
     "name": "Cosmic Depths",
     "rarity": "legendary",
@@ -724,7 +740,35 @@ export const CATALOG = [
     "name": "Katakana Signature",
     "type": "translation",
     "rarity": "legendary",
-    "description": "Automatically render your name phonetically in Japanese katakana. Works with any collected signature style."
+    "description": "A legendary modifier that renders your name phonetically in Japanese katakana. Works with any collected signature style.",
+    "preview": "Aa → カナ"
+  },
+  {
+    "id": "cyrillic",
+    "key": "translation:cyrillic",
+    "name": "Cyrillic Etching",
+    "type": "translation",
+    "rarity": "legendary",
+    "description": "A legendary modifier that recasts your name as a bold Cyrillic-style phonetic inscription.",
+    "preview": "Aa → Аа"
+  },
+  {
+    "id": "greek",
+    "key": "translation:greek",
+    "name": "Olympian Script",
+    "type": "translation",
+    "rarity": "legendary",
+    "description": "A legendary modifier that renders your name in a monumental Greek-inspired alphabet.",
+    "preview": "Aa → Αα"
+  },
+  {
+    "id": "runic",
+    "key": "translation:runic",
+    "name": "Runic Inscription",
+    "type": "translation",
+    "rarity": "legendary",
+    "description": "A legendary modifier that carves your name into an Elder Futhark-inspired runic rendering.",
+    "preview": "Aa → ᚨᚨ"
   }
 ];
 export const PEN_MARKS = {
@@ -775,6 +819,6 @@ export const PEN_MARKS = {
 };
 export const TIERS = ['common','rare','epic','legendary'];
 export const PACK_ODDS = {common:69,rare:17,epic:10,legendary:4};
-export const DEFAULT_EQUIPMENT = {border:'grey',finish:'none',autograph:'none',translation:'none',text:'',x:50,y:60,size:15,rotation:-7};
+export const DEFAULT_EQUIPMENT = {border:'grey',finish:'none',autograph:'none',translation:'none',text:'',x:50,y:60,size:15,rotation:-7,particleSpeed:100};
 export const itemByKey = key => CATALOG.find(item=>item.key===key);
 

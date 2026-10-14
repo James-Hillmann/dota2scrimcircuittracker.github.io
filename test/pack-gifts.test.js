@@ -24,7 +24,7 @@ test('gifts support screen packs, each card item type, and individual unowned sc
 });
 
 test('vault checks the gift sender, persists gifts and makes retries safe',async()=>{
-  const rows=new Map(),storage={get:async k=>structuredClone(rows.get(k)),put:async(k,v)=>rows.set(k,structuredClone(v))};
+  const rows=new Map(),storage={get:async k=>structuredClone(rows.get(k)),put:async(k,v)=>rows.set(k,structuredClone(v)),list:async({prefix})=>new Map([...rows].filter(([k])=>k.startsWith(prefix)))};
   storage.transaction=fn=>fn(storage);
   const vault=new CosmeticsVault({storage});
   const request=(account,body)=>vault.fetch(new Request(`https://vault/action?account=${account}`,{method:'POST',body:JSON.stringify(body)}));

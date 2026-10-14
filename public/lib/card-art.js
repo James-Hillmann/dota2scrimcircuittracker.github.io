@@ -12,7 +12,7 @@ const screens = new Map(SCREEN_ART.map((s) => [s.id, s]));
 export const SCREEN_COUNT = SCREEN_ART.length;
 export function screenArt(id) {
   const s = screens.get(id);
-  return s && { id: s.id, label: s.label, rarity: s.rarity, hero: s.hero ?? null, cls: "src-ls src-screen", src: `https://community.fastly.steamstatic.com/economy/image/${s.icon}` };
+  return s && { id: s.id, label: s.label, rarity: s.rarity, hero: s.hero ?? null, cls: "src-ls src-screen", src: absolute(`img/loading-screens/${s.id.slice(4)}.webp`) };
 }
 // owned: the player's pack screen ids; those for this hero (or none) follow the hero's own art.
 export function cardArtOptions(hero, owned = []) {

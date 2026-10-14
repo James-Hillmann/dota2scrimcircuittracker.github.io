@@ -4,6 +4,28 @@ import {grantLogin,applyPackGrants,rollPack,equipCosmetics,SCREENS_PER_PACK,SCRE
 import {SCREEN_ART} from '../public/lib/screen-art-data.js';
 import {cardArtwork,cardArtOptions} from '../public/lib/card-art.js';
 import {HERO_META} from '../public/lib/hero-meta.js';
+import {restoreScreenPacks} from '../workers/steam-auth/src/cosmetics.js';
+import {existsSync} from 'node:fs';
+
+test('every screen image ships with the site',()=>{
+  for(const s of SCREEN_ART)assert.ok(existsSync(new URL(`../public/img/loading-screens/${s.id.slice(4)}.webp`,import.meta.url)),s.label);
+});
+
+test('recovery restores old screen openings once, preserving discoveries and all pending packs',()=>{
+  const state={...grantLogin(null),packs:['common','rare'],screens:[SCREEN_ART[0].id],nextPackAt:12345};
+  const receipts=new Map([
+    ['old-screen',{action:'open',result:{rewards:[],screens:[SCREEN_ART[0].id]}}],
+    ['old-card',{action:'open',result:{rewards:[{key:'border:copper'}],screens:[SCREEN_ART[1].id]}}],
+    ['new-screen',{action:'open',openedAt:1000,result:{rewards:[],screens:[SCREEN_ART[2].id]}}],
+    ['failed',{action:'open',result:{error:'Failed'}}]
+  ]);
+  const repaired=restoreScreenPacks(state,receipts,2000);
+  assert.deepEqual(repaired.packs,['common','rare','screens']);
+  assert.deepEqual(repaired.screens,state.screens);assert.deepEqual(repaired.inventory,state.inventory);
+  assert.equal(repaired.nextPackAt,12345);
+  assert.deepEqual(restoreScreenPacks(repaired,receipts,3000),repaired);
+  assert.deepEqual(state.packs,['common','rare']);
+});
 
 test('three screen packs are granted once to existing and new players without changing their cards',()=>{
   for(const original of [grantLogin(null),{...grantLogin(null),inventory:{'border:copper':2},packs:[],screens:[SCREEN_ART[0].id]}]) {

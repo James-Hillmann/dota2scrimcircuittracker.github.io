@@ -6,6 +6,15 @@ import { isAdmin, giftPacks, clearGifts } from '../../../public/lib/pack-gifts.j
 const json=(value,status=200)=>Response.json(value,{status});
 const secureRandom=()=>crypto.getRandomValues(new Uint32Array(1))[0]/4294967296;
 
+// Restore pre-fix screen-pack openings once. Display failures were not reported to the
+// server, so all old screen-only openings receive replacements; discoveries are preserved.
+export function restoreScreenPacks(state, receipts, now=Date.now()) {
+  if(state.screenPackRecovery==='images-v1')return state;
+  const count=[...receipts.values()].filter(r=>r.action==='open'&&!r.openedAt&&r.result?.rewards?.length===0&&r.result?.screens?.length>0).length;
+  return {...state,screenPackRecovery:'images-v1',packs:[...state.packs,...Array(count).fill('screens')],
+    ...(count?{gifts:[...(state.gifts??[]),{kind:'pack',tier:'screens',count,note:'Replacement packs for the loading-screen display issue. Your collected screens are still yours.',at:now}].slice(-20)}:{})};
+}
+
 // One serialized vault for this league. Inventory, receipts, daily grants and appearance
 // writes commit together. Browser input never supplies drop odds, items or counts.
 export class CosmeticsVault {
@@ -59,7 +68,9 @@ export class CosmeticsVault {
       const result=await this.ctx.storage.transaction(async txn=>{
         const key=`user:${account}`, saved=await txn.get(key);
         if(body.action==='session') {
-          const state=applyPackGrants(grantLogin(saved));await txn.put(key,state);return {state};
+          let state=grantLogin(saved);
+          if(state.screenPackRecovery!=='images-v1')state=restoreScreenPacks(state,await txn.list({prefix:`receipt:${account}:`}));
+          state=applyPackGrants(state);await txn.put(key,state);return {state};
         }
         if(!saved) throw new Error('Load your collection first.');
         if(!/^[\w-]{16,80}$/.test(body.requestId??'')) throw new Error('Invalid request ID.');
@@ -105,7 +116,7 @@ export class CosmeticsVault {
         else throw new Error('Unknown collection action.');
         await txn.put(key,result.state);
         if(['equip','card-settings','nickname'].includes(body.action)) await txn.put(`appearance:${account}`,cardAppearance(result.state));
-        await txn.put(receipt,{action:body.action,result});
+        await txn.put(receipt,{action:body.action,result,...(body.action==='open'?{openedAt:Date.now(),packType:saved.packs[body.packIndex]}:{})});
         return result;
       });
       return json({...result,serverNow:Date.now()});

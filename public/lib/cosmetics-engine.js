@@ -125,6 +125,8 @@ export function equipCosmetics(state, raw) {
   if(layout)equipment.layout=layout;
   equipment.hue=raw.hue??state.equipment?.hue??0;
   if(!Number.isFinite(equipment.hue)||equipment.hue<0||equipment.hue>360)throw new Error('Choose a valid hue.');
+  equipment.particleSpeed=raw.particleSpeed??state.equipment?.particleSpeed??DEFAULT_EQUIPMENT.particleSpeed;
+  if(!Number.isInteger(equipment.particleSpeed)||equipment.particleSpeed<50||equipment.particleSpeed>200)throw new Error('Choose a particle speed from 50% to 200%.');
   // The border's corner symbol shows unless the owner turns it off; only false is stored.
   const emblem=raw.emblem??state.equipment?.emblem??true;
   if(typeof emblem!=='boolean')throw new Error('Choose whether to show the border symbol.');

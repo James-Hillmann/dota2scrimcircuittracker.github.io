@@ -35,19 +35,35 @@
 [data-finish=ghost]{--finish-paint:radial-gradient(ellipse at var(--px,50%) var(--py,30%),#aef8ddaa,transparent 60%),linear-gradient(120deg,transparent,#d4d5ff88,transparent);--finish-opacity:.4}
 [data-finish=inferno]{--finish-paint:radial-gradient(ellipse at 50% 110%,#ff4c00cc,transparent 65%);--finish-opacity:.65;--finish-size:100% 100%}
 [data-finish=blizzard]{--finish-paint:linear-gradient(135deg,#d4ffff77,transparent 50%,#73b7ea55);--finish-opacity:.4}
+[data-finish=voidstorm]{--finish-paint:radial-gradient(circle at 52% 43%,#08030fcc 0 8%,#6d21a888 20%,transparent 48%),radial-gradient(ellipse at 15% 90%,#7d30d977,transparent 55%);--finish-opacity:.7;--finish-size:100% 100%}
+[data-finish=voidstorm] .cosmetic-overlay{animation:void-breathe 3.6s ease-in-out infinite}
+[data-finish=sandstorm]{--finish-paint:linear-gradient(100deg,transparent 5%,#c58a4670 28%,#f0c47b66 45%,#7a4b2870 72%,transparent 95%);--finish-opacity:.58;--finish-size:220% 100%}
+[data-finish=sandstorm] .cosmetic-overlay{animation:sand-haze 3.2s linear infinite}
 [data-finish=cosmic]{--finish-paint:radial-gradient(ellipse at var(--px,50%) var(--py,30%),#d75cff88,transparent 45%),radial-gradient(ellipse at 0 100%,#328cffa0,transparent 60%);--finish-opacity:.6}
 [data-finish=rift]{--finish-paint:repeating-conic-gradient(from 15deg at var(--px,50%) var(--py,40%),transparent 0 10deg,#ed81ee88 11deg 13deg,transparent 14deg 30deg,#7fdfffaa 31deg 34deg);--finish-opacity:.4;--finish-size:100% 100%}
 .particles{position:absolute;inset:0;z-index:2;pointer-events:none;overflow:hidden}.particles i{position:absolute;display:none;width:3px;height:3px;border-radius:50%;background:white;box-shadow:0 0 5px currentColor;animation:float 5s linear infinite}
-[data-finish=inferno] .particles i{display:block;color:#ff954c;background:#ffb15b;animation:cosmetic-rise 4s linear infinite}
-[data-finish=blizzard] .particles i{display:block;color:#d3f6ff;background:#e3ffff;width:calc(2px + mod(var(--i),3)*1px);animation:snow 6s linear infinite}
+[data-finish=inferno] .particles i{display:block;width:calc(3px + mod(var(--i),4)*1px);height:calc(5px + mod(var(--i),5)*1px);color:#ff6a1f;background:radial-gradient(circle at 68% 68%,#fff6a8 0 13%,#ffc14f 28%,#ff6323 62%,#b91d0a 82%,transparent 84%);border-radius:55% 48% 52% 18%;box-shadow:0 0 5px #ff9b38,0 0 11px #ff3d1766;animation:cosmetic-rise calc(2.8s + mod(var(--i),5)*.28s) ease-in infinite}
+[data-finish=inferno] .particles i:nth-child(3n){filter:hue-rotate(-12deg) brightness(1.15)}
+[data-finish=inferno] .particles i:nth-child(4n){width:3px;height:3px;border-radius:50%;background:#ffe398;box-shadow:0 0 5px #ff9a36,0 0 9px #ff4c22}
+[data-finish=blizzard] .particles i{display:block;width:auto;height:auto;color:#effdff;background:none;border-radius:0;box-shadow:none;filter:drop-shadow(0 0 2px #9feaff) drop-shadow(0 0 5px #82cfff99);animation:snow calc(5s + mod(var(--i),5)*.42s) linear infinite}
+[data-finish=blizzard] .particles i::before{content:'\2744';display:block;font:400 calc(7px + mod(var(--i),4)*2px)/1 Georgia,'Times New Roman',serif;transform:rotate(calc(var(--i)*19deg));opacity:calc(.58 + mod(var(--i),4)*.1)}
+[data-finish=voidstorm] .particles i{display:block;width:calc(3px + mod(var(--i),4)*1px);height:calc(3px + mod(var(--i),3)*1px);color:#b768ff;background:linear-gradient(135deg,#f3d7ff,#9d4dff 45%,#371066);border-radius:1px;clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%);box-shadow:0 0 6px #cc8cff,0 0 13px #7427db;animation:void-spiral calc(3.4s + mod(var(--i),5)*.32s) cubic-bezier(.45,.05,.65,1) infinite}
+[data-finish=voidstorm] .particles i:nth-child(3n){background:#e6baff;filter:blur(.4px)}
+[data-finish=voidstorm] .particles i:nth-child(5n){width:2px;height:10px;background:#9c55ff;filter:blur(1px)}
+[data-finish=sandstorm] .particles i{display:block;width:calc(8px + mod(var(--i),6)*3px);height:calc(1px + mod(var(--i),3)*1px);color:#efc27d;background:linear-gradient(90deg,transparent,#f2ca89 35%,#b87538 85%,transparent);border-radius:50%;box-shadow:0 0 4px #d99a50;filter:blur(calc(mod(var(--i),3)*.35px));animation:dust-crosswind calc(2.2s + mod(var(--i),6)*.25s) linear infinite}
+[data-finish=sandstorm] .particles i:nth-child(4n){height:4px;opacity:.45;filter:blur(1.4px)}
 [data-finish=cosmic] .particles i{display:block;color:#ccb3ff;animation:orbit 12s linear infinite}
 [data-finish=diamond] .particles i,[data-finish=stars] .particles i{display:block;animation:twinkle 3s ease-in-out infinite}
 @keyframes foil-drift{from{background-position:15% 20%}to{background-position:85% 80%}}
 @keyframes frame-flow{to{background-position:0 0,200% 200%}}
 @keyframes charge{0%,85%,100%{filter:brightness(1)}90%,95%{filter:brightness(1.5)}}
 @keyframes glitch{0%,90%{transform:translate(0);opacity:.14}95%{transform:translateX(3px);opacity:.7}}
-@keyframes cosmetic-rise{from{transform:translateY(220px);opacity:0}25%{opacity:1}to{transform:translateY(-240px);opacity:0}}
-@keyframes snow{from{transform:translate(-20px,-240px);opacity:0}20%,80%{opacity:.9}to{transform:translate(35px,260px);opacity:0}}
+@keyframes cosmetic-rise{0%{transform:translate3d(0,220px,0) rotate(35deg) scale(.45);opacity:0}18%{opacity:1}55%{transform:translate3d(calc(mod(var(--i),3)*7px - 7px),-10px,0) rotate(48deg) scale(1)}100%{transform:translate3d(calc(mod(var(--i),5)*6px - 12px),-240px,0) rotate(62deg) scale(.35);opacity:0}}
+@keyframes snow{0%{transform:translate3d(-18px,-240px,0) rotate(0deg);opacity:0}12%{opacity:.9}35%{transform:translate3d(10px,-75px,0) rotate(105deg)}62%{transform:translate3d(-8px,85px,0) rotate(215deg)}88%{opacity:.9}100%{transform:translate3d(24px,260px,0) rotate(340deg);opacity:0}}
+@keyframes void-breathe{0%,100%{filter:saturate(.9) brightness(.75);transform:scale(1)}50%{filter:saturate(1.35) brightness(1.2);transform:scale(1.035)}}
+@keyframes void-spiral{0%{transform:translate3d(-26px,18px,0) rotate(0deg) scale(.15);opacity:0}20%{opacity:.9}52%{transform:translate3d(18px,-14px,0) rotate(190deg) scale(1.35);opacity:1}80%{opacity:.75}100%{transform:translate3d(-10px,8px,0) rotate(430deg) scale(0);opacity:0}}
+@keyframes sand-haze{from{background-position:110% 50%}to{background-position:-110% 50%}}
+@keyframes dust-crosswind{0%{transform:translate3d(-230px,calc(mod(var(--i),3)*5px - 5px),0) scaleX(.45);opacity:0}12%{opacity:.85}55%{transform:translate3d(15px,calc(mod(var(--i),5)*4px - 8px),0) scaleX(1.15);opacity:1}88%{opacity:.7}100%{transform:translate3d(260px,calc(mod(var(--i),7)*3px - 9px),0) scaleX(.65);opacity:0}}
 @keyframes orbit{from{transform:rotate(0deg) translateX(20px)}to{transform:rotate(360deg) translateX(20px)}}
 @keyframes twinkle{0%,100%{opacity:.1;transform:scale(.4)}50%{opacity:1;transform:scale(1.3)}}
 [data-texture=enamel]{--frame-paint:linear-gradient(150deg,var(--a),var(--b) 32%,var(--a) 55%,var(--b) 83%,var(--a))}
@@ -119,6 +135,9 @@
 [data-writing=ja]{--signature-font:'Autograph Japanese','Yu Mincho',serif;}
 [data-writing=zh]{--signature-font:'Autograph Chinese','KaiTi',serif;}
 [data-writing=ko]{--signature-font:'Autograph Korean','Malgun Gothic',cursive;}
+[data-writing=cyrl]{--signature-font:Georgia,'Times New Roman',serif;}
+[data-writing=greek]{--signature-font:Georgia,'Times New Roman',serif;}
+[data-writing=runic]{--signature-font:'Segoe UI Symbol','Noto Sans Runic',serif;letter-spacing:.04em;}
 .signature-sample,.reward-signature{position:relative;display:block;width:100%;text-align:center;min-width:0;line-height:1.4;}
 .signature-sample{--signature-size:25px;transform:rotate(var(--signature-slant));padding:4px 0;}
 .signature-sample .autograph-lettering{padding:0;line-height:1.4;}
@@ -168,3 +187,15 @@
 .ft-card[data-cosmetic] .ft-front::after{content:'';position:absolute;inset:3px;z-index:7;pointer-events:none;border-radius:5px;border:var(--ornament-border,0)}
 @media(prefers-reduced-motion:reduce){.collection-swatch[data-texture],.fantasy-tier-chip.open[data-cosmetic]{animation:none!important}}
 .fantasy-tier-chip.open[data-cosmetic]{padding:12px;border:5px solid transparent;border-radius:12px;background-image:linear-gradient(#181619,#181619),var(--frame-paint);background-origin:padding-box,border-box;background-clip:padding-box,border-box;container-type:inline-size}.fantasy-tier-chip.open[data-cosmetic]::before{inset:0;filter:saturate(.82) contrast(1.08) hue-rotate(var(--art-hue,0deg))}.fantasy-tier-chip.open>.tier-expanded-signature{position:absolute;inset:0;z-index:1;pointer-events:none}.tier-expanded-signature .card-autograph{position:absolute;width:min(42%,420px);transform:translate(-50%,-50%) rotate(var(--placement-rotation,-7deg));text-align:center;color:var(--signature-ink);filter:drop-shadow(0 2px 3px #000) drop-shadow(0 0 8px var(--signature-glow));--signature-size:var(--expanded-signature-size,32px)!important;opacity:.75}.fantasy-tier-chip.open>.tier-open-head,.fantasy-tier-chip.open .bd-left,.fantasy-tier-chip.open .bd-right{z-index:2}
+
+/* Per-card speed: 100% is each finish's authored pace. */
+[data-finish=inferno] .particles i{animation-duration:calc((2.8s + mod(var(--i),5)*.28s)/var(--particle-speed,1))}
+[data-finish=blizzard] .particles i{animation-duration:calc((5s + mod(var(--i),5)*.42s)/var(--particle-speed,1))}
+[data-finish=voidstorm] .particles i{animation-duration:calc((3.4s + mod(var(--i),5)*.32s)/var(--particle-speed,1))}
+[data-finish=sandstorm] .particles i{animation-duration:calc((2.2s + mod(var(--i),6)*.25s)/var(--particle-speed,1))}
+[data-finish=cosmic] .particles i{animation-duration:calc(12s/var(--particle-speed,1))}
+[data-finish=diamond] .particles i,[data-finish=stars] .particles i{animation-duration:calc(3s/var(--particle-speed,1))}
+[data-finish=goldust] .particles i{animation-duration:calc(4s/var(--particle-speed,1))}
+[data-finish=starlight] .particles i{animation-duration:calc(5s/var(--particle-speed,1))}
+[data-finish=voidstorm] .cosmetic-overlay{animation-duration:calc(3.6s/var(--particle-speed,1))}
+[data-finish=sandstorm] .cosmetic-overlay{animation-duration:calc(3.2s/var(--particle-speed,1))}

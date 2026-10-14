@@ -698,6 +698,10 @@ play the whole Heroic/Aegis game. Predict's "Your name" bar hides on this tab (F
   can be previewed before collecting, and become card backgrounds in Customize. Hero-specific
   screens fit their hero; event and team screens fit any hero. Near completion, a pack contains
   the remaining screens; when none remain, it stays unopened.
+  Images ship as `public/img/loading-screens/*.webp`; regenerate with
+  `node scripts/gen/cache-screen-art.js` after updating the catalog. The October image fix restores
+  every earlier screen-only opening with a replacement pack on the player's next Steam session,
+  once per account. It preserves discoveries, pending packs and the refill timer.
 - **Gifts from Fav**: the profile gift box sends any pack type, copies of any card item (border,
   finish, signature or name rendering), or a specific unowned screen. The Worker verifies the
   sender's Steam account and makes retries safe. Notices name the actual gifts and include an

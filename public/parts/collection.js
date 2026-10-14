@@ -1,9 +1,9 @@
 import { esc, SOURCES, allLoad } from '../core.js';
 import { steamAccount, steamLoginUrl, listCards } from '../lib/store.js';
-import { CATALOG, DEFAULT_EQUIPMENT, collectionState, collectionAction, publicCollection, applyEquipment, cardRatings, galleryCards, myCardVotes } from '../lib/cosmetics.js';
+import { CATALOG, DEFAULT_EQUIPMENT, PARTICLE_FINISHES, collectionState, collectionAction, publicCollection, applyEquipment, cardRatings, galleryCards, myCardVotes } from '../lib/cosmetics.js';
 import { RATINGS } from '../lib/card-ratings.js';
 import { TIERS, itemByKey } from '../lib/cosmetics-catalog.js';
-import { signatureHtml, japaneseName } from '../lib/signatures.js';
+import { signatureHtml, renderedName } from '../lib/signatures.js';
 import { createPlayerCards, PAINT_FILTER, wirePlayerCards } from './player-card.js';
 import { startSteamSignIn, steamName } from './me.js';
 import { HERO_META } from '../lib/hero-meta.js';
@@ -21,7 +21,7 @@ const colors={common:'#abb3be',rare:'#80c4ff',epic:'#d7a3ff',legendary:'#ffd879'
 const typeLabel=type=>type==='translation'?'modifier':type;
 function swatch(item,name='Scionara') {
   if(item.type==='autograph') return `<span class="collection-swatch signature-sample">${signatureHtml({...DEFAULT_EQUIPMENT,autograph:item.id,text:name},name).replace('card-autograph','collection-signature')}</span>`;
-  if(item.type==='translation')return '<span class="collection-swatch translation-swatch">Aa → カナ</span>';
+  if(item.type==='translation')return `<span class="collection-swatch translation-swatch ${item.id}">${esc(item.preview)}</span>`;
   return `<span class="collection-swatch ${item.type==='finish'?'finish-swatch':''}" data-texture="${item.texture??'metal'}" data-finish="${item.id}" style="--a:${item.a??'#536282'};--b:${item.b??'#151a29'}">${item.symbol??''}</span>`;
 }
 // Grouped by type (catalog order), common to legendary within each type.
@@ -175,16 +175,18 @@ export async function openCollection({tab='packs',viewAccount=null,cardHtml=null
     // A name-rendering preview needs a signature to make the script visible.
     if(previewItem?.type==='translation'&&previewEquipment.autograph==='none')previewEquipment.autograph='brush-ink';
     body.innerHTML=`${cardSlotsHtml()}<div class="dex-progress"><strong>${count} / ${CATALOG.length} collected</strong><progress max="${CATALOG.length}" value="${count}" aria-label="Collection completion"></progress><small>${owned.size} / ${SCREEN_COUNT} bonus loading screens</small></div><div class="dex-layout"><div><div class="dex-filters"><label>Type <select data-filter>${['all','border','finish','autograph','translation'].map(t=>`<option value="${t}">${t}</option>`).join('')}<option value="screen">loading screens</option></select></label>${filter==='screen'?`<label>Hero <select data-screen-hero><option value="all">all</option><option value="any">any hero (events, teams)</option>${SCREEN_HEROES.map(h=>`<option value="${esc(h)}">${esc(h)}</option>`).join('')}</select></label>`:`<label>Rarity <select data-rarity-filter><option value="all">all</option>${TIERS.map(t=>`<option value="${t}">${t}</option>`).join('')}</select></label>`}<label>Show <select data-status><option value="all">All designs</option><option value="owned">Collected</option><option value="missing">Not collected</option></select></label></div><div class="dex-grid">${filter==='screen'?screenDexHtml(owned,status,screenHero,previewScreen):dexHtml(inventory,filter,status,name,savedEquipment,editable,rarity)}</div></div><aside class="dex-card-preview"><h3>${previewItem||screen?'Card preview':editable?'Your equipped card':'Equipped card'}</h3>${previewItem||screen?`<p class="dex-preview-note">Previewing ${esc(previewItem?.name??screen.label)}${(previewItem?inventory[previewItem.key]>0:owned.has(screen.id))?'':' - Not collected'}. Your saved card is unchanged.</p><button type="button" data-clear-preview>Show equipped card</button>`:''}<div data-dex-card>${cardHtml}</div><dl>${['border','finish','autograph','translation'].map(type=>`<dt>${type==='autograph'?'Signature':type==='translation'?'Name rendering':type}</dt><dd>${esc(itemByKey(`${type}:${previewEquipment[type]}`)?.name??({border:'Default grey',finish:'No finish',autograph:'No signature',translation:'Original name'}[type]))}</dd>`).join('')}</dl>${editable?'<button type="button" data-customize-card>Edit card design</button><p>Equip an item to save and update your card immediately.</p>':''}</aside></div>`;
+    body.querySelector('[data-save]').insertAdjacentHTML('beforebegin',`<label class="particle-speed-control">Particle speed <output data-particle-speed-value>${equipment.particleSpeed}%</output><input type="range" data-particle-speed min="50" max="200" step="10" value="${equipment.particleSpeed}" ${editable?'':'disabled'}></label>`);
     wireCardSlots();
     const preview=body.querySelector('[data-dex-card] .ft-card');preview.dataset.designSlot=selectedSlot;preview.classList.remove('flipped');preview.querySelectorAll('button').forEach(b=>b.remove());applyEquipment(preview,previewEquipment,shownName());
     body.querySelectorAll('[data-preview]').forEach(b=>{b.setAttribute('aria-pressed',String(previewItem?.key===b.dataset.preview));b.onclick=()=>{previewItem=itemByKey(b.dataset.preview);previewScreen=null;drawDex();};});
     body.querySelectorAll('[data-preview-screen]').forEach(b=>b.onclick=()=>{previewScreen=b.dataset.previewScreen;previewItem=null;drawDex();});
     body.querySelector('[data-clear-preview]')?.addEventListener('click',()=>{previewItem=null;previewScreen=null;drawDex();});
     body.querySelector('[data-customize-card]')?.addEventListener('click',()=>{equipment={...savedEquipment};initialEquipment=JSON.stringify(equipment);tab='customize';draw();});
-    const f=body.querySelector('[data-filter]'),s=body.querySelector('[data-status]'),rr=body.querySelector('[data-rarity-filter]'),sh=body.querySelector('[data-screen-hero]');f.value=filter;s.value=status;
+    const oldStatus=body.querySelector('[data-status]');oldStatus.parentElement.innerHTML=`<span>Show only collected</span><input type="checkbox" data-status ${status==='owned'?'checked':''}>`;
+    const f=body.querySelector('[data-filter]'),s=body.querySelector('[data-status]'),rr=body.querySelector('[data-rarity-filter]'),sh=body.querySelector('[data-screen-hero]');f.value=filter;f.querySelector('option[value="translation"]')?.replaceChildren('modifier');
     if(rr){rr.value=rarity;rr.onchange=()=>{rarity=rr.value;drawDex();};}
     if(sh){sh.value=screenHero;sh.onchange=()=>{screenHero=sh.value;drawDex();};}
-    f.onchange=()=>{filter=f.value;drawDex();};s.onchange=()=>{status=s.value;drawDex();};
+    f.onchange=()=>{filter=f.value;drawDex();};s.onchange=()=>{status=s.checked?'owned':'all';drawDex();};
     body.querySelectorAll('[data-equip]').forEach(b=>{b.onclick=async()=>{
       const item=itemByKey(b.dataset.equip),next={...savedEquipment,[item.type]:item.id};
       const data=await run('equip',{equipment:next});
@@ -192,11 +194,11 @@ export async function openCollection({tab='packs',viewAccount=null,cardHtml=null
     };});
   }
   function select(type,defaultName) {
-    return `<label>${type==='autograph'?'Signature style':type==='translation'?'Name rendering':type}<select data-equipment="${type}"><option value="${DEFAULT_EQUIPMENT[type]}">${defaultName}</option>${CATALOG.filter(i=>i.type===type&&inventory[i.key]>0).map(i=>`<option value="${i.id}">${esc(i.name)}</option>`).join('')}</select></label>`;
+    return `<label>${type==='autograph'?'Signature style':type==='translation'?'Modifier':type}<select data-equipment="${type}"><option value="${DEFAULT_EQUIPMENT[type]}">${defaultName}</option>${CATALOG.filter(i=>i.type===type&&inventory[i.key]>0).map(i=>`<option value="${i.id}">${esc(i.name)}</option>`).join('')}</select></label>`;
   }
   function visualTextChoices(type) {
-    const items=[{id:DEFAULT_EQUIPMENT[type],name:type==='autograph'?'No signature':'Original name'},...CATALOG.filter(i=>i.type===type&&inventory[i.key]>0)];
-    return `<fieldset class="visual-text-options"><legend>${type==='autograph'?'Signature style':'Name rendering'}</legend><div>${items.map(item=>`<button type="button" data-text-choice="${type}" data-choice="${item.id}" aria-pressed="${equipment[type]===item.id}" ${editable?'':'disabled'}><span data-text-choice-preview></span><strong>${esc(item.name)}</strong><small data-choice-status>${equipment[type]===item.id?'Selected':'Select'}</small></button>`).join('')}</div></fieldset>`;
+    const items=[{id:DEFAULT_EQUIPMENT[type],name:type==='autograph'?'No signature':'No modifier'},...CATALOG.filter(i=>i.type===type&&inventory[i.key]>0)];
+    return `<fieldset class="visual-text-options"><legend>${type==='autograph'?'Signature style':'Modifier'}</legend><div>${items.map(item=>`<button type="button" data-text-choice="${type}" data-choice="${item.id}" aria-pressed="${equipment[type]===item.id}" ${editable?'':'disabled'}><span data-text-choice-preview></span><strong>${esc(item.name)}</strong><small data-choice-status>${equipment[type]===item.id?'Selected':'Select'}</small></button>`).join('')}</div></fieldset>`;
   }
   function drawEditor() {
     const imageOpen=body.querySelector('.card-settings:last-of-type')?.open??false;
@@ -216,13 +218,16 @@ export async function openCollection({tab='packs',viewAccount=null,cardHtml=null
     const card=body.querySelector('.ft-card');card.dataset.designSlot=selectedSlot;card.classList.remove('flipped');
     card.querySelectorAll('button').forEach(b=>b.remove());
     const update=()=>{applyEquipment(card,equipment,shownName());wireSignature();say(JSON.stringify(equipment)===initialEquipment?'':'Unsaved card changes');};
+    const speedControl=body.querySelector('.particle-speed-control'),speedInput=body.querySelector('[data-particle-speed]');
+    const syncParticleControl=()=>{speedControl.hidden=!PARTICLE_FINISHES.includes(equipment.finish);speedInput.value=equipment.particleSpeed;body.querySelector('[data-particle-speed-value]').textContent=`${equipment.particleSpeed}%`;};
+    speedInput.oninput=()=>{equipment.particleSpeed=Number(speedInput.value);syncParticleControl();update();};syncParticleControl();
     wireLayout(card,update);
     const refreshTextChoices=()=>body.querySelectorAll('[data-text-choice]').forEach(button=>{
       const type=button.dataset.textChoice,id=button.dataset.choice,selected=equipment[type]===id;
       button.setAttribute('aria-pressed',String(selected));button.querySelector('[data-choice-status]').textContent=selected?'Selected':'Select';
       const preview=button.querySelector('[data-text-choice-preview]');
       if(type==='autograph')preview.innerHTML=id==='none'?'<span class="no-signature-preview">—</span>':`<span class="collection-swatch signature-sample">${signatureHtml({...equipment,autograph:id},shownName()).replace('card-autograph','collection-signature')}</span>`;
-      else {preview.className='name-rendering-preview';preview.textContent=id==='japanese'?japaneseName(shownName()):shownName();}
+      else {preview.className=`name-rendering-preview ${id}`;preview.textContent=renderedName(shownName(),id);}
     });
     body.querySelectorAll('[data-text-choice]').forEach(button=>button.onclick=()=>{equipment[button.dataset.textChoice]=button.dataset.choice;refreshTextChoices();update();});
     refreshTextChoices();
@@ -240,12 +245,12 @@ export async function openCollection({tab='packs',viewAccount=null,cardHtml=null
       });
     }
     drawImageGallery();
-    body.querySelectorAll('[data-equipment]').forEach(s=>{s.value=equipment[s.dataset.equipment];s.disabled=!editable;s.onchange=()=>{equipment[s.dataset.equipment]=s.value;update();};});
+    body.querySelectorAll('[data-equipment]').forEach(s=>{s.value=equipment[s.dataset.equipment];s.disabled=!editable;s.onchange=()=>{equipment[s.dataset.equipment]=s.value;syncParticleControl();update();};});
     body.querySelectorAll('[data-base]').forEach(s=>{
       const key=s.dataset.base;s.value=base[key]??'';
       s.onchange=()=>{base[key]=key==='hero'?(Number(s.value)||null):(s.value||null);if(key==='hero'){base.art=null;base.crop=null;drawEditor();}else {if(key==='art'){if(base.art&&!base.hero)base.hero=effectiveHero;base.crop=null;}update();}};
     });
-    body.querySelector('[data-emblem]').onchange=e=>{if(e.target.checked)delete equipment.emblem;else equipment.emblem=false;update();};
+    body.querySelector('[data-emblem]').onchange=e=>{equipment.emblem=e.target.checked;update();};
     body.querySelector('[data-hue]').oninput=e=>{equipment.hue=Number(e.target.value);body.querySelector('[data-hue-value]').textContent=equipment.hue;update();};
     body.querySelectorAll('[data-crop]').forEach(input=>input.oninput=()=>{base.crop??=defaultCardCrop(cardArtwork(effectiveHero,base));base.crop[input.dataset.crop]=Number(input.value);update();});
     body.querySelectorAll('[data-position]').forEach(input=>input.oninput=()=>{equipment[input.dataset.position]=Number(input.value);syncControls();update();});

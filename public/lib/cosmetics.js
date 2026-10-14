@@ -4,6 +4,7 @@ import { steamAccount, steamIdToken } from './store.js';
 import { cardArtwork } from './card-art.js';
 import { heroById, heroImg } from './hero-meta.js';
 import { cardAppearance, selectedCardDesign, shownNickname } from './cosmetics-engine.js';
+export const PARTICLE_FINISHES=Object.freeze(['inferno','blizzard','voidstorm','sandstorm','cosmic','diamond','stars','goldust','starlight']);
 import { syncPackOfferClaims } from './bonus-offers.js';
 import { applyLayout } from './card-layout.js';
 
@@ -64,12 +65,12 @@ export async function cosmeticAppearances() {
 }
 export function cosmeticAttributes(raw) {
   const e={...DEFAULT_EQUIPMENT,...raw}, border=itemByKey(`border:${e.border}`);
-  return ` data-cosmetic="true" data-texture="${border?.texture??'metal'}" data-finish="${itemByKey(`finish:${e.finish}`)?.id??'none'}" data-rarity="${border?.rarity??'free'}" style="--a:${border?.a??'#92969c'};--b:${border?.b??'#41454c'};--art-hue:${Number(e.hue)||0}deg"`;
+  return ` data-cosmetic="true" data-texture="${border?.texture??'metal'}" data-finish="${itemByKey(`finish:${e.finish}`)?.id??'none'}" data-rarity="${border?.rarity??'free'}" style="--a:${border?.a??'#92969c'};--b:${border?.b??'#41454c'};--art-hue:${Number(e.hue)||0}deg;--particle-speed:${e.particleSpeed/100}"`;
 }
 export function cosmeticLayers(e,name) {
   const equipment={...DEFAULT_EQUIPMENT,...e}, border=itemByKey(`border:${equipment.border}`);
   const symbol=equipment.emblem===false?'':border?.symbol??'';
-  const particles=['inferno','blizzard','cosmic','diamond','stars','goldust','starlight'].includes(equipment.finish)?`<span class="particles" aria-hidden="true">${Array.from({length:24},(_,i)=>`<i style="--i:${i};left:${(i*43+13)%100}%;top:${(i*29+7)%100}%;animation-delay:-${i*.39}s"></i>`).join('')}</span>`:'';
+  const particles=PARTICLE_FINISHES.includes(equipment.finish)?`<span class="particles" aria-hidden="true">${Array.from({length:24},(_,i)=>`<i style="--i:${i};left:${(i*43+13)%100}%;top:${(i*29+7)%100}%;animation-delay:-${i*.39}s"></i>`).join('')}</span>`:'';
   return `<span class="cosmetic-overlay" aria-hidden="true"></span>${particles}${symbol?`<span class="cosmetic-emblem" aria-hidden="true">${symbol}</span>`:''}${signatureHtml(equipment,name)}`;
 }
 export function applyEquipment(card,e,name) {
@@ -78,6 +79,7 @@ export function applyEquipment(card,e,name) {
   card.dataset.cosmetic='true';card.dataset.texture=border?.texture??'metal';card.dataset.finish=e.finish;card.dataset.rarity=border?.rarity??'free';
   card.style.setProperty('--a',border?.a??'#92969c');card.style.setProperty('--b',border?.b??'#41454c');
   card.style.setProperty('--art-hue',`${Number(e.hue)||0}deg`);
+  card.style.setProperty('--particle-speed',(e.particleSpeed??DEFAULT_EQUIPMENT.particleSpeed)/100);
   if(e.baseCard) {
     const base=e.baseCard,hero=base.hero??Number(card.dataset.autoHero),art=cardArtwork(hero,base);
     if(art) {
