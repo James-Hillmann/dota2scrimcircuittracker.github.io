@@ -48,7 +48,7 @@ const screenDexHtml=(owned,status,hero,preview,empty='<p>No loading screens matc
 export async function openCollection({tab='packs',viewAccount=null,cardHtml=null,name=null,adapter=null,page=null,tabBar=null,onTab=null}={}) {
   const own=adapter?.account??await steamAccount().catch(()=>null), target=viewAccount??own, editable=target!=null&&target===own;
   name=name??steamName(target)??'Your Name';
-  let state=editable?(adapter?.state??collectionState()):null, inventory={}, busy=false, filter='all', rarity='all', status='all', rewards=[], rewardScreens=[], resultVisible=false;
+  let state=editable?(adapter?.state??collectionState()):null, inventory={}, busy=false, filter='all', rarity='all', status='all', rewards=[], rewardScreens=[], resultVisible=false, rewardStep=0, rewardRevealed=false;
   const action=adapter?.action??collectionAction;
   let selectedSlot=state?.primaryCard??0, publicDesigns=null, previewItem=null, previewScreen=null, screenHero='all';
   const designs=()=>cardDesignState(state??publicDesigns??{equipment});
@@ -138,7 +138,7 @@ export async function openCollection({tab='packs',viewAccount=null,cardHtml=null
     body.querySelector('[data-claim-bonus]')?.addEventListener('click',async()=>{const source=offers[0],data=await run('claim-bonus',{source});if(data){try{localStorage.removeItem(`ad2l-pack-offer:${source}`);}catch{}markPackOfferClaimed(source);drawPacks();say(data.alreadyClaimed?'This bonus was already claimed. Your collection is up to date.':'Bonus pack added to your collection.');}});
     body.querySelectorAll('[data-open]').forEach(b=>b.onclick=async()=>{
       const data=await run('open',{packIndex:Number(b.dataset.open)});if(!data)return;
-      rewards=data.rewards;rewardScreens=data.screens??[];resultVisible=false;
+      rewards=data.rewards;rewardScreens=data.screens??[];resultVisible=false;rewardStep=0;rewardRevealed=false;
       drawPacks();body.querySelector('.pack-results').scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth',block:'nearest'});
     });
     updateCountdown();
@@ -159,13 +159,20 @@ export async function openCollection({tab='packs',viewAccount=null,cardHtml=null
   dialog._packTimer=setInterval(()=>{if(!dialog.isConnected){clearInterval(dialog._packTimer);clearTimeout(dialog._revealTimer);return;}updateCountdown();},1000);
   function showRewards() {
     const host=body.querySelector('.pack-results');if(!host)return;
-    host.innerHTML=`<h3>Your pack</h3>${rewards.length?`<div class="reward-three ${resultVisible?'revealed':''}">${rewards.map((r,i)=>{const item=itemByKey(r.key);return `<button type="button" class="reward-card" style="--rarity:${colors[item.rarity]};--delay:${i*220}ms" aria-label="Reveal card ${i+1}" data-reveal><span class="reward-back">${gift}<b>AD2L</b></span><span class="reward-front">${swatch(item,name)}<small>${item.rarity} · ${item.type}</small><strong>${esc(item.name)}</strong><span>${r.duplicate?'Duplicate':'New discovery'}</span></span></button>`;}).join('')}</div>`:''}${rewardScreens.length?`<h4>${rewards.length?'Bonus loading screens':'New loading screens'}</h4><div class="reward-screens">${rewardScreens.map(screenArt).filter(Boolean).map(s=>`<figure><img src="${esc(s.src)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer"><figcaption><strong>${esc(s.label)}</strong><small>${esc(s.hero??'Any hero')} · New</small></figcaption></figure>`).join('')}</div><p class="muted">Use them as your card background in Customize, on the hero shown.</p>`:''}${rewards.length?'<button type="button" data-reveal-all>Reveal all three</button>':''}<button type="button" data-view-dex>View collection</button>`;
-    host.querySelectorAll('[data-reveal]').forEach(b=>b.onclick=()=>{b.classList.add('revealed');b.setAttribute('aria-label',b.querySelector('.reward-front').textContent);});
-    if(resultVisible)host.querySelectorAll('[data-reveal]').forEach(b=>b.setAttribute('aria-label',b.querySelector('.reward-front').textContent));
-    const reveal=()=>{host.querySelector('.reward-three')?.classList.add('revealed');resultVisible=true;host.querySelectorAll('[data-reveal]').forEach(b=>b.setAttribute('aria-label',b.querySelector('.reward-front').textContent));};
-    const all=host.querySelector('[data-reveal-all]');if(all)all.onclick=reveal;
-    host.querySelector('[data-view-dex]').onclick=()=>{tab='collection';if(!rewards.length)filter='screen';draw();};
-    if(!resultVisible){clearTimeout(dialog._revealTimer);dialog._revealTimer=setTimeout(reveal,650);}
+    clearTimeout(dialog._revealTimer);
+    const cardHtml=(r,i,summary=false)=>{const item=itemByKey(r.key),content=`<span class="reward-back">${gift}<b>AD2L</b></span><span class="reward-front">${swatch(item,name)}<small>${item.rarity} · ${typeLabel(item.type)}</small><strong>${esc(item.name)}</strong><span>${r.duplicate?'Duplicate':'New discovery'}</span></span>`;return summary?`<article class="reward-card opening-prismatic revealed" style="--rarity:${colors[item.rarity]};--delay:${i*120}ms" aria-label="${esc(item.name)}, ${item.rarity}, ${r.duplicate?'duplicate':'new discovery'}">${content}</article>`:`<button type="button" class="reward-card opening-prismatic ${rewardRevealed?'revealed':''}" style="--rarity:${colors[item.rarity]}" aria-label="${rewardRevealed?esc(item.name):`Reveal card ${i+1} of ${rewards.length}`}" data-reveal>${content}</button>`;};
+    const cards=resultVisible?`<div class="reward-three revealed reward-summary">${rewards.map((r,i)=>cardHtml(r,i,true)).join('')}</div>`:rewards.length?`<div class="reward-one">${cardHtml(rewards[rewardStep],rewardStep)}</div><p class="reward-instruction" data-reveal-prompt>${rewardRevealed?'Card revealed. Continue when ready.':'Select the card to reveal it.'}</p><button type="button" data-next-reward ${rewardRevealed?'':'hidden'}>${rewardStep+1<rewards.length?'Next card':'See all rewards'}</button>`:'';
+    const showExtras=resultVisible||!rewards.length;
+    host.innerHTML=`<h3>${resultVisible?'Pack opened':rewards.length?`Card ${rewardStep+1} of ${rewards.length}`:'Your pack'}</h3>${cards}${showExtras&&rewardScreens.length?`<h4>${rewards.length?'Bonus loading screens':'New loading screens'}</h4><div class="reward-screens">${rewardScreens.map(screenArt).filter(Boolean).map(s=>`<figure><img src="${esc(s.src)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer"><figcaption><strong>${esc(s.label)}</strong><small>${esc(s.hero??'Any hero')} · New</small></figcaption></figure>`).join('')}</div><p class="muted">Use them as your card background in Customize, on the hero shown.</p>`:''}${showExtras?'<button type="button" data-view-dex>View collection</button>':''}`;
+    const reveal=host.querySelector('[data-reveal]'),next=host.querySelector('[data-next-reward]');
+    if(reveal&&!rewardRevealed)reveal.onclick=()=>{
+      rewardRevealed=true;reveal.classList.add('revealed');reveal.setAttribute('aria-label',reveal.querySelector('.reward-front').textContent);
+      const prompt=host.querySelector('[data-reveal-prompt]');if(prompt)prompt.textContent='Revealing…';
+      next.hidden=false;next.disabled=true;
+      dialog._revealTimer=setTimeout(()=>{if(!next.isConnected)return;next.disabled=false;if(prompt)prompt.textContent='Card revealed. Continue when ready.';next.focus();},matchMedia('(prefers-reduced-motion: reduce)').matches?0:760);
+    };
+    if(next)next.onclick=()=>{if(!rewardRevealed)return;if(rewardStep+1<rewards.length){rewardStep++;rewardRevealed=false;}else resultVisible=true;showRewards();host.scrollIntoView({behavior:'smooth',block:'nearest'});};
+    host.querySelector('[data-view-dex]')?.addEventListener('click',()=>{tab='collection';if(!rewards.length)filter='screen';draw();});
   }
   function drawDex() {
     const count=CATALOG.filter(i=>inventory[i.key]>0).length;
