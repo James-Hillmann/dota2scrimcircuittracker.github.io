@@ -68,7 +68,7 @@ export function cosmeticAttributes(raw) {
 }
 export function cosmeticLayers(e,name) {
   const equipment={...DEFAULT_EQUIPMENT,...e}, border=itemByKey(`border:${equipment.border}`);
-  const symbol=border?.symbol??'';
+  const symbol=equipment.emblem===false?'':border?.symbol??'';
   const particles=['inferno','blizzard','cosmic','diamond','stars','goldust','starlight'].includes(equipment.finish)?`<span class="particles" aria-hidden="true">${Array.from({length:24},(_,i)=>`<i style="--i:${i};left:${(i*43+13)%100}%;top:${(i*29+7)%100}%;animation-delay:-${i*.39}s"></i>`).join('')}</span>`:'';
   return `<span class="cosmetic-overlay" aria-hidden="true"></span>${particles}${symbol?`<span class="cosmetic-emblem" aria-hidden="true">${symbol}</span>`:''}${signatureHtml(equipment,name)}`;
 }

@@ -99,11 +99,12 @@ test('vault persists grants, ignores replayed opens and rejects forged equip',as
   const rows=new Map(),storage={get:async k=>structuredClone(rows.get(k)),put:async(k,v)=>rows.set(k,structuredClone(v)),list:async({prefix})=>new Map([...rows].filter(([k])=>k.startsWith(prefix)))};storage.transaction=fn=>fn(storage);
   const vault=new CosmeticsVault({storage});
   const request=body=>vault.fetch(new Request('https://vault/action?account=101',{method:'POST',body:JSON.stringify(body)}));
-  assert.equal((await (await request({action:'session'})).json()).state.packs.length,3);
+  assert.deepEqual((await (await request({action:'session'})).json()).state.packs,['common','common','common','screens','screens','screens']);
+  assert.equal((await (await request({action:'session'})).json()).state.packs.length,6);
   const input={action:'open',packIndex:0,requestId:'a-unique-request-12345'};
   const result=await (await request(input)).json();assert.equal(result.rewards.length,3);
   assert.deepEqual((await (await request(input)).json()).rewards,result.rewards);
-  assert.equal(rows.get('user:101').packs.length,2);
+  assert.equal(rows.get('user:101').packs.length,5);
   assert.equal((await request({action:'equip',requestId:'another-request-12345',equipment:{border:'madeup'}})).status,400);
   assert.equal((await request({action:'equip',requestId:'equipment-request-12345',equipment:DEFAULT_EQUIPMENT})).status,200);
   const pub=await (await vault.fetch(new Request('https://vault/collection?account=101'))).json();assert.equal(pub.packs,undefined);assert.ok(pub.inventory);
@@ -152,4 +153,13 @@ test('API verifies Steam sessions with the allowed site referrer and distinguish
     globalThis.fetch=async()=>Response.json({error:{message:'TOKEN_EXPIRED'}},{status:400});
     assert.equal((await cosmeticsRequest(request(),env,['http://localhost:3000'])).status,401);
   } finally {globalThis.fetch=original;}
+});
+
+test('border symbol can be turned off and back on; only false is stored',()=>{
+  const state={inventory:{},equipment:{...DEFAULT_EQUIPMENT}};
+  const off=equipCosmetics(state,{emblem:false});
+  assert.equal(off.equipment.emblem,false);
+  assert.equal(equipCosmetics(off,{}).equipment.emblem,false);
+  assert.equal('emblem' in equipCosmetics(off,{emblem:true}).equipment,false);
+  assert.throws(()=>equipCosmetics(state,{emblem:'no'}),/border symbol/);
 });

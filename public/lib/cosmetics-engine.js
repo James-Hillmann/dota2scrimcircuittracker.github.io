@@ -1,6 +1,8 @@
 import { CATALOG, TIERS, PACK_ODDS, DEFAULT_EQUIPMENT, itemByKey } from './cosmetics-catalog.js';
 import { heroById } from './hero-meta.js';
 import { CARD_ART } from './card-art-data.js';
+import { SCREEN_ART } from './screen-art-data.js';
+const screenHero=new Map(SCREEN_ART.map(s=>[s.id,s.hero??null]));
 import { CARD_STYLES, validCardCrop } from './card-art.js';
 import { validLayout, MAX_NAME } from './card-layout.js';
 
@@ -61,6 +63,13 @@ export function grantLogin(saved, now = new Date()) {
 export function rollPack(state, packIndex, random = Math.random, now = new Date()) {
   if(!Number.isInteger(packIndex) || packIndex<0 || packIndex>=state.packs.length) throw new Error('Choose an available pack.');
   const next=grantLogin(state,now), min=TIERS.indexOf(next.packs[packIndex]), rewards=[];
+  if(next.packs[packIndex]==='screens') {
+    // A loading screen pack: five screens the player doesn't have, no cards.
+    const screens=rollScreens(next.screens??[],random,SCREEN_PACK_SIZE);
+    if(!screens.length)throw new Error('You already have every loading screen.');
+    next.screens=[...(next.screens??[]),...screens];next.packs.splice(packIndex,1);
+    return {state:next,rewards,screens};
+  }
   const groups=TIERS.slice(min).map(rarity=>({rarity,weight:PACK_ODDS[rarity],items:CATALOG.filter(i=>i.rarity===rarity)}));
   if(groups.some(g=>!g.items.length)) throw new Error('The collection is missing a rarity.');
   for(let n=0;n<3;n++) {
@@ -70,9 +79,19 @@ export function rollPack(state, packIndex, random = Math.random, now = new Date(
     rewards.push({key:item.key,duplicate:(next.inventory[item.key]??0)>0});
     next.inventory[item.key]=(next.inventory[item.key]??0)+1;
   }
+  const screens=rollScreens(next.screens??[],random);
+  if(screens.length)next.screens=[...(next.screens??[]),...screens];
   next.packs.splice(packIndex,1);
   if(next.nextPackAt==null && next.packs.filter(p=>p==='common').length<NORMAL_PACK_CAP)next.nextPackAt=now.getTime()+PACK_INTERVAL_MS;
-  return {state:next,rewards};
+  return {state:next,rewards,screens};
+}
+// Bonus loading screens (screen-art-data.js): two per pack, always ones the player doesn't have,
+// until they own them all. Usable as card art with any hero.
+export const SCREENS_PER_PACK=2, SCREEN_PACK_SIZE=5;
+function rollScreens(owned,random,count=SCREENS_PER_PACK) {
+  const have=new Set(owned),left=SCREEN_ART.filter(s=>!have.has(s.id)),picked=[];
+  while(picked.length<count&&left.length)picked.push(left.splice(Math.min(left.length-1,Math.floor((random()||0)*left.length)),1)[0].id);
+  return picked;
 }
 export const RECYCLE_COST=10;
 export function recycleCards(state, selections) {
@@ -106,6 +125,10 @@ export function equipCosmetics(state, raw) {
   if(layout)equipment.layout=layout;
   equipment.hue=raw.hue??state.equipment?.hue??0;
   if(!Number.isFinite(equipment.hue)||equipment.hue<0||equipment.hue>360)throw new Error('Choose a valid hue.');
+  // The border's corner symbol shows unless the owner turns it off; only false is stored.
+  const emblem=raw.emblem??state.equipment?.emblem??true;
+  if(typeof emblem!=='boolean')throw new Error('Choose whether to show the border symbol.');
+  if(!emblem)equipment.emblem=false;
   const base=raw.baseCard??state.equipment?.baseCard;
   if(base!=null) {
     if(typeof base!=='object'||Array.isArray(base))throw new Error('Choose a valid base card.');
@@ -114,7 +137,11 @@ export function equipCosmetics(state, raw) {
     if(art!=null&&hero==null)throw new Error('Choose a hero for this artwork.');
     if(pos!=null&&![1,2,3,4,5].includes(pos))throw new Error('Choose a valid role.');
     if(style!=null&&!CARD_STYLES.some(([id])=>id===style))throw new Error('Choose a valid filter.');
-    if(art!=null&&!['vert','crop','render',...(CARD_ART[heroById(hero)?.name]??[]).filter(i=>!/mini[\s_-]*heroes/i.test(i.label)).map(i=>i.id)].includes(art))throw new Error('Choose artwork for your selected hero.');
+    if(art!=null&&String(art).startsWith('scr:')) {
+      if(!(state.screens??[]).includes(art))throw new Error('Collect this loading screen before using it.');
+      const owner=screenHero.get(art);if(owner&&owner!==heroById(hero)?.name)throw new Error(`This loading screen is for ${owner}.`);
+    }
+    else if(art!=null&&!['vert','crop','render',...(CARD_ART[heroById(hero)?.name]??[]).filter(i=>!/mini[\s_-]*heroes/i.test(i.label)).map(i=>i.id)].includes(art))throw new Error('Choose artwork for your selected hero.');
     if(crop!=null&&!validCardCrop(crop))throw new Error('Choose a valid crop.');
     equipment.baseCard={hero,pos,art,style,crop};
   }
@@ -124,4 +151,13 @@ export function equipCosmetics(state, raw) {
     equipment[k]=n;
   }
   return {...state,equipment};
+}
+// One-time grants, applied on the player's next visit (the Worker's session action) and to new
+// players. Each shows in the "Fav sent you" notice (parts/pack-gifts.js).
+export const PACK_GRANTS=[{id:'screens-2026-10',packs:['screens','screens','screens'],note:"Loading screens are here. Each pack has five you don't have yet."}];
+export function applyPackGrants(state,now=Date.now()) {
+  const due=PACK_GRANTS.filter(g=>!(state.grants??[]).includes(g.id));
+  if(!due.length)return state;
+  return {...state,packs:[...state.packs,...due.flatMap(g=>g.packs)],grants:[...(state.grants??[]),...due.map(g=>g.id)],
+    gifts:[...(state.gifts??[]),...due.map(g=>({kind:'pack',tier:g.packs[0],count:g.packs.length,note:g.note,at:now}))].slice(-20)};
 }

@@ -691,6 +691,17 @@ play the whole Heroic/Aegis game. Predict's "Your name" bar hides on this tab (F
   Fantasy and profiles, and has the gallery as its last tab. Sort by voted rarity
   (legendary first; among equals, the clearer verdict, then more votes), most votes, or player
   name. Signed in, "Not rated by me" leaves the cards you can still rate. Names link to profiles.
+- **Loading screen packs**: each contains five unowned screens and no card items. All 443 screens
+  have equal drop chances. Every Steam player receives three packs once on their next visit,
+  including new sign-ups, with a "Fav sent you" notice. Normal card packs also include two
+  unowned screens while any remain. Screens appear in Collection with hero and ownership filters,
+  can be previewed before collecting, and become card backgrounds in Customize. Hero-specific
+  screens fit their hero; event and team screens fit any hero. Near completion, a pack contains
+  the remaining screens; when none remain, it stays unopened.
+- **Gifts from Fav**: the profile gift box sends any pack type, copies of any card item (border,
+  finish, signature or name rendering), or a specific unowned screen. The Worker verifies the
+  sender's Steam account and makes retries safe. Notices name the actual gifts and include an
+  optional note. Dismissing a notice never removes the gifts.
 - **Captain**: choose one of your five picks as captain before saving. Their weekly points are
   doubled after selecting their best two games. Captain choices lock with the lineup and are
   stored as an account ID in the entry. Older entries without a captain retain their base score.

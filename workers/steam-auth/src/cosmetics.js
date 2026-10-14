@@ -1,4 +1,4 @@
-import { grantLogin, rollPack, recycleCards, saveCardDesign, setCardPreferences, cardAppearance, cardDesignState, setNickname, shownNickname } from '../../../public/lib/cosmetics-engine.js';
+import { grantLogin, applyPackGrants, rollPack, recycleCards, saveCardDesign, setCardPreferences, cardAppearance, cardDesignState, setNickname, shownNickname } from '../../../public/lib/cosmetics-engine.js';
 import { designKey, castVote, tally } from '../../../public/lib/card-ratings.js';
 import { DEFAULT_EQUIPMENT } from '../../../public/lib/cosmetics-catalog.js';
 import { isAdmin, giftPacks, clearGifts } from '../../../public/lib/pack-gifts.js';
@@ -45,7 +45,7 @@ export class CosmeticsVault {
     }
     if(req.method==='GET') {
       const state=await this.ctx.storage.get(`user:${account}`);
-      return json({inventory:state?.inventory??{},equipment:state?.equipment??null,nickname:shownNickname(state),...(state?cardDesignState(state):{})});
+      return json({inventory:state?.inventory??{},screens:state?.screens??[],equipment:state?.equipment??null,nickname:shownNickname(state),...(state?cardDesignState(state):{})});
     }
     let body;try {body=await req.json();} catch {return json({error:'Invalid request.'},400);}
     // Which designs this player has rated, and how: "<owner>:<design key>" → rating. A read, so
@@ -59,7 +59,7 @@ export class CosmeticsVault {
       const result=await this.ctx.storage.transaction(async txn=>{
         const key=`user:${account}`, saved=await txn.get(key);
         if(body.action==='session') {
-          const state=grantLogin(saved);await txn.put(key,state);return {state};
+          const state=applyPackGrants(grantLogin(saved));await txn.put(key,state);return {state};
         }
         if(!saved) throw new Error('Load your collection first.');
         if(!/^[\w-]{16,80}$/.test(body.requestId??'')) throw new Error('Invalid request ID.');
@@ -79,13 +79,14 @@ export class CosmeticsVault {
         else if(body.action==='card-settings')result={state:setCardPreferences(saved,body)};
         else if(body.action==='nickname')result={state:setNickname(saved,body)};
         else if(body.action==='gift') {
-          // Fav only: packs into another player's collection, with a notice they see next visit.
+          // Fav only: packs, card items or a loading screen into another player's collection, with a
+          // notice they see next visit.
           if(!isAdmin(account))throw new Error('Only Fav can gift packs.');
           const target=String(body.target??'');
           if(!/^\d{1,10}$/.test(target))throw new Error('Choose a player.');
           const targetKey=`user:${target}`,given=giftPacks((target===account?saved:await txn.get(targetKey))??grantLogin(null),body);
-          if(target===account)result={state:given,gift:{target,tier:body.tier,count:body.count}};
-          else {await txn.put(targetKey,given);result={state:saved,gift:{target,tier:body.tier,count:body.count}};}
+          if(target===account)result={state:given,gift:{target,kind:body.kind??'pack',tier:body.tier,item:body.item,count:body.count}};
+          else {await txn.put(targetKey,given);result={state:saved,gift:{target,kind:body.kind??'pack',tier:body.tier,item:body.item,count:body.count}};}
         }
         else if(body.action==='gifts-seen')result={state:clearGifts(saved)};
         else if(body.action==='rate') {
