@@ -13,33 +13,42 @@ permissions:
 jobs:
   find:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
-      - name: STRATZ front end
+      - name: STRATZ CDN bucket listing
         run: |
-          mkdir -p s && cd s
-          UA="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36"
-          curl -sSL -A "$UA" https://stratz.com/players/75379546 -o page.html || true
-          echo "page bytes: $(wc -c < page.html)"
-          grep -oE '(src|href)="[^"]+\.js"' page.html | sed -E 's/^(src|href)="//; s/"$//' | sort -u | head -80 > scripts.txt
-          cat scripts.txt
-          while read -r u; do case "$u" in http*) ;; //*) u="https:$u" ;; /*) u="https://stratz.com$u" ;; *) u="https://stratz.com/$u" ;; esac
-            curl -sSL -A "$UA" "$u" >> all.js || true; echo >> all.js; done < scripts.txt
-          echo "js bytes: $(wc -c < all.js)"
-          echo "--- badge / plus / level image refs"
-          cat page.html all.js | grep -oiE '[A-Za-z0-9_./:${}-]*(hero_?badge|herobadge|dota_?plus|plus/|herolevel|hero_level|badge_rank|prestige)[A-Za-z0-9_./${}-]*' | sort | uniq -c | sort -rn | head -80
-          echo "--- image hosts"
-          cat page.html all.js | grep -oE 'https://[a-z0-9.-]+/images/[A-Za-z0-9_/.-]{0,60}' | sed -E 's#(https://[^/]+/images/[^/]+/[^/]+).*#\1#' | sort | uniq -c | sort -rn | head -40
-      - name: Valve and STRATZ CDN guesses
-        run: |
-          for base in \
-            https://cdn.cloudflare.steamstatic.com/apps/dota2/images/dota_react/hero_badges \
-            https://cdn.cloudflare.steamstatic.com/apps/dota2/images/dota_react/icons/hero_badges \
-            https://cdn.cloudflare.steamstatic.com/apps/dota2/images/hero_badges \
-            https://cdn.stratz.com/images/dota2/hero_badges \
-            https://cdn.stratz.com/images/dota2/plus \
-            https://cdn.stratz.com/images/dota2/badges; do
-            for f in hero_badge_rank_0.png hero_badge_rank_5.png hero_badge_rank_0_png.png 0.png 1.png; do
-              echo "$(curl -s -o /dev/null -w '%{http_code} %{content_type}' "$base/$f") $base/$f"
-            done
+          for q in "?prefix=images/dota2/&delimiter=/" "?list-type=2&prefix=images/dota2/&delimiter=/"; do
+            echo "== $q"; curl -s "https://cdn.stratz.com/$q" | grep -oE '<Prefix>[^<]*</Prefix>|<Key>[^<]*</Key>|<Code>[^<]*</Code>' | head -80
           done
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: STRATZ in a browser
+        run: |
+          mkdir -p b && cd b && npm init -y >/dev/null && npm i -s playwright@1.56.1 >/dev/null && npx playwright install chromium >/dev/null
+          cat > run.mjs <<'EOF'
+          import { chromium } from "playwright";
+          const b = await chromium.launch();
+          const p = await b.newPage({ userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36", viewport: { width: 1400, height: 1000 } });
+          const imgs = new Set();
+          p.on("response", (r) => { const u = r.url(); if (/\.(png|webp|svg|jpg)(\?|$)/i.test(u) || r.headers()["content-type"]?.startsWith("image/")) imgs.add(`${r.status()} ${u}`); });
+          for (const path of ["/players/75379546", "/players/75379546/heroes", "/players/75379546/dota-plus"]) {
+            await p.goto("https://stratz.com" + path, { waitUntil: "networkidle", timeout: 60000 }).catch((e) => console.log("goto", e.message));
+            await p.waitForTimeout(4000);
+            console.log("PAGE", path, "title:", await p.title());
+          }
+          const all = [...imgs];
+          console.log("images:", all.length);
+          for (const u of all.filter((u) => !/\/heroes\/|\/items\/|abilities|avatars|steamcdn|steamstatic.*avatars/i.test(u))) console.log(u);
+          // Elements that look like hero level badges in the DOM.
+          const dom = await p.evaluate(() => [...document.querySelectorAll("img,svg,[style*='background']")].map((e) => e.getAttribute("src") || e.style?.backgroundImage || "").filter((s) => /badge|plus|level|tier|rank/i.test(s)).slice(0, 40));
+          console.log("DOM refs:", JSON.stringify([...new Set(dom)], null, 1));
+          await p.screenshot({ path: "stratz.png", fullPage: false });
+          await b.close();
+          EOF
+          node run.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: stratz-shot
+          path: b/stratz.png
