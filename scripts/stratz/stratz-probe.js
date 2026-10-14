@@ -4,7 +4,7 @@
 // 2. Asks for one player's basics, to show the token and account work.
 // Output goes to the log only; nothing is written.
 //
-// Usage: STRATZ_TOKEN=... node scripts/stratz/stratz-probe.js [account_id]
+// Usage: STRATZ_API_KEY=... node scripts/stratz/stratz-probe.js [account_id]
 // The account defaults to the first player in public/data/ad2l.json.
 // In Actions: run "STRATZ probe" from the Actions tab (.github/workflows/stratz-probe.yml).
 import { readFile } from "node:fs/promises";

@@ -1,5 +1,5 @@
 # Run by hand from the Actions tab: lists where STRATZ keeps Dota Plus hero levels and checks
-# the STRATZ_TOKEN secret works. Prints to the log; commits nothing.
+# the STRATZ_API_KEY secret works. Prints to the log; commits nothing.
 # The Actions tab only offers "Run workflow" once this file is on main, so until then it also
 # runs on pushes to claude/ branches that touch the STRATZ scripts.
 name: STRATZ probe
@@ -22,15 +22,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
-      STRATZ_TOKEN: ${{ secrets.STRATZ_TOKEN }}
+      STRATZ_API_KEY: ${{ secrets.STRATZ_API_KEY }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
       - name: No token yet
-        if: env.STRATZ_TOKEN == ''
-        run: echo "::warning::Add a STRATZ_TOKEN repo secret (Settings > Secrets and variables > Actions) to run the probe."
+        if: env.STRATZ_API_KEY == ''
+        run: echo "::warning::Add a STRATZ_API_KEY repo secret (Settings > Secrets and variables > Actions) to run the probe."
       - name: Probe STRATZ
-        if: env.STRATZ_TOKEN != ''
+        if: env.STRATZ_API_KEY != ''
         run: node scripts/stratz/stratz-probe.js ${{ inputs.account_id }}

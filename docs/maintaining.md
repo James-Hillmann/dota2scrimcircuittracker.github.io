@@ -228,7 +228,7 @@ Backfills refill a field for games already synced, from the cached OpenDota matc
 
 OpenDota and the Steam Web API have no Dota Plus hero levels, so they're coming from STRATZ's
 GraphQL API (`scripts/stratz/stratz.js`). It needs a token from stratz.com/api: the
-`STRATZ_TOKEN` repository secret in Actions, or `STRATZ_TOKEN=... node ...` locally.
+`STRATZ_API_KEY` repository secret in Actions, or `STRATZ_API_KEY=... node ...` locally.
 `scripts/stratz/stratz-probe.js` (the **STRATZ probe** workflow) lists the schema fields that
 look like Dota Plus hero XP or level and checks the token on one player. Nothing reaches the
 site yet; the sync gets the levels once the probe shows where they are.
