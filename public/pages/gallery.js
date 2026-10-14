@@ -5,7 +5,7 @@
 import { app, pageHead, addressOf, setRoutedAt } from "../core.js";
 import { openCollection } from "../parts/collection.js";
 
-const TABS = [["gallery", "Everyone's cards"], ["packs", "Packs"], ["collection", "Collection"], ["customize", "Customize"], ["recycle", "Recycle"]];
+const TABS = [["gallery", "Everyone's cards"], ["packs", "Packs"], ["collection", "Collection"], ["customize", "Customize"], ["recycle", "Recycle"], ["log", "Log"]];
 
 export function renderGallery(src, tab) {
   const open = TABS.some(([id]) => id === tab) ? tab : "gallery";

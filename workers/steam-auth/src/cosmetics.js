@@ -1,6 +1,6 @@
 import { grantLogin, applyPackGrants, rollPack, recycleCards, saveCardDesign, setCardPreferences, cardAppearance, cardDesignState, setNickname, shownNickname } from '../../../public/lib/cosmetics-engine.js';
 import { designKey, castVote, tally } from '../../../public/lib/card-ratings.js';
-import { DEFAULT_EQUIPMENT } from '../../../public/lib/cosmetics-catalog.js';
+import { DEFAULT_EQUIPMENT, itemByKey } from '../../../public/lib/cosmetics-catalog.js';
 import { isAdmin, giftPacks, clearGifts } from '../../../public/lib/pack-gifts.js';
 
 const json=(value,status=200)=>Response.json(value,{status});
@@ -14,6 +14,11 @@ export function restoreScreenPacks(state, receipts, now=Date.now()) {
   return {...state,screenPackRecovery:'images-v1',packs:[...state.packs,...Array(count).fill('screens')],
     ...(count?{gifts:[...(state.gifts??[]),{kind:'pack',tier:'screens',count,note:'Replacement packs for the loading-screen display issue. Your collected screens are still yours.',at:now}].slice(-20)}:{})};
 }
+
+// The pull log: one row per opened pack that dealt an epic or legendary card, keyed by time.
+const LOGGED=['epic','legendary'];
+const pullRow=(account,openedAt,packType,rewards)=>{const items=(rewards??[]).map(r=>r.key).filter(k=>LOGGED.includes(itemByKey(k)?.rarity));return items.length?{account,at:openedAt,packType,items}:null;};
+const pullKey=(at,account,requestId)=>`pull:${String(at).padStart(15,'0')}:${account}:${requestId}`;
 
 // One serialized vault for this league. Inventory, receipts, daily grants and appearance
 // writes commit together. Browser input never supplies drop odds, items or counts.
@@ -38,6 +43,28 @@ export class CosmeticsVault {
         });
       }
       return json({cards});
+    }
+    // The newest 150 epic and legendary pulls, with each puller's shown nickname. The first call
+    // fills the log from the pack receipts opened before it existed.
+    if(url.pathname==='/pulls') {
+      if(!await this.ctx.storage.get('pulls-backfilled')) {
+        const rows={};let after;
+        for(;;) {
+          const page=await this.ctx.storage.list({prefix:'receipt:',limit:256,...(after?{startAfter:after}:{})});
+          for(const [k,r] of page) {
+            if(r?.action!=='open'||!r.openedAt)continue;
+            const [,acct,id]=k.split(':'),row=pullRow(acct,r.openedAt,r.packType,r.result?.rewards);
+            if(row)rows[pullKey(r.openedAt,acct,id)]=row;
+          }
+          if(page.size<256)break;after=[...page.keys()].at(-1);
+        }
+        for(const [k,v] of Object.entries(rows))await this.ctx.storage.put(k,v);
+        await this.ctx.storage.put('pulls-backfilled',true);
+      }
+      const pulls=[...(await this.ctx.storage.list({prefix:'pull:'})).values()].sort((a,b)=>b.at-a.at).slice(0,150);
+      const nicknames={};
+      for(const a of new Set(pulls.map(p=>p.account)))nicknames[a]=shownNickname(await this.ctx.storage.get(`user:${a}`));
+      return json({pulls:pulls.map(p=>({...p,nickname:nicknames[p.account]}))});
     }
     const account=url.searchParams.get('account');
     if(!/^\d{1,10}$/.test(account??'')) return json({error:'Invalid account.'},400);
@@ -116,7 +143,10 @@ export class CosmeticsVault {
         else throw new Error('Unknown collection action.');
         await txn.put(key,result.state);
         if(['equip','card-settings','nickname'].includes(body.action)) await txn.put(`appearance:${account}`,cardAppearance(result.state));
-        await txn.put(receipt,{action:body.action,result,...(body.action==='open'?{openedAt:Date.now(),packType:saved.packs[body.packIndex]}:{})});
+        const openedAt=Date.now();
+        await txn.put(receipt,{action:body.action,result,...(body.action==='open'?{openedAt,packType:saved.packs[body.packIndex]}:{})});
+        const pull=body.action==='open'&&pullRow(account,openedAt,saved.packs[body.packIndex],result.rewards);
+        if(pull)await txn.put(pullKey(openedAt,account,body.requestId),pull);
         return result;
       });
       return json({...result,serverNow:Date.now()});
@@ -134,6 +164,7 @@ export async function cosmeticsRequest(req,env,allowedOrigins) {
   const vault=env.COSMETICS.get(env.COSMETICS.idFromName('league-v1'));
   if(req.method==='GET' && url.pathname==='/cosmetics/appearances') return respond(await vault.fetch('https://vault/appearances'));
   if(req.method==='GET' && url.pathname==='/cosmetics/gallery') return respond(await vault.fetch('https://vault/gallery'));
+  if(req.method==='GET' && url.pathname==='/cosmetics/pulls') return respond(await vault.fetch('https://vault/pulls'));
   const publicAccount=/^\/cosmetics\/collection\/(\d{1,10})$/.exec(url.pathname)?.[1];
   if(req.method==='GET' && publicAccount) return respond(await vault.fetch(`https://vault/collection?account=${publicAccount}`));
   const ratedAccount=/^\/cosmetics\/ratings\/(\d{1,10})$/.exec(url.pathname)?.[1];

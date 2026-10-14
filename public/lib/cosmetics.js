@@ -54,6 +54,10 @@ export async function cardRatings(account) {
 export async function galleryCards() {
   const r=await fetch(`${COLLECTION_API}/gallery`);if(!r.ok)throw new Error('Gallery unavailable.');return (await r.json()).cards;
 }
+// The newest epic and legendary pack pulls across the league, newest first (the Log tab).
+export async function pullLog() {
+  const r=await fetch(`${COLLECTION_API}/pulls`);if(!r.ok)throw new Error('Pull log unavailable.');return (await r.json()).pulls;
+}
 // The signed-in player's own votes, "<owner>:<design key>" → rating; empty when signed out.
 export async function myCardVotes() {
   const token=await steamIdToken().catch(()=>null);if(!token)return {};

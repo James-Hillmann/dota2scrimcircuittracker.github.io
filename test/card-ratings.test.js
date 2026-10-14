@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {designKey,castVote,tally} from '../public/lib/card-ratings.js';
-import {DEFAULT_EQUIPMENT} from '../public/lib/cosmetics-catalog.js';
+import {DEFAULT_EQUIPMENT,CATALOG} from '../public/lib/cosmetics-catalog.js';
 import {CosmeticsVault} from '../workers/steam-auth/src/cosmetics.js';
 
 test('a design fingerprint ignores key order and changes with the design',()=>{
@@ -76,4 +76,23 @@ test('nicknames: plain text up to 24, shown only when chosen, in the appearance,
   assert.equal((await (await vault.fetch(new Request('https://vault/gallery'))).json()).cards[0].nickname,'Big Dog');
   await as(401,{action:'nickname',nickname:'Big Dog',showNickname:false});
   assert.equal((await (await vault.fetch(new Request('https://vault/collection?account=401'))).json()).nickname,null);
+});
+test('pull log: epic and legendary pulls only, newest first, filled once from older receipts',async()=>{
+  const rows=new Map(),storage={get:async k=>structuredClone(rows.get(k)),put:async(k,v)=>rows.set(k,structuredClone(v)),list:async({prefix})=>new Map([...rows].filter(([k])=>k.startsWith(prefix)).sort(([a],[b])=>a<b?-1:1).map(([k,v])=>[k,structuredClone(v)]))};storage.transaction=fn=>fn(storage);
+  const vault=new CosmeticsVault({storage});let n=0;
+  const as=(account,body)=>vault.fetch(new Request(`https://vault/action?account=${account}`,{method:'POST',body:JSON.stringify({requestId:`pull-request-${String(++n).padStart(6,'0')}`,...body})}));
+  const pulls=async()=>(await (await vault.fetch(new Request('https://vault/pulls'))).json()).pulls;
+  // A receipt from before the log existed: one legendary among commons.
+  const legendary=CATALOG.find(i=>i.rarity==='legendary'),common=CATALOG.find(i=>i.rarity==='common');
+  rows.set('user:401',{nickname:'Dops',showNickname:true});
+  rows.set('receipt:401:old-request-000000001',{action:'open',openedAt:1000,packType:'common',result:{rewards:[{key:common.key},{key:legendary.key}]}});
+  rows.set('receipt:401:old-request-000000002',{action:'open',openedAt:2000,packType:'common',result:{rewards:[{key:common.key}]}});
+  assert.deepEqual(await pulls(),[{account:'401',at:1000,packType:'common',items:[legendary.key],nickname:'Dops'}]);
+  // New opens log as they happen; an epic upgrade pack is all epic or better.
+  await as(402,{action:'session'});
+  rows.set('user:402',{...rows.get('user:402'),packs:['epic']});
+  await as(402,{action:'open',packIndex:0});
+  const log=await pulls();
+  assert.equal(log.length,2);assert.equal(log[0].account,'402');assert.equal(log[0].items.length,3);
+  assert.ok(log[0].items.every(k=>['epic','legendary'].includes(CATALOG.find(i=>i.key===k).rarity)));
 });

@@ -1,6 +1,6 @@
 import { esc, SOURCES, allLoad } from '../core.js';
 import { steamAccount, steamLoginUrl, listCards } from '../lib/store.js';
-import { CATALOG, DEFAULT_EQUIPMENT, PARTICLE_FINISHES, collectionState, collectionAction, publicCollection, applyEquipment, cardRatings, galleryCards, myCardVotes } from '../lib/cosmetics.js';
+import { CATALOG, DEFAULT_EQUIPMENT, PARTICLE_FINISHES, collectionState, collectionAction, publicCollection, applyEquipment, cardRatings, galleryCards, myCardVotes, pullLog } from '../lib/cosmetics.js';
 import { RATINGS } from '../lib/card-ratings.js';
 import { TIERS, itemByKey } from '../lib/cosmetics-catalog.js';
 import { signatureHtml, renderedName } from '../lib/signatures.js';
@@ -23,7 +23,9 @@ const typeLabel=type=>type==='translation'?'modifier':type;
 function swatch(item,name='Scionara') {
   if(item.type==='autograph') return `<span class="collection-swatch signature-sample">${signatureHtml({...DEFAULT_EQUIPMENT,autograph:item.id,text:name},name).replace('card-autograph','collection-signature')}</span>`;
   if(item.type==='translation')return `<span class="collection-swatch translation-swatch ${item.id}">${esc(item.preview)}</span>`;
-  return `<span class="collection-swatch ${item.type==='finish'?'finish-swatch':''}" data-texture="${item.texture??'metal'}" data-finish="${item.id}" style="--a:${item.a??'#536282'};--b:${item.b??'#151a29'}">${item.symbol??''}</span>`;
+  // A finish shows what it does on a card: the card's own overlay and, for particle finishes, its particles.
+  const inner=item.type==='finish'?`<span class="cosmetic-overlay" aria-hidden="true"></span>${PARTICLE_FINISHES.includes(item.id)?`<span class="particles" aria-hidden="true">${Array.from({length:16},(_,i)=>`<i style="--i:${i};left:${(i*43+13)%100}%;top:${(i*29+7)%100}%;animation-delay:-${i*.39}s"></i>`).join('')}</span>`:''}`:item.symbol??'';
+  return `<span class="collection-swatch ${item.type==='finish'?'finish-swatch':''}" data-texture="${item.texture??'metal'}" data-finish="${item.id}" style="--a:${item.a??'#536282'};--b:${item.b??'#151a29'}">${inner}</span>`;
 }
 // Grouped by type (catalog order), common to legendary within each type.
 const TYPE_ORDER=[...new Set(CATALOG.map(i=>i.type))];
@@ -57,7 +59,7 @@ export async function openCollection({tab='packs',viewAccount=null,cardHtml=null
   const dialog=document.createElement(page?'section':'dialog');dialog.className=page?'collection-dialog collection-page':'collection-dialog';dialog.setAttribute('aria-labelledby','collection-title');
   const closeView=()=>{if(!page)dialog.close();}, tabsHost=tabBar??dialog;
   const shownName=()=>shownNickname(state)??name;
-  dialog.innerHTML=`${page?'':`<div class="collection-head"><div><small>AD2L COLLECTION</small><h2 id="collection-title">Your collection</h2></div><div class="collection-head-actions"><button type="button" data-feedback title="Suggest a change: mark up the collection and say what you'd change">Feedback</button><button type="button" data-close aria-label="Close collection">×</button></div></div><nav class="collection-tabs" aria-label="Collection sections">${['packs','collection','customize','recycle','gallery'].map(t=>`<button type="button" data-tab="${t}">${t[0].toUpperCase()+t.slice(1)}</button>`).join('')}</nav>`}${page?'<p class="collection-message" role="status" aria-live="polite"></p><div class="collection-body"></div>':'<div class="collection-body"></div><p class="collection-message" role="status" aria-live="polite"></p>'}`;
+  dialog.innerHTML=`${page?'':`<div class="collection-head"><div><small>AD2L COLLECTION</small><h2 id="collection-title">Your collection</h2></div><div class="collection-head-actions"><button type="button" data-feedback title="Suggest a change: mark up the collection and say what you'd change">Feedback</button><button type="button" data-close aria-label="Close collection">×</button></div></div><nav class="collection-tabs" aria-label="Collection sections">${['packs','collection','customize','recycle','gallery','log'].map(t=>`<button type="button" data-tab="${t}">${t[0].toUpperCase()+t.slice(1)}</button>`).join('')}</nav>`}${page?'<p class="collection-message" role="status" aria-live="polite"></p><div class="collection-body"></div>':'<div class="collection-body"></div><p class="collection-message" role="status" aria-live="polite"></p>'}`;
   if(page)page.replaceChildren(dialog);
   else {document.querySelector('dialog.collection-dialog')?.close();document.querySelector('dialog.collection-dialog')?.remove();document.body.append(dialog);dialog.showModal();}
   const body=dialog.querySelector('.collection-body'), message=dialog.querySelector('.collection-message');
@@ -124,7 +126,7 @@ export async function openCollection({tab='packs',viewAccount=null,cardHtml=null
   }
   function draw() {
     tabsHost.querySelectorAll('[data-tab]').forEach(b=>{b.setAttribute(tabBar?'aria-selected':'aria-pressed',String(b.dataset.tab===tab));if(tabBar)b.tabIndex=b.dataset.tab===tab?0:-1;b.disabled=busy;});
-    if(tab==='packs')drawPacks();else if(tab==='collection')drawDex();else if(tab==='customize')drawEditor();else if(tab==='gallery')drawGallery(body,{viewer:own,signIn});else drawRecycle();
+    if(tab==='packs')drawPacks();else if(tab==='collection')drawDex();else if(tab==='customize')drawEditor();else if(tab==='gallery')drawGallery(body,{viewer:own,signIn});else if(tab==='log')drawLog(body);else drawRecycle();
   }
   function drawPacks() {
     const packs=state?.packs??[],normal=packs.filter(p=>p==='common').length;
@@ -525,6 +527,22 @@ async function drawGallery(body,{viewer,signIn}) {
     for(const c of shown)mountRating(grid.querySelector(`[data-gallery="${c.account}:${c.slot}"]`),c.account,c,{viewer,votes,onVote:next=>Object.assign(c,next)});
   };
   draw();
+}
+
+// The Log: who pulled which epic and legendary cards from packs, newest first. One line per card.
+const ago=at=>{const m=Math.round((Date.now()-at)/60000);return m<1?'just now':m<60?`${m}m ago`:m<1440?`${Math.round(m/60)}h ago`:`${Math.round(m/1440)}d ago`;};
+async function drawLog(body) {
+  body.innerHTML='<p>Loading log…</p>';
+  let pulls,teams;
+  try {[pulls,teams]=await Promise.all([pullLog(),SOURCES.all.data().then(d=>d.teams).catch(()=>[])]);}
+  catch(e) {body.innerHTML=`<p>${esc(e.message)}</p>`;return;}
+  if(!body.isConnected)return;
+  const roster=new Map(teams.flatMap(t=>t.players.map(p=>[String(p.account_id),{name:p.name,league:t.league}])));
+  const lines=pulls.flatMap(p=>p.items.map(key=>({...p,item:itemByKey(key)}))).filter(l=>l.item);
+  body.innerHTML=`<div class="pull-log-head"><h3>Epic and legendary pulls</h3><p>Every epic or legendary card anyone has opened from a pack, newest first.</p></div>${lines.length?`<ol class="pull-log">${lines.map(l=>{
+    const r=roster.get(String(l.account)),who=esc(l.nickname??r?.name??steamName(Number(l.account))??`Player ${l.account}`);
+    return `<li style="--rarity:${colors[l.item.rarity]}"><span class="pull-swatch">${swatch(l.item,l.nickname??r?.name??'Name')}</span><span class="pull-text">${r?`<a href="${SOURCES[r.league]?.root??'#/all'}/player/${l.account}">${who}</a>`:`<b>${who}</b>`} pulled <strong>${esc(l.item.name)}</strong> <span class="pull-rarity">${l.item.rarity}</span><small>${esc(typeLabel(l.item.type))}</small></span><time datetime="${new Date(l.at).toISOString()}" title="${new Date(l.at).toLocaleString()}">${ago(l.at)}</time></li>`;
+  }).join('')}</ol>`:'<p>No epic or legendary pulls yet.</p>'}`;
 }
 
 // Your name on the site (lib/cosmetics-engine.js setNickname): a nickname, and which name shows on
