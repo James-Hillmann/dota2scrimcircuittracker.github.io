@@ -62,6 +62,14 @@ test('gifts reject bad rarities, counts and notes',()=>{
   for(const g of [{tier:'mythic'},{count:0},{count:11},{count:1.5},{note:'<b>'},{note:'x'.repeat(121)}])
     assert.throws(()=>giftPacks(state,g),undefined,JSON.stringify(g));
 });
+
+test('sent packs append to pending packs and preserve inventory, designs, grants and the refill timer',()=>{
+  const state={...grantLogin(null),packs:['common','rare','epic','legendary','screens'],nextPackAt:123456789,grants:['screens-2026-10'],inventory:{'border:copper':4}};
+  const given=giftPacks(state,{tier:'screens',count:3});
+  assert.deepEqual(given.packs,[...state.packs,'screens','screens','screens']);
+  for(const key of ['inventory','equipment','grants','nextPackAt'])assert.deepEqual(given[key],state[key]);
+  assert.equal(state.packs.length,5);
+});
 test('gift labels read naturally',()=>{
   assert.equal(giftLabel({tier:'epic',count:1}),'an Epic pack');
   assert.equal(giftLabel({tier:'common',count:1}),'a Common pack');

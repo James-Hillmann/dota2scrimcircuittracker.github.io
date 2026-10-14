@@ -32,6 +32,14 @@ test('screen packs return remaining screens near completion and preserve the pac
   assert.throws(()=>rollPack({...result.state,packs:['screens']},0),/every loading screen/);
 });
 
+test('screen grants append to every pending pack type without replacing packs or resetting their timer',()=>{
+  const original={...grantLogin(null),packs:['common','rare','epic','legendary','screens'],nextPackAt:987654321};
+  const granted=applyPackGrants(original);
+  assert.deepEqual(granted.packs,['common','rare','epic','legendary','screens','screens','screens','screens']);
+  assert.equal(granted.nextPackAt,original.nextPackAt);
+  assert.deepEqual(original.packs,['common','rare','epic','legendary','screens']);
+});
+
 test('every pack adds two loading screens the player did not have', () => {
   let state=grantLogin(null);
   const seen=new Set();
