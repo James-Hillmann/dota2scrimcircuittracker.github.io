@@ -21,6 +21,7 @@ import { radarSvg, roleScores } from "../parts/radar.js";
 import { tagContext, gameTags, tagsHtml, tagCells } from "../lib/gametags.js";
 import { mountProfileCollection } from '../parts/collection.js';
 import { mountProfileTickets } from '../parts/profile-tickets.js';
+import { mountGiftPanel } from '../parts/pack-gifts.js';
 
 // ---------- Player page ----------
 
@@ -150,6 +151,7 @@ export async function renderPlayer(src, key) {
   wirePlayerTabs();
   if(/^\d+$/.test(key)) mountProfileCollection(app,{account:Number(key),name:s.name,matches,team:roster?.team?.name??s.team,tier:tierOf}).catch(()=>{});
   if(/^\d+$/.test(key)) mountProfileTickets(app,key).catch(()=>{});
+  if(/^\d+$/.test(key)) mountGiftPanel(app,key,s.name).catch(()=>{});
   wireItemHeroes();
   wireCharts(app);
   wireTierModal();

@@ -32,3 +32,14 @@ export function availablePackOffers(state) {
   const claimed = state?.bonusPackClaims ?? {};
   return packOfferSources().filter(source => !claimed[source] && state?.bonusPackClaimed !== source && state?.bonusPackClaimed!==true);
 }
+
+// Actions already done in this browser or claimed on the account; the packs tab hides their steps.
+export function completedPackOffers(state) {
+  const done = new Set(packOfferSources());
+  for (const source of ['feedback', 'tour', 'discord']) {
+    let claimed = !!state?.bonusPackClaims?.[source] || state?.bonusPackClaimed === source || state?.bonusPackClaimed === true;
+    try { claimed ||= localStorage.getItem(`${CLAIMED_PREFIX}${source}`) === '1'; } catch { /* storage blocked */ }
+    if (claimed) done.add(source);
+  }
+  return done;
+}

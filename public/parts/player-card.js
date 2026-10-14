@@ -4,7 +4,7 @@ import { playerKey } from "../lib/stats.js";
 import { heroById, heroImg, heroVert, HERO_META } from "../lib/hero-meta.js";
 import { cardArtwork } from "../lib/card-art.js";
 import { teamLogoHtml } from "../lib/team-logos.js";
-import { cosmeticAttributes, cosmeticLayers, playerEquipment } from '../lib/cosmetics.js';
+import { cosmeticAttributes, cosmeticLayers, playerEquipment, playerNickname } from '../lib/cosmetics.js';
 import { BACK_STATS, backStats, partState } from '../lib/card-layout.js';
 
 // The cards' hero art filters. Each hero has its own art and style (lib/hero-art.js, picked by
@@ -110,8 +110,10 @@ export function createPlayerCards(matches, { cards = new Map(), teams = [], tier
     const tierChip = `<span class="ft-tier">${t ? `${t.tier}<small>${t.rating}</small>` : "—"}</span>`;
     // The owner's layout (lib/card-layout.js): their own name, which front parts show and where,
     // and the back's stats. Every stat is rendered; the layout picks which show, in what order.
-    const layout = equipment?.layout ?? null, cardName = layout?.name ?? p.name;
-    const nameShown = layout?.name != null ? esc(layout.name) : nameHtml ?? esc(p.name);
+    // A card name of its own first, then the nickname the player shows (lib/cosmetics-engine.js).
+    const nick = playerNickname(p.account) ?? ov?.cosmetics?.nickname ?? null;
+    const layout = equipment?.layout ?? null, cardName = layout?.name ?? nick ?? p.name;
+    const nameShown = layout?.name != null ? esc(layout.name) : nick != null ? esc(nick) : nameHtml ?? esc(p.name);
     const part = (key, cls, html, tag = "span", extra = "") => {
       const s = partState(layout, key);
       return `<${tag} class="${cls}${s.placed ? " ft-placed" : ""}" data-part="${key}"${s.show ? "" : " hidden"}${s.style ? ` style="${s.style}"` : ""}${extra}>${html}</${tag}>`;
@@ -121,8 +123,8 @@ export function createPlayerCards(matches, { cards = new Map(), teams = [], tier
     const statValue = {
       games: g, win: g ? Math.round((100 * st.wins) / g) + "%" : "—", kda,
       gpm: g ? Math.round(avg(st.gpm)) : "—", xpm: g ? Math.round(avg(st.xpm)) : "—", dmg: g ? kShort(avg(st.dmg)) : "—",
-      lh: g ? Math.round(avg(st.lh)) : "—", wards: g ? `${one(st.obs)}/${one(st.sen)}` : "—", dewards: one(st.dew),
-      stacks: one(st.stack), heal: g ? kShort(avg(st.heal)) : "—",
+      lh: g ? Math.round(avg(st.lh)) : "—", wards: g ? `${one(st.obs)}/${one(st.sen)}` : "—", dewards: one(st?.dew),
+      stacks: one(st?.stack), heal: g ? kShort(avg(st.heal)) : "—",
     };
     const shown = backStats(layout, role);
     const statsHtml = BACK_STATS.map(([key, label, wide]) => {

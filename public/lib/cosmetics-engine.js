@@ -2,7 +2,7 @@ import { CATALOG, TIERS, PACK_ODDS, DEFAULT_EQUIPMENT, itemByKey } from './cosme
 import { heroById } from './hero-meta.js';
 import { CARD_ART } from './card-art-data.js';
 import { CARD_STYLES, validCardCrop } from './card-art.js';
-import { validLayout } from './card-layout.js';
+import { validLayout, MAX_NAME } from './card-layout.js';
 
 export const PACK_INTERVAL_MS=8*60*60*1000;
 export const NORMAL_PACK_CAP=3;
@@ -10,10 +10,21 @@ export function cardDesignState(state) {
   const designs=Array.from({length:3},(_,i)=>state.cardDesigns?.[i]??(i===0?state.equipment:null));
   return {cardDesigns:designs,primaryCard:state.primaryCard??0,shuffleCards:state.shuffleCards??false};
 }
+// The public look of a player's cards; nickname is the name they chose to show, else null.
 export function cardAppearance(state) {
   const preferences=cardDesignState(state);
-  return {...state.equipment,...preferences};
+  return {...state.equipment,...preferences,nickname:shownNickname(state)};
 }
+// Your name on the site: a nickname, and whether it shows in place of your in-game name (on your
+// cards and your profile, where the in-game name follows in brackets). Same rules as card names.
+export function setNickname(state,{nickname=null,showNickname=false}={}) {
+  if(typeof showNickname!=='boolean')throw new Error('Choose which name to show.');
+  let name=nickname==null?'':String(nickname).replace(/\s+/g,' ').trim();
+  if(name&&([...name].length>MAX_NAME||/[\u0000-\u001f\u007f<>]/.test(name)))throw new Error(`Nicknames are 1 to ${MAX_NAME} characters, plain text.`);
+  if(showNickname&&!name)throw new Error('Type a nickname to show it.');
+  return {...state,nickname:name||null,showNickname};
+}
+export const shownNickname=state=>state?.showNickname&&state.nickname?state.nickname:null;
 export function saveCardDesign(state,raw,slot=state.primaryCard??0) {
   if(!Number.isInteger(slot)||slot<0||slot>2)throw new Error('Choose one of your three cards.');
   const preferences=cardDesignState(state);
@@ -63,15 +74,16 @@ export function rollPack(state, packIndex, random = Math.random, now = new Date(
   if(next.nextPackAt==null && next.packs.filter(p=>p==='common').length<NORMAL_PACK_CAP)next.nextPackAt=now.getTime()+PACK_INTERVAL_MS;
   return {state:next,rewards};
 }
+export const RECYCLE_COST=10;
 export function recycleCards(state, selections) {
-  if(!selections || typeof selections!=='object' || Array.isArray(selections)) throw new Error('Choose five duplicates.');
+  if(!selections || typeof selections!=='object' || Array.isArray(selections)) throw new Error(`Choose ${RECYCLE_COST} duplicates.`);
   const entries=Object.entries(selections).filter(([,n])=>n!==0);
-  if(entries.some(([,n])=>!Number.isSafeInteger(n)||n<1) || entries.reduce((s,[,n])=>s+n,0)!==5) throw new Error('Choose exactly five duplicates.');
+  if(entries.some(([,n])=>!Number.isSafeInteger(n)||n<1) || entries.reduce((s,[,n])=>s+n,0)!==RECYCLE_COST) throw new Error(`Choose exactly ${RECYCLE_COST} duplicates.`);
   const rarity=itemByKey(entries[0]?.[0])?.rarity, tier=TIERS.indexOf(rarity);
   if(tier<0 || tier===3) throw new Error('Legendary cards cannot be recycled into a higher tier.');
   const next=structuredClone(state);
   for(const [key,n] of entries) {
-    if(itemByKey(key)?.rarity!==rarity) throw new Error('Use five duplicates of the same rarity.');
+    if(itemByKey(key)?.rarity!==rarity) throw new Error(`Use ${RECYCLE_COST} duplicates of the same rarity.`);
     if(n>Math.max(0,(next.inventory[key]??0)-1)) throw new Error('Your last copy is protected.');
     next.inventory[key]-=n;
   }

@@ -275,7 +275,7 @@ const commands = {
     }
     let digest = "not due";
     if (digestDue) {
-      if (dry) for (const body of digestBodies(all.map(summary))) await post(body);
+      if (dry) for (const body of digestBodies(all.map(summary), s.posts, hook && await webhookWhere(hook))) await post(body);
       else await postDigest(hook, s, all.map(summary));
       digest = all.length ? "sent" : "due, nothing open";
       if (!dry) { s.lastDigest = today(); writeState(s); }

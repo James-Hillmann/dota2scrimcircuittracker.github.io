@@ -3,7 +3,7 @@ import { signatureHtml } from './signatures.js';
 import { steamAccount, steamIdToken } from './store.js';
 import { cardArtwork } from './card-art.js';
 import { heroById, heroImg } from './hero-meta.js';
-import { cardAppearance, selectedCardDesign } from './cosmetics-engine.js';
+import { cardAppearance, selectedCardDesign, shownNickname } from './cosmetics-engine.js';
 import { syncPackOfferClaims } from './bonus-offers.js';
 import { applyLayout } from './card-layout.js';
 
@@ -17,6 +17,8 @@ export function playerEquipment(id,fallback) {
   return selectedCardDesign(appearances.get(String(id))??fallback,String(id)===String(account),hash/4294967296);
 }
 export const collectionState=()=>state;
+// The nickname a player shows in place of their in-game name, or null (cosmetics-engine.js).
+export const playerNickname=id=>appearances.get(String(id))?.nickname??null;
 export async function collectionAction(action,details={}) {
   const token=await steamIdToken();if(!token)throw new Error('Sign in with Steam to collect cards.');
   account=await steamAccount();
@@ -33,7 +35,7 @@ export async function collectionAction(action,details={}) {
   pending=null;state=data.state;
   syncPackOfferClaims(state);
   appearances.set(String(account),cardAppearance(state));
-  document.querySelectorAll(`.ft-card[data-pick="${account}"]`).forEach(card=>applyEquipment(card,card.dataset.designSlot!=null?(state.cardDesigns?.[Number(card.dataset.designSlot)]??state.equipment):state.equipment,card.dataset.playerName??'Your Name'));
+  document.querySelectorAll(`.ft-card[data-pick="${account}"]`).forEach(card=>applyEquipment(card,card.dataset.designSlot!=null?(state.cardDesigns?.[Number(card.dataset.designSlot)]??state.equipment):state.equipment,shownNickname(state)??card.dataset.playerName??'Your Name'));
   document.querySelectorAll(`.fantasy-tier-chip.open[data-expanded-account="${account}"]`).forEach(panel=>applyExpandedEquipment(panel,state.equipment,panel.dataset.playerName));
   dispatchEvent(new CustomEvent('collection-change',{detail:{state,account}}));
   return data;
@@ -44,6 +46,16 @@ export async function publicCollection(account) {
 // Each saved design's rating counts (lib/card-ratings.js); rating one is the 'rate' action.
 export async function cardRatings(account) {
   const r=await fetch(`${COLLECTION_API}/ratings/${account}`);if(!r.ok)throw new Error('Ratings unavailable.');return (await r.json()).cards;
+}
+// Every changed saved design in the league, with its ratings (the Gallery).
+export async function galleryCards() {
+  const r=await fetch(`${COLLECTION_API}/gallery`);if(!r.ok)throw new Error('Gallery unavailable.');return (await r.json()).cards;
+}
+// The signed-in player's own votes, "<owner>:<design key>" → rating; empty when signed out.
+export async function myCardVotes() {
+  const token=await steamIdToken().catch(()=>null);if(!token)return {};
+  const r=await fetch(COLLECTION_API,{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},body:JSON.stringify({action:'my-votes'})});
+  if(!r.ok)throw new Error('Your ratings are unavailable.');return (await r.json()).votes;
 }
 export async function cosmeticAppearances() {
   const r=await fetch(`${COLLECTION_API}/appearances`);if(!r.ok)throw new Error('Collection service unavailable.');const data=await r.json();
@@ -80,6 +92,8 @@ export function applyEquipment(card,e,name) {
     }
   }
   applyLayout(card,e.layout??null,name);
+  // No card name of its own: the player's shown name (their nickname, else in-game name).
+  if(e.layout?.name==null&&name)card.querySelectorAll('.ft-name').forEach(n=>{if(n.textContent!==name){n.textContent=name;n.title=name;}});
   const face=card.querySelector('.ft-front');face.querySelectorAll('.card-autograph,.cosmetic-overlay,.cosmetic-emblem,.particles').forEach(n=>n.remove());
   face.insertAdjacentHTML('beforeend',cosmeticLayers(e,e.layout?.name??name));
 }

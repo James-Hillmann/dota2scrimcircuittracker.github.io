@@ -24,6 +24,7 @@ const uploadPage = () => import("./pages/upload.js");
 const predictPage = () => import("./pages/predict.js");
 const drafterPage = () => import("./pages/drafter.js");
 const searchPage = () => import("./pages/search.js");
+const galleryPage = () => import("./pages/gallery.js");
 
 // ---------- League switcher + router ----------
 
@@ -508,6 +509,7 @@ export function route() {
     else if (new RegExp(`^${r}/edit/[0-9a-f]{32}$`).test(h)) { section = "week"; page = async () => (await uploadPage()).renderEdit(h.slice(`${r}/edit/`.length), src.key); }
     else if (h.startsWith(`${r}/upload`)) { section = "upload"; page = async () => { const { endEdit, upload, checkDraft, renderUpload } = await uploadPage(); endEdit(); upload.league = src.key; await src.data().catch(() => null); await divUploaded(src.key); if (upload.draft) upload.check = checkDraft(upload.draft); return renderUpload(); }; }
     else if (h.startsWith(`${r}/search`)) { section = "search"; page = async () => (await searchPage()).renderSearch(src); }
+    else if (h.startsWith(`${r}/gallery`)) { section = "gallery"; page = async () => (await galleryPage()).renderGallery(src, h.slice(r.length).split("/")[2]); }
     else if (/^(\/(standings|matches|crosstable|race)?)?\/?$/.test(h.slice(r.length))) { section = "standings"; tm = true; page = () => renderStandings(t); }
     else page = () => renderNotFound(src);
   } else {
@@ -536,6 +538,7 @@ export function route() {
     else if (p.startsWith("/hero/")) { section = "heroes"; tm = true; page = () => renderHero(t, p.slice("/hero/".length)); }
     else if (p.startsWith("/heroes")) { section = "heroes"; tm = true; page = () => renderHeroes(t); }
     else if (p.startsWith("/search")) { section = "search"; page = async () => (await searchPage()).renderSearch(src); }
+    else if (p.startsWith("/gallery")) { section = "gallery"; page = async () => (await galleryPage()).renderGallery(src, p.split("/")[2]); }
     // Teams: the table, the matches and the team grid. /teams and /matches were their own pages once.
     else if (/^(\/(standings|matches|teams)?)?\/?$/.test(p)) { section = "standings"; tm = true; page = () => renderMatches(t); }
     else page = () => renderNotFound(src);

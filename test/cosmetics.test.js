@@ -39,14 +39,14 @@ test('roll boundaries follow exact odds; packs contain three and do not mutate i
   const legend=rollPack(first,0,()=>.999999);assert.ok(legend.rewards.every(r=>CATALOG.find(i=>i.key===r.key).rarity==='legendary'));
   assert.throws(()=>rollPack(first,-1));assert.throws(()=>rollPack(first,3));
 });
-test('recycling protects last copies and only accepts five extras of one tier',()=>{
+test('recycling protects last copies and only accepts ten extras of one tier',()=>{
   const common=CATALOG.find(i=>i.rarity==='common'),rare=CATALOG.find(i=>i.rarity==='rare'),legend=CATALOG.find(i=>i.rarity==='legendary');
-  const state={...grantLogin(null),inventory:{[common.key]:6,[rare.key]:6,[legend.key]:6}};
-  const result=recycleCards(state,{[common.key]:5});assert.equal(result.state.inventory[common.key],1);assert.equal(result.state.packs.at(-1),'rare');
-  assert.throws(()=>recycleCards({...state,inventory:{[common.key]:5}},{[common.key]:5}),/last copy/);
-  assert.throws(()=>recycleCards(state,{[common.key]:4,[rare.key]:1}),/same rarity/);
-  assert.throws(()=>recycleCards(state,{[common.key]:4}),/exactly five/);
-  assert.throws(()=>recycleCards(state,{[legend.key]:5}),/Legendary/);
+  const state={...grantLogin(null),inventory:{[common.key]:11,[rare.key]:11,[legend.key]:11}};
+  const result=recycleCards(state,{[common.key]:10});assert.equal(result.state.inventory[common.key],1);assert.equal(result.state.packs.at(-1),'rare');
+  assert.throws(()=>recycleCards({...state,inventory:{[common.key]:10}},{[common.key]:10}),/last copy/);
+  assert.throws(()=>recycleCards(state,{[common.key]:9,[rare.key]:1}),/same rarity/);
+  assert.throws(()=>recycleCards(state,{[common.key]:5}),/exactly 10/);
+  assert.throws(()=>recycleCards(state,{[legend.key]:10}),/Legendary/);
   for(const minimum of TIERS.slice(1)) {
     const upgraded={...state,packs:[minimum]};
     for(let n=0;n<50;n++)assert.ok(rollPack(upgraded,0).rewards.every(r=>TIERS.indexOf(CATALOG.find(i=>i.key===r.key).rarity)>=TIERS.indexOf(minimum)));

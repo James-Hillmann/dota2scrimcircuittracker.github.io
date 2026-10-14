@@ -1,5 +1,7 @@
-import { grantLogin, rollPack, recycleCards, saveCardDesign, setCardPreferences, cardAppearance, cardDesignState } from '../../../public/lib/cosmetics-engine.js';
+import { grantLogin, rollPack, recycleCards, saveCardDesign, setCardPreferences, cardAppearance, cardDesignState, setNickname, shownNickname } from '../../../public/lib/cosmetics-engine.js';
 import { designKey, castVote, tally } from '../../../public/lib/card-ratings.js';
+import { DEFAULT_EQUIPMENT } from '../../../public/lib/cosmetics-catalog.js';
+import { isAdmin, giftPacks, clearGifts } from '../../../public/lib/pack-gifts.js';
 
 const json=(value,status=200)=>Response.json(value,{status});
 const secureRandom=()=>crypto.getRandomValues(new Uint32Array(1))[0]/4294967296;
@@ -13,6 +15,20 @@ export class CosmeticsVault {
     if(url.pathname==='/appearances') {
       const rows=await this.ctx.storage.list({prefix:'appearance:',limit:5000});
       return json(Object.fromEntries([...rows].map(([k,v])=>[k.slice(11),v])));
+    }
+    // The gallery: every saved design anyone has changed from the default card, with its ratings.
+    if(url.pathname==='/gallery') {
+      const plain=designKey(DEFAULT_EQUIPMENT), users=await this.ctx.storage.list({prefix:'user:',limit:5000});
+      const votes=await this.ctx.storage.list({prefix:'votes:',limit:20000}), cards=[];
+      for(const [k,state] of users) {
+        const account=k.slice(5),prefs=cardDesignState(state);
+        prefs.cardDesigns.forEach((design,slot)=>{
+          if(!design||designKey({...DEFAULT_EQUIPMENT,...design})===plain)return;
+          const key=designKey(design);
+          cards.push({account,slot,key,design,primary:slot===prefs.primaryCard,nickname:shownNickname(state),...tally(votes.get(`votes:${account}:${key}`))});
+        });
+      }
+      return json({cards});
     }
     const account=url.searchParams.get('account');
     if(!/^\d{1,10}$/.test(account??'')) return json({error:'Invalid account.'},400);
@@ -29,9 +45,16 @@ export class CosmeticsVault {
     }
     if(req.method==='GET') {
       const state=await this.ctx.storage.get(`user:${account}`);
-      return json({inventory:state?.inventory??{},equipment:state?.equipment??null,...(state?cardDesignState(state):{})});
+      return json({inventory:state?.inventory??{},equipment:state?.equipment??null,nickname:shownNickname(state),...(state?cardDesignState(state):{})});
     }
     let body;try {body=await req.json();} catch {return json({error:'Invalid request.'},400);}
+    // Which designs this player has rated, and how: "<owner>:<design key>" → rating. A read, so
+    // no receipt.
+    if(body.action==='my-votes') {
+      const mine={};
+      for(const [k,v] of await this.ctx.storage.list({prefix:'votes:',limit:20000}))if(v?.[account])mine[k.slice(6)]=v[account];
+      return json({votes:mine});
+    }
     try {
       const result=await this.ctx.storage.transaction(async txn=>{
         const key=`user:${account}`, saved=await txn.get(key);
@@ -54,6 +77,17 @@ export class CosmeticsVault {
         else if(body.action==='recycle') result=recycleCards(saved,body.selections);
         else if(body.action==='equip') result={state:saveCardDesign(saved,body.equipment,body.cardSlot)};
         else if(body.action==='card-settings')result={state:setCardPreferences(saved,body)};
+        else if(body.action==='nickname')result={state:setNickname(saved,body)};
+        else if(body.action==='gift') {
+          // Fav only: packs into another player's collection, with a notice they see next visit.
+          if(!isAdmin(account))throw new Error('Only Fav can gift packs.');
+          const target=String(body.target??'');
+          if(!/^\d{1,10}$/.test(target))throw new Error('Choose a player.');
+          const targetKey=`user:${target}`,given=giftPacks((target===account?saved:await txn.get(targetKey))??grantLogin(null),body);
+          if(target===account)result={state:given,gift:{target,tier:body.tier,count:body.count}};
+          else {await txn.put(targetKey,given);result={state:saved,gift:{target,tier:body.tier,count:body.count}};}
+        }
+        else if(body.action==='gifts-seen')result={state:clearGifts(saved)};
         else if(body.action==='rate') {
           // One vote per voter per design, never your own; the design is read here, not sent.
           const target=String(body.target??'');
@@ -69,7 +103,7 @@ export class CosmeticsVault {
         }
         else throw new Error('Unknown collection action.');
         await txn.put(key,result.state);
-        if(body.action==='equip'||body.action==='card-settings') await txn.put(`appearance:${account}`,cardAppearance(result.state));
+        if(['equip','card-settings','nickname'].includes(body.action)) await txn.put(`appearance:${account}`,cardAppearance(result.state));
         await txn.put(receipt,{action:body.action,result});
         return result;
       });
@@ -87,6 +121,7 @@ export async function cosmeticsRequest(req,env,allowedOrigins) {
   if(!env.COSMETICS) return respond(json({error:'The collection service is not configured yet.'},503));
   const vault=env.COSMETICS.get(env.COSMETICS.idFromName('league-v1'));
   if(req.method==='GET' && url.pathname==='/cosmetics/appearances') return respond(await vault.fetch('https://vault/appearances'));
+  if(req.method==='GET' && url.pathname==='/cosmetics/gallery') return respond(await vault.fetch('https://vault/gallery'));
   const publicAccount=/^\/cosmetics\/collection\/(\d{1,10})$/.exec(url.pathname)?.[1];
   if(req.method==='GET' && publicAccount) return respond(await vault.fetch(`https://vault/collection?account=${publicAccount}`));
   const ratedAccount=/^\/cosmetics\/ratings\/(\d{1,10})$/.exec(url.pathname)?.[1];

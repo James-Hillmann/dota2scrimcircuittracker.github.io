@@ -37,3 +37,43 @@ test('vault ratings: signed-in voters only once per design, never their own, res
   await as(201,{action:'equip',equipment:{...DEFAULT_EQUIPMENT,hue:30}});
   assert.deepEqual((await ratings()).counts.epic,2);
 });
+test('vault gallery: changed designs only, with ratings; my-votes lists only the asker\'s votes',async()=>{
+  const rows=new Map(),storage={get:async k=>structuredClone(rows.get(k)),put:async(k,v)=>rows.set(k,structuredClone(v)),list:async({prefix})=>new Map([...rows].filter(([k])=>k.startsWith(prefix)).map(([k,v])=>[k,structuredClone(v)]))};storage.transaction=fn=>fn(storage);
+  const vault=new CosmeticsVault({storage});let n=0;
+  const as=(account,body)=>vault.fetch(new Request(`https://vault/action?account=${account}`,{method:'POST',body:JSON.stringify({requestId:`gallery-request-${String(++n).padStart(6,'0')}`,...body})}));
+  const gallery=async()=>(await (await vault.fetch(new Request('https://vault/gallery'))).json()).cards;
+  for(const a of [301,302,303])await as(a,{action:'session'});
+  assert.deepEqual(await gallery(),[]); // fresh collections are the default card
+  await as(301,{action:'equip',equipment:{...DEFAULT_EQUIPMENT,hue:30}});
+  await as(302,{action:'equip',equipment:{...DEFAULT_EQUIPMENT,hue:60},cardSlot:2});
+  await as(303,{action:'rate',target:301,cardSlot:0,rating:'legendary'});
+  await as(302,{action:'rate',target:301,cardSlot:0,rating:'legendary'});
+  const cards=await gallery();
+  assert.deepEqual(cards.map(c=>[c.account,c.slot,c.primary]).sort(),[['301',0,true],['302',2,false]]);
+  const card=cards.find(c=>c.account==='301');
+  assert.equal(card.pick,'legendary');assert.equal(card.total,2);assert.equal(card.design.hue,30);
+  const mine=await (await as(303,{action:'my-votes'})).json();
+  assert.deepEqual(mine.votes,{[`301:${card.key}`]:'legendary'});
+  assert.deepEqual((await (await as(301,{action:'my-votes'})).json()).votes,{});
+});
+test('nicknames: plain text up to 24, shown only when chosen, in the appearance, collection and gallery',async()=>{
+  const {setNickname,shownNickname,cardAppearance}=await import('../public/lib/cosmetics-engine.js');
+  const base={v:2,inventory:{},packs:[],equipment:{...DEFAULT_EQUIPMENT}};
+  assert.equal(shownNickname(setNickname(base,{nickname:'  Big   Dog ',showNickname:false})),null);
+  const on=setNickname(base,{nickname:'Big Dog',showNickname:true});
+  assert.equal(shownNickname(on),'Big Dog');assert.equal(cardAppearance(on).nickname,'Big Dog');
+  assert.throws(()=>setNickname(base,{nickname:'<b>x</b>',showNickname:true}));
+  assert.throws(()=>setNickname(base,{nickname:'x'.repeat(25),showNickname:true}));
+  assert.throws(()=>setNickname(base,{nickname:'',showNickname:true}));
+  const rows=new Map(),storage={get:async k=>structuredClone(rows.get(k)),put:async(k,v)=>rows.set(k,structuredClone(v)),list:async({prefix})=>new Map([...rows].filter(([k])=>k.startsWith(prefix)).map(([k,v])=>[k,structuredClone(v)]))};storage.transaction=fn=>fn(storage);
+  const vault=new CosmeticsVault({storage});let n=0;
+  const as=(account,body)=>vault.fetch(new Request(`https://vault/action?account=${account}`,{method:'POST',body:JSON.stringify({requestId:`nickname-request-${String(++n).padStart(6,'0')}`,...body})}));
+  await as(401,{action:'session'});
+  await as(401,{action:'equip',equipment:{...DEFAULT_EQUIPMENT,hue:40}});
+  assert.equal((await as(401,{action:'nickname',nickname:'Big Dog',showNickname:true})).status,200);
+  assert.equal((await (await vault.fetch(new Request('https://vault/collection?account=401'))).json()).nickname,'Big Dog');
+  assert.equal((await (await vault.fetch(new Request('https://vault/appearances'))).json())['401'].nickname,'Big Dog');
+  assert.equal((await (await vault.fetch(new Request('https://vault/gallery'))).json()).cards[0].nickname,'Big Dog');
+  await as(401,{action:'nickname',nickname:'Big Dog',showNickname:false});
+  assert.equal((await (await vault.fetch(new Request('https://vault/collection?account=401'))).json()).nickname,null);
+});

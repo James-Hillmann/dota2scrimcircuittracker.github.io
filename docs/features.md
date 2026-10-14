@@ -677,7 +677,20 @@ play the whole Heroic/Aegis game. Predict's "Your name" bar hides on this tab (F
 - **Card ratings**: on a profile, each saved design shows how players rated it (common, rare,
   epic, legendary) and the community's pick. Signed in, you get one vote per card (changeable),
   never on your own. Votes belong to the design: changing the card starts it at none, and
-  changing it back restores them.
+  changing it back restores them. Your votes are kept by the Worker, so the button you pressed
+  shows on any device.
+- **Nickname**: signed in, set a nickname and pick which name shows, it or your in-game name, in
+  Gallery › Customize or on your own profile (the Worker keeps it). Shown, it's the name on all
+  your cards and signatures (a card's own name from its layout still wins on that card), on
+  Gallery captions, and your profile title reads "Nickname (in-game name)". Plain text, up to 24.
+- **Gallery** (nav tab in every league, `#/<league>/gallery`): opens on **Everyone's cards**,
+  every saved card anyone in the league has changed from the default, each with its ratings and
+  the same vote buttons as the profile. The other sub-tabs (Packs, Collection, Customize,
+  Recycle; `#/<league>/gallery/<tab>`) are your own collection on a full page, the same as the
+  collection dialog; the top bar's gift button opens Gallery › Packs. The dialog still opens from
+  Fantasy and profiles, and has the gallery as its last tab. Sort by voted rarity
+  (legendary first; among equals, the clearer verdict, then more votes), most votes, or player
+  name. Signed in, "Not rated by me" leaves the cards you can still rate. Names link to profiles.
 - **Captain**: choose one of your five picks as captain before saving. Their weekly points are
   doubled after selecting their best two games. Captain choices lock with the lineup and are
   stored as an account ID in the entry. Older entries without a captain retain their base score.
