@@ -322,9 +322,13 @@ async function weekMenu(src) {
   });
   return { items };
 }
-// Phones: the tabs after the first four (Predict, Drafter, Upload) fold under "More ▾".
+// Phones: the tabs after the first four (Predict, Drafter, Upload) fold under "More ▾". Predict's
+// own tabs follow it there, indented, so the Leaderboard is named one tap from the nav.
 const NAV_SHOWN = 4;
-const moreMenu = async (src) => ({ items: src.nav.slice(NAV_SHOWN).map(([href, , label]) => ({ name: label, href })) });
+const moreMenu = async (src) => ({ items: (await Promise.all(src.nav.slice(NAV_SHOWN).map(async ([href, key, label]) => [
+  { name: label, href },
+  ...(key === "predict" && hasMenu(key, src) ? (await NAV_MENUS.predict(src)).items.map((x) => ({ ...x, child: true })) : []),
+]))).flat() });
 const NAV_MENUS = { standings: teamMenu, players: playerMenu, heroes: heroMenu, week: weekMenu,
   predict: pageMenu(PREDICT_TABS, "predict"), drafter: pageMenu(DRAFTER_MODES, "drafter"), more: moreMenu };
 // Scrim Predict has no tabs, so no dropdown.
@@ -360,7 +364,7 @@ async function openNavMenu(it) {
   const list = menu.items.map((x, i) => {
     const g = x.group != null && x.group !== group ? `<div class="nd-group">${esc(x.group)}</div>` : "";
     group = x.group ?? group;
-    return `${g}<a class="nd-item" href="${x.href}" data-i="${i}"><span class="nd-name">${esc(x.name)}</span>${x.sub ? `<span class="nd-sub">${esc(x.sub)}</span>` : ""}</a>`;
+    return `${g}<a class="nd-item${x.child ? " nd-child" : ""}" href="${x.href}" data-i="${i}"><span class="nd-name">${esc(x.name)}</span>${x.sub ? `<span class="nd-sub">${esc(x.sub)}</span>` : ""}</a>`;
   }).join("");
   drop.innerHTML = `<div class="nd-list">${list}</div>`;
   // Mark where you are (a team's page, or the tab a link opened), scrolled into view.

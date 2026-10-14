@@ -342,6 +342,8 @@ nav a.nav-cta:hover { background: #f5c862; color: var(--on-accent); }
 }
 .nd-item .nd-name, .nd-item .nd-sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nd-item .nd-sub { font-size: 12px; color: var(--dust); margin-top: 2px; }
+.nav-drop .nd-item.nd-child { padding: 5px 10px 5px 24px; font-size: 13px; color: var(--dust); }
+.nav-drop .nd-item.nd-child:hover { color: var(--bone); }
 .nav-drop .nd-item.on { background: rgba(var(--accent-rgb), .1); border-left-color: var(--accent); }
 .nav-drop .nd-item:focus-visible { outline: 1px solid var(--accent); outline-offset: -1px; }
 /* Header search: players and teams in every league. Each result wears its league's colour. */
@@ -1880,6 +1882,18 @@ button.linkish:hover { text-decoration: underline; }
 .pred-picks button[aria-pressed="true"] .pk-sub, .pred-picks button[aria-pressed="true"] .pk-sub b { color: var(--on-accent); }
 .pred-picks button:disabled { opacity: .55; cursor: not-allowed; }
 .pred-picks button[aria-pressed="true"]:disabled { opacity: 1; }
+/* Sized to its columns, not the page: on a wide screen the scores sit next to the names. */
+.pred-board { width: auto; }
+.table-wrap:has(> .pred-board) { width: fit-content; max-width: 100%; }
+@media (min-width: 761px) { .pred-board :is(td, th) { padding: 10px 14px; } .pred-board td.l:nth-child(2) { min-width: 180px; } }
+/* Phones: last week's change goes above the score, so Points and Correct both fit on screen. */
+@media (max-width: 760px) {
+  .pred-board .pb-delta { display: block; margin: 0 0 2px; font-size: 11px; }
+  .pred-board td.l:nth-child(2) { white-space: normal; }
+  .pred-board :is(td, th) { padding-left: 6px; padding-right: 6px; }
+}
+.pred-board .rank { width: auto; } /* .rank's 1% would stretch the table to the page again */
+.pred-board tr:has(> td.rank.lead) td:nth-child(2) { font-weight: 600; }
 .pred-board td.num { text-align: right; }
 .pb-delta { display: inline-block; margin-right: 10px; font: 500 12px var(--mono); color: var(--dust); }
 .pb-delta.up { color: var(--jade); }
@@ -2673,6 +2687,16 @@ button.ga-go:hover:not(:disabled) { background: var(--accent); color: var(--on-a
 .pp-head { margin-bottom: 22px; }
 .pp-head .kicker { flex-wrap: wrap; row-gap: 6px; }
 .pp-head .kicker a, .pp-league { color: inherit; white-space: nowrap; }
+/* A player's profile background (parts/profile-background.js): a loading screen framed by
+   object-position and scale, under the page colour at --pbg-dim. Behind the head it fades in from
+   the left so the name stays readable; .pbg-fixed covers the whole page behind the content. */
+.pp-head.has-bg { position: relative; isolation: isolate; padding: 22px 22px 0; border-radius: 10px; overflow: hidden; }
+@media (max-width: 760px) { .pp-head.has-bg { padding: 14px 12px 0; } }
+.pbg-layer { position: absolute; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
+.pbg-layer img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.pbg-layer::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(var(--ink-rgb), min(1, calc(var(--pbg-dim) + .4))) 0%, rgba(var(--ink-rgb), var(--pbg-dim)) 55%, rgba(var(--ink-rgb), calc(var(--pbg-dim) * .6)) 100%); }
+.pbg-layer.pbg-fixed { position: fixed; z-index: -1; }
+.pbg-layer.pbg-fixed::after { background: linear-gradient(rgba(var(--ink-rgb), calc(var(--pbg-dim) * .8)), rgba(var(--ink-rgb), var(--pbg-dim)) 40%, rgba(var(--ink-rgb), min(1, calc(var(--pbg-dim) + .15)))); }
 @media (max-width: 760px) {
   .pp-head .kicker::before { display: none; }
   .pp-row .pp-tabs { margin-left: -11px; width: calc(100% + 11px); }
