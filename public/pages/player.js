@@ -49,6 +49,11 @@ export async function renderPlayer(src, key) {
   try { matches = await src.load(); if (src.ad2l) await src.data(); } catch (e) { app.innerHTML = `${pageHead(src.kicker, "Player")}${errorBox(e)}`; return; }
   const h = playerHistory(matches, key);
   const back = `<div class="kicker" style="margin-bottom:16px"><a href="${src.root}/players">← All players</a></div>`;
+  // No games here: a Steam player on no roster gets their scout report instead (parts/scouted.js).
+  if (!h && /^\d+$/.test(key) && !src.cache?.()?.teams?.some((t) => t.players.some((p) => String(p.account_id) === key))) {
+    const { renderScoutedPlayer } = await import("../parts/scouted.js");
+    if (await renderScoutedPlayer(src, key).catch(() => false)) return;
+  }
   if (!h) { app.innerHTML = `${back}<div class="panel empty"><strong>No games found for this player</strong>Private scrims don't include players.</div>`; return; }
   const s = h.summary;
 

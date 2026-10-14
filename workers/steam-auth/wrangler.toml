@@ -12,3 +12,11 @@ class_name = "CosmeticsVault"
 [[migrations]]
 tag = "cosmetics-v1"
 new_sqlite_classes = ["CosmeticsVault"]
+
+[[durable_objects.bindings]]
+name = "SCOUT"
+class_name = "ScoutStore"
+
+[[migrations]]
+tag = "scout-v1"
+new_sqlite_classes = ["ScoutStore"]

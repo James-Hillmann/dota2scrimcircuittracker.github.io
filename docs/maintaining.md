@@ -248,6 +248,12 @@ signs in with it). Only the site and the two localhost previews may receive a to
 key, firebase-adminsdk, set in the Cloudflare dashboard; never in the repo). Tests:
 `test/steam-auth.test.js`.
 
+Scouting (`src/scout.js`, Durable Object `ScoutStore`): `POST /scout` with the Steam session's
+Firebase ID token scouts that account from OpenDota (asks OpenDota to refresh it first; reuses a
+report under 6 hours old); `GET /scout/<account>` returns the report or 404. The site asks for it
+only for players on no roster (`parts/me.js`). Reports use the sync's `pubs` and `totals`
+formats. Tests: `test/scout.test.js`.
+
 ```bash
 cd workers/steam-auth && npx wrangler deploy     # after changing src/index.js
 npx wrangler secret list                          # FIREBASE_SA should be listed

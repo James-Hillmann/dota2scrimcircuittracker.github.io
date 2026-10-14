@@ -631,7 +631,12 @@ play the whole Heroic/Aegis game. Predict's "Your name" bar hides on this tab (F
 - **Sign in with Steam** — **Sign in** in the top bar (left of the settings cog) or on the tab.
   Signed in, the top bar shows your Steam avatar (from OpenDota's public profile, kept a day);
   it opens your player page in the first league whose roster has you (the one you're viewing
-  first), else the Fantasy tab (`parts/me.js`). Sign out is on the Fantasy tab. The sign-in
+  first), else your page in the league you're viewing (`parts/me.js`).
+- **Scouted profiles** — a Steam player on no league roster is scouted when they sign in: the
+  Worker reads their public OpenDota history (rank, last 30 days of pubs, all-time heroes in pubs
+  and practice lobbies) and keeps it, at most one fresh scout every 6 hours. Their player page
+  (`parts/scouted.js`) shows that with Recent pubs and All time, plus the card collection,
+  tickets and gift box every profile has. A private match history gets a note saying so. Sign out is on the Fantasy tab. The sign-in
   sends you to Steam's own page; the Worker
   (`workers/steam-auth`, https://steam-auth.ad2lstats.workers.dev) checks Steam's reply and returns
   a Firebase sign-in for `steam:<account id>`. It runs on its own Firebase session, so the

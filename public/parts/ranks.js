@@ -194,8 +194,8 @@ export function heroPlayersHtml(src, hero, list, lines, overallList) {
 export const lastNight = (d) => Math.max(0, ...(d?.series ?? []).filter(isPlayed).map((s) => s.time ?? 0));
 export const sinceLabel = (d) => new Date(lastNight(d) * 1000).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
 
-export function pubSection(src, accountId) {
-  const d = src.cache();
+// `d` is the division file, or a scout report (parts/scouted.js) for a player on no roster.
+export function pubSection(src, accountId, d = src.cache()) {
   if (!d?.pubs || !accountId) return "";
   const games = pubsSince(d, accountId, pubStart(d));
   const ps = pubSummary(games);
