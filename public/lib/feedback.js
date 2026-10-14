@@ -84,8 +84,21 @@ const boundsOf = (strokes) => {
 
 // ---------- screenshot ----------
 let shotLib = null;
-// JPEG of `area` (page coordinates) with the pending mark drawn in, or null if it fails.
-async function capture(area, mark) {
+const SHOT_WAIT = 8000; // past this the note is kept without a picture
+// JPEG of `area` (page coordinates) with the pending mark drawn in, or null if it fails or is slow.
+function capture(area, mark) {
+  let timer;
+  const late = new Promise((r) => { timer = setTimeout(() => { console.warn("feedback: screenshot took too long, skipped"); r(null); }, SHOT_WAIT); });
+  return Promise.race([shoot(area, mark), late]).finally(() => clearTimeout(timer));
+}
+async function shoot(area, mark) {
+  // Copying every element is what takes the time (~11,000 with the collection open: 30 s), so
+  // hidden ones are left out and one wholly outside the area is copied empty at its measured
+  // size: nothing in view moves.
+  const hollow = new WeakSet(), marked = [];
+  const view = { l: area.x - scrollX, t: area.y - scrollY };
+  const outside = (r) => r.width > 0 && r.height > 0 &&
+    (r.right < view.l || r.left > view.l + area.w || r.bottom < view.t || r.top > view.t + area.h);
   try {
     shotLib ??= import(SHOT_LIB);
     const { domToCanvas } = await shotLib;
@@ -98,7 +111,29 @@ async function capture(area, mark) {
       // cross-origin image is drawn as a grey box instead of failing (and logging) one by one.
       fetchFn: async (url) => (new URL(url, location.href).origin === location.origin ? false : FOREIGN_IMG),
       backgroundColor: getComputedStyle(document.body).backgroundColor,
-      filter: (n) => !(n instanceof Element && n.classList.contains("fb")),
+      filter: (n) => {
+        if (n instanceof Element && n.classList.contains("fb")) return false;
+        // Under a lifted dialog the page is dimmed almost black: leave it out.
+        if (lifted && n.parentNode === document.body && n !== lifted) return false;
+        if (hollow.has(n.parentNode)) return false;
+        if (n instanceof HTMLElement && n.parentNode !== document.documentElement) {
+          // Not drawn at all (the hidden tabs of a profile are thousands of elements).
+          if (n.tagName !== "STYLE" && !n.getClientRects().length && getComputedStyle(n).display === "none") return false;
+          const r = n.getBoundingClientRect();
+          if (outside(r)) {
+            hollow.add(n);
+            n.dataset.fbHollow = `${r.width} ${r.height}`; // read back by the copy below
+            marked.push(n);
+          }
+        }
+        return true;
+      },
+      onCloneEachNode: (c) => {
+        if (!c.dataset?.fbHollow) return;
+        const [w, h] = c.dataset.fbHollow.split(" ");
+        delete c.dataset.fbHollow;
+        Object.assign(c.style, { boxSizing: "border-box", width: `${w}px`, height: `${h}px`, minWidth: "0", minHeight: "0", maxWidth: "none", maxHeight: "none" });
+      },
       style: { transform: `translate(${-area.x}px, ${-area.y}px)`, transformOrigin: "0 0" },
     });
     const ctx = page.getContext("2d");
@@ -118,6 +153,8 @@ async function capture(area, mark) {
   } catch (e) {
     console.warn("feedback: screenshot failed", e);
     return null;
+  } finally {
+    for (const n of marked) delete n.dataset.fbHollow;
   }
 }
 // Lower the quality, then the size, until the data URL fits the rules' cap.
@@ -610,11 +647,30 @@ function onKey(e) {
 // Feedback mode from inside a modal (the collection's own Feedback button).
 export function startFeedback() { setOn(true); }
 
+// Any other modal dialog (a full-size card, the tier breakdown, an image zoom) blocks the top-bar
+// button, so each one gets its own Feedback button in its corner when it opens.
+function addDialogButtons() {
+  new MutationObserver(() => {
+    for (const d of document.querySelectorAll("dialog[open]")) {
+      if (!d.matches(":modal") || d.querySelector("[data-feedback]")) continue;
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "fb-dialog-btn";
+      b.dataset.feedback = "";
+      b.title = "Suggest a change: mark up what's on screen and say what you'd change";
+      b.textContent = "Feedback";
+      b.onclick = (e) => { e.stopPropagation(); setOn(true); };
+      d.append(b);
+    }
+  }).observe(document.body, { subtree: true, attributes: true, attributeFilter: ["open"] });
+}
+
 export function initFeedback() {
   openBtn = document.getElementById("fb-open");
   if (!openBtn) return;
   openBtn.onclick = () => setOn(!on);
   document.addEventListener("keydown", onKey, true);
+  addDialogButtons();
   refresh();
   // Local server only: replay a ticket (?fbreview=FB-XXXXXX, files from scripts/feedback.cjs show).
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) import("./feedback-review.js").then((m) => m.initReview()).catch(() => {});

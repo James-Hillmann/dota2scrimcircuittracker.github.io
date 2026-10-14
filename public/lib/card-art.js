@@ -29,7 +29,11 @@ export function cardArtOptions(hero, owned = []) {
   ].map((x) => ({ ...x, src: absolute(x.src) }));
 }
 export function cardArtwork(hero, choices = {}) {
-  const options = cardArtOptions(hero, String(choices?.art ?? "").startsWith("scr:") ? [choices.art] : []);
+  const screen = String(choices?.art ?? "").startsWith("scr:") ? screenArt(choices.art) : null;
+  const options = cardArtOptions(hero, screen ? [choices.art] : []);
+  // An any-hero screen (event, team, courier) shows on a card with no hero yet, e.g. a preview
+  // on a new account's card.
+  if (!options.length && screen && screen.hero == null) options.push(screen);
   const art = options.find((x) => x.id === (choices?.art ?? null)) ?? options[0];
   if (!art) return null;
   const def = heroArt(typeof hero === "number" ? heroById(hero)?.name : hero);
