@@ -224,6 +224,15 @@ Backfills refill a field for games already synced, from the cached OpenDota matc
 - **Ward maps** are drawn on `public/img/minimap.webp`, lined up by its two fountains against where
   players stand before the horn (both axes 4.25 px per map unit).
 
+## STRATZ (Dota Plus hero levels, in progress)
+
+OpenDota and the Steam Web API have no Dota Plus hero levels, so they're coming from STRATZ's
+GraphQL API (`scripts/stratz/stratz.js`). It needs a token from stratz.com/api: the
+`STRATZ_TOKEN` repository secret in Actions, or `STRATZ_TOKEN=... node ...` locally.
+`scripts/stratz/stratz-probe.js` (the **STRATZ probe** workflow) lists the schema fields that
+look like Dota Plus hero XP or level and checks the token on one player. Nothing reaches the
+site yet; the sync gets the levels once the probe shows where they are.
+
 ## Firebase key
 
 `public/firebase-config.js` is not committed. The Pages workflow writes it from the

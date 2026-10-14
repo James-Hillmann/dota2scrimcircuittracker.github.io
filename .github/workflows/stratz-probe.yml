@@ -1,0 +1,36 @@
+# Run by hand from the Actions tab: lists where STRATZ keeps Dota Plus hero levels and checks
+# the STRATZ_TOKEN secret works. Prints to the log; commits nothing.
+# The Actions tab only offers "Run workflow" once this file is on main, so until then it also
+# runs on pushes to claude/ branches that touch the STRATZ scripts.
+name: STRATZ probe
+
+on:
+  push:
+    branches: ["claude/**"]
+    paths: ["scripts/stratz/**", ".github/workflows/stratz-probe.yml"]
+  workflow_dispatch:
+    inputs:
+      account_id:
+        description: "32-bit Dota account id to test with (blank = first AD2L player)"
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      STRATZ_TOKEN: ${{ secrets.STRATZ_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: No token yet
+        if: env.STRATZ_TOKEN == ''
+        run: echo "::warning::Add a STRATZ_TOKEN repo secret (Settings > Secrets and variables > Actions) to run the probe."
+      - name: Probe STRATZ
+        if: env.STRATZ_TOKEN != ''
+        run: node scripts/stratz/stratz-probe.js ${{ inputs.account_id }}
