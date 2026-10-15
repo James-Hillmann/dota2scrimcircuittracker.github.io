@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(./firebase-debug.log)",
+      "Read(./_site/**)",
+      "Read(./node_modules/**)",
+      "Read(./workers/steam-auth/.wrangler/**)",
+      "Read(./public/_dev/**)",
+      "Read(./test-screenshots/**)",
+      "Read(./package-lock.json)",
+      "Read(./.cache/**)"
+    ]
+  }
+}

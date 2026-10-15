@@ -1,30 +1,51 @@
 # Dota 2 Scrim Circuit Tracker
 
-What the site does: `docs/features.md`. How it's built, synced, deployed and changed (code
-layout, adding a division or season, Firestore rules, feedback tickets): `docs/maintaining.md`.
-Feature ideas and decisions: `docs/ideas/2026-09-28-feature-ideas.md`; the site audit and its
-decisions: `docs/ideas/2026-09-30-site-audit.md`; competitor gaps, fantasy league and build
-order: `docs/ideas/2026-10-11-competitor-gaps.md`; page and element placement: `docs/ideas/2026-10-11-organisation-audit.md`.
+Static site (GitHub Pages) + Firestore + one Cloudflare Worker. No framework, no bundler.
+Vanilla ES modules under `public/`. Tests in `test/` (`npm test`). Dev server: `node server.js` (port 3000).
 
-## Parked: Discord highlight cards
+## Read less (usage)
 
-Liked, not started. Resume only when the user says so.
+- Docs are big. Never read them whole. `grep -n "^## " docs/features.md` for the heading, then read that section only.
+  - `docs/features.md` (68 KB): what each page does. `docs/maintaining.md` (27 KB): layout, sync, deploy, rules.
+  - Ideas and audits are in `docs/ideas/`. Open one only when the task names it.
+- Grep first, read a range second. Don't open a file over ~500 lines in full.
+- Never open (grep only if you must): `public/style.css` (377 KB), `public/lib/abilities-data.js`,
+  `card-art-data.js`, `screen-art-data.js`, `heroes-data.js`, `items-data.js`, `team-logo-data.js` (generated),
+  `public/data/*.json` (synced data), `package-lock.json`. Denied in `.claude/settings.json`: logs, `_site`, `.wrangler`, `_dev`, screenshots.
+- Don't re-explore. Use the map below to go straight to the file.
+- Small edits: no subagents. Use one only for a sweep across many files.
 
-- **Stage 1, webhook (no bot).** A step at the end of `.github/workflows/sync.yml` runs
-  `scripts/discord-post.js`, which posts to `DISCORD_WEBHOOK_URL` (repo secret).
-- **Posts:**
-  - Tier list image per division, only when tiers changed. Lead with movers.
-  - Series highlight image when a series is complete: score, drafts, gold lines, MVP, link.
-  - Weekly recap. Upset alert (winner under ~30% by the model).
-- **Images:** attach a PNG to the webhook and show it with `attachment://card.png`. Render it
-  with satori + resvg, using the site fonts. `public/lib/tiers.js` already runs in Node.
-- **No double posts:** keep a posted-log file committed by the sync.
-- **Test mode:** post to a private channel first. Live posts are public, so the user turns them on.
-- **Stage 2, optional:** slash commands on a serverless interactions endpoint (e.g. a
-  Cloudflare Worker) that reads the published JSON.
-- **Open questions:**
-  - Should the images count unticketed/scrim games? Those live in Firestore, not the synced
-    JSON, and the site's tier list counts them.
-  - Tier posts on every change or weekly? Scrim cards too?
-  - One channel for everything or one per division?
-  - Game pages have no share pages, so their links show no Discord preview.
+## Site map
+
+Router: `route()` in `public/app.js`. Hash URLs. `core.js` is shared helpers and loads first.
+
+| URL | Page file | Notes |
+|---|---|---|
+| `#/` | `app.js` routeHub | league hub |
+| `#/<division>` (champion, heroic, conqueror, warrior, challenger, voyager, explorer) | `pages/standings.js`, `pages/teams.js` | standings, matches, teams grid |
+| `#/<division>/players`, `/player/<id>` | `pages/players.js`, `pages/player.js` | tabs list: `lib/pagetabs.js` |
+| `#/<division>/heroes`, `/hero/<id>` | `pages/heroes.js`, `pages/hero.js` | |
+| `#/<division>/content` (old `/week`) | `pages/week.js` | the Content tab |
+| `#/<division>/game/<id>` | `pages/games.js` | game page |
+| `#/<division>/cards`, `/gallery` | `pages/gallery.js` | |
+| `#/<division>/predict`, `/drafter`, `/upload`, `/edit/<id>` | `pages/predict.js`, `drafter.js`, `upload.js` | load on first visit |
+| fantasy: opened from `pages/predict.js`, not routed in `app.js` | `pages/fantasy.js` | Steam sign-in via Worker |
+| `#/scrims/...` | `pages/games.js` + same pages | scrims, `/match/<id>` |
+| `#/stats`, `#/privacy`, `/<division>/search` | `pages/stats.js`, `privacy.js`, `search.js` | |
+
+Where logic lives:
+- `public/parts/` page pieces shared by pages (feed, tiers, combat, lanes, items, draft, collection, me).
+- `public/lib/` logic with no page code, tested in `test/`. Features by name: see "Where features live" in `docs/maintaining.md` (Code layout).
+- `public/style.css` all styles. Search it with grep for the class name.
+- `workers/steam-auth/src/`: `index.js` (routes), `stats.js`, `scout.js`, `cosmetics.js`, `image-check.js` (Workers AI). Deploy: `npx wrangler deploy` from that folder.
+- `scripts/sync/` AD2L sync. `scripts/deploy/` Pages build. `scripts/feedback.cjs` tickets.
+- `firebase/scrimleague.rules` Firestore rules (see memory: live rules may differ from git).
+- `.github/workflows/`: `sync.yml`, `pages.yml`.
+
+## Docs
+
+What the site does: `docs/features.md`. How it's built, synced, deployed and changed (adding a division or
+season, Firestore rules, feedback tickets): `docs/maintaining.md`. Cosmetics: `docs/cosmetics.md`.
+Ideas: `docs/ideas/2026-09-28-feature-ideas.md`, site audit `2026-09-30-site-audit.md`, competitor gaps and
+fantasy `2026-10-11-competitor-gaps.md`, page placement `2026-10-11-organisation-audit.md`.
+Parked, resume only when the user says so: `docs/ideas/discord-highlight-cards.md`.
