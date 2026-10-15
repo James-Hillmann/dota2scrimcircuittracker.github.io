@@ -216,3 +216,24 @@ test('Greek and Cyrillic modifiers take lower or upper case; only upper is saved
   assert.equal(setProfileBackground(bg,{background:{id:'scr:aaa',sig:{autograph:sig.id,translation:'greek',letterCase:'upper'}}}).profileBackground.sig.letterCase,'upper');
   assert.throws(()=>setProfileBackground(bg,{background:{id:'scr:aaa',sig:{autograph:sig.id,letterCase:1}}}),/upper case/);
 });
+
+test('pictures only go through /cosmetics/post, so the image filter cannot be skipped',async()=>{
+  let vaultCalls=0,aiCalls=0;
+  const env={COSMETICS:{idFromName:()=>'id',get:()=>({fetch:async()=>{vaultCalls++;return Response.json({ok:true});}})},
+    AI:{run:async()=>{aiCalls++;return {response:'SAFE'};}},FIREBASE_WEB_API_KEY:'test'};
+  const send=(path,body)=>cosmeticsRequest(new Request(`https://worker${path}`,{method:'POST',headers:{origin:'http://localhost:3000',authorization:'Bearer t'},body:JSON.stringify(body)}),env,['http://localhost:3000']);
+  const original=globalThis.fetch;
+  try {
+    globalThis.fetch=async()=>Response.json({users:[{localId:'steam:101'}]});
+    // A post or a comment with a picture sent to /cosmetics is refused before the vault.
+    assert.equal((await send('/cosmetics',{action:'post',requestId:'aaaaaaaaaaaaaaaa',images:['AAAA']})).status,400);
+    assert.equal((await send('/cosmetics',{action:'comment',post:'u:1:1',text:'hi',image:'AAAA',requestId:'aaaaaaaaaaaaaaab'})).status,400);
+    // /cosmetics/post's larger size limit is only for posts and comments.
+    assert.equal((await send('/cosmetics/post',{action:'open',requestId:'aaaaaaaaaaaaaaac'})).status,400);
+    assert.equal(vaultCalls,0);assert.equal(aiCalls,0);
+    // Ordinary actions and plain comments still work on /cosmetics.
+    assert.equal((await send('/cosmetics',{action:'session'})).status,200);
+    assert.equal((await send('/cosmetics',{action:'comment',post:'u:1:1',text:'hi',requestId:'aaaaaaaaaaaaaaad'})).status,200);
+    assert.equal(vaultCalls,2);
+  } finally {globalThis.fetch=original;}
+});
