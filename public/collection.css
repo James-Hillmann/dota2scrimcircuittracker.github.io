@@ -283,3 +283,6 @@
 .feed-auto-group{display:inline-flex;flex-wrap:wrap;align-items:center;gap:6px 12px}.feed-auto-note{flex-basis:100%;color:#9f95aa}
 .feed-pull-screen img{width:96px;aspect-ratio:16/9;object-fit:cover;border-radius:6px;border:1px solid var(--rarity)}
 @media(max-width:560px){.feed-pull-screen img{width:64px}}
+/* A Feed card post's rating (parts/card-rating.js), four buttons in a row under the card. */
+.feed-card-rating{padding:0 16px}.feed-card-rating .card-rating-votes{grid-template-columns:repeat(4,minmax(0,1fr))}.feed-card-rating-old{margin:8px 0 0;font-size:11px;color:#8f8797;text-align:center}
+@media(max-width:560px){.feed-card-rating{padding:0 12px}}
