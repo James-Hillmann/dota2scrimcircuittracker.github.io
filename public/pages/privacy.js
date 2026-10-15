@@ -27,7 +27,7 @@ export function renderPrivacy() {
     <p>Firebase gives each browser a random ID, with no name or email, so you can edit or delete what you added. Settings (theme, colour-blind mode, my team, hero grids, the name you last typed) are kept in your browser's own storage. There are no advertising or tracking cookies.</p>
 
     <h2>Visit counts</h2>
-    <p>Page views may be counted with <a href="https://www.goatcounter.com/" target="_blank" rel="noopener">GoatCounter</a>: which page was opened, with no cookies and nothing that identifies you.</p>
+    <p>Page views are counted with <a href="https://www.goatcounter.com/" target="_blank" rel="noopener">GoatCounter</a>: which page was opened, with no cookies and nothing that identifies you.</p>
 
     <h2>Getting something removed</h2>
     <p>Want your name, a prediction, an upload, a cast or a feedback ticket taken down? Ask Fav on the

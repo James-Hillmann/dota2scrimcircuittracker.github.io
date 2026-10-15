@@ -14,6 +14,7 @@ import { cosmeticsRequest } from './cosmetics.js';
 export { CosmeticsVault } from './cosmetics.js';
 import { scoutRequest } from './scout.js';
 export { ScoutStore } from './scout.js';
+import { statsRequest } from './stats.js';
 const STEAM_OPENID = "https://steamcommunity.com/openid/login";
 const STEAM_ID_RE = /^https:\/\/steamcommunity\.com\/openid\/id\/(\d{17})$/;
 const STEAM64_BASE = 76561197960265728n;
@@ -79,6 +80,7 @@ export default {
     const url = new URL(req.url);
     if(url.pathname.startsWith('/cosmetics')) return cosmeticsRequest(req,env,ALLOWED_ORIGINS);
     if(url.pathname === '/scout' || url.pathname.startsWith('/scout/')) return scoutRequest(req,env,ALLOWED_ORIGINS);
+    if (url.pathname === '/stats') return statsRequest(req, env, ALLOWED_ORIGINS);
     if (url.pathname === "/login") {
       const ret = url.searchParams.get("return");
       if (!allowedReturn(ret)) return text("Unknown return page.");

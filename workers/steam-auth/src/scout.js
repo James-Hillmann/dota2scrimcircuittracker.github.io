@@ -56,7 +56,7 @@ export class ScoutStore {
 }
 
 // The Steam account behind a Firebase ID token, or null.
-async function tokenAccount(token, env, referer) {
+export async function tokenAccount(token, env, referer) {
   const r = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${encodeURIComponent(env.FIREBASE_WEB_API_KEY)}`, {
     method: 'POST', headers: { 'Content-Type': 'application/json', Referer: referer }, body: JSON.stringify({ idToken: token }),
   });

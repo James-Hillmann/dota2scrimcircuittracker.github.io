@@ -3,7 +3,7 @@
 // The guided tour's automatic page moves don't count. Off until SITE_CODE is set; GoatCounter
 // itself ignores localhost. To stop counting your own browser, open the site once with
 // #toggle-goatcounter on the end of the address.
-const SITE_CODE = ""; // e.g. "ad2l" for https://ad2l.goatcounter.com
+export const SITE_CODE = "jonahbyu"; // https://jonahbyu.goatcounter.com
 // GoatCounter's versioned script (its plain count.js changes without notice) and its hash: the
 // browser refuses a copy that doesn't match. scripts/gen/cdn-integrity.js refreshes the hash.
 const COUNT_JS = "https://gc.zgo.at/count.v5.js";
@@ -31,7 +31,13 @@ let last = null;
 export function countVisit() {
   if (document.body.classList.contains("touring")) return;
   const path = (location.pathname + location.hash) || "/";
+  if (path.endsWith("#/stats")) return; // Fav reading the counts
   if (path === last) return;
   last = path;
   load()?.then((gc) => gc?.count?.({ path }));
 }
+
+// For Fav's /stats page (pages/stats.js), from GoatCounter's per-day "hourly" arrays:
+// every hour as { day, hour, n }, and the 24-hour profile summed over all days.
+export const hoursOf = (stats) => stats.flatMap(({ day, hourly }) => hourly.map((n, hour) => ({ day, hour, n })));
+export const byHourOfDay = (stats) => stats.reduce((acc, { hourly }) => (hourly.forEach((n, h) => { acc[h] += n; }), acc), Array(24).fill(0));

@@ -355,9 +355,19 @@ npx firebase firestore:delete scrimLeague/data/matches/<id> --project pistachio-
 
 ## Visitor counts
 
-GoatCounter (`public/lib/visits.js`), off until `SITE_CODE` is set: no cookies, no personal data,
-each page change one view (path + route). GoatCounter ignores localhost; open the site once with
-`#toggle-goatcounter` on the end of the address to stop counting your own browser.
+GoatCounter (`public/lib/visits.js`, site code `jonahbyu`, dashboard
+https://jonahbyu.goatcounter.com): no cookies, no personal data, each page change one view (path +
+route). GoatCounter ignores localhost; open the site once with `#toggle-goatcounter` on the end of
+the address to stop counting your own browser. `#/stats` itself isn't counted.
+
+`#/stats` (`public/pages/stats.js`) is Fav's page: every page and route hour by hour (bars, a day ×
+hour table with the numbers, a row per path that opens its own table), for 24 hours to 90 days.
+It asks the Worker's `GET /stats?start=&end=` (`workers/steam-auth/src/stats.js`, Bearer Firebase ID
+token), which answers only the admin account (`ADMIN_ACCOUNT` in `lib/pack-gifts.js`) and reads
+GoatCounter's API with the Worker secret `GOATCOUNTER_TOKEN` (a GoatCounter API key with "Read
+statistics"; `npx wrangler secret put GOATCOUNTER_TOKEN`). The numbers are GoatCounter's visitors
+(one per browser session per page), in the timezone set in GoatCounter's settings. Tests:
+`test/stats.test.js`.
 
 ## OCR test material
 

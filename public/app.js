@@ -460,6 +460,7 @@ export function route() {
   setRoutedAt(location.href);
   if (h === "#/" || /^#\/ad2l\/?$/.test(h)) return routeHub();
   if (h === "#/privacy") return routePrivacy();
+  if (h === "#/stats") return routeStats();
   // #/<division>/..., or #/<division>/<view>/... for a sub-division.
   const [, slug, view] = /^#\/([a-z0-9]+)(?:\/([a-z])(?=\/|$))?/.exec(h) ?? [];
   const key = bySlug[slug];
@@ -603,6 +604,17 @@ function routePrivacy() {
   document.getElementById("div-switch").hidden = true;
   timeBar(null, false);
   return import("./pages/privacy.js").then((m) => m.renderPrivacy());
+}
+
+// Visit counts: Fav only, site-wide like Privacy (pages/stats.js).
+function routeStats() {
+  footSync(null);
+  document.body.dataset.league = "hub";
+  document.getElementById("league-name").innerHTML = "AD2L<b>Stat Tracker</b>";
+  document.getElementById("nav").innerHTML = "";
+  document.getElementById("div-switch").hidden = true;
+  timeBar(null, false);
+  return import("./pages/stats.js").then((m) => m.renderStats());
 }
 
 // The picker page: no tabs, no time machine, and the menu opens each league's first page.

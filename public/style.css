@@ -4498,6 +4498,39 @@ html.cb .cmp-c1 { --pc: #56b4e9; } html.cb .cmp-c2 { --pc: #e69f00; } html.cb .c
 .privacy ul { padding-left: 20px; }
 .privacy li { margin: 6px 0; }
 
+/* ---------- visit counts, Fav only (pages/stats.js) ---------- */
+.stats-page { color: var(--dust); }
+.stats-page h2 { margin: 28px 0 10px; font: 800 22px/1.1 var(--display); letter-spacing: .02em; text-transform: uppercase; color: var(--bone); }
+.stats-page h2 small { font: 400 12px/1 var(--mono); text-transform: none; letter-spacing: 0; color: var(--dim); margin-left: 8px; }
+.stats-page .muted { color: var(--dim); font-size: 13px; }
+.stats-bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }
+.stats-ranges { display: flex; flex-wrap: wrap; gap: 6px; }
+.stats-filter { flex: 1 1 220px; max-width: 360px; padding: 8px 10px; background: var(--stone); color: var(--bone); border: 1px solid var(--seam); font: inherit; }
+.stats-totals { display: flex; flex-wrap: wrap; gap: 12px; margin: 18px 0 0; }
+.stats-totals > div { flex: 1 1 160px; padding: 12px 14px; background: var(--stone); border: 1px solid var(--seam); }
+.stats-totals b { display: block; font: 900 26px/1.1 var(--display); color: var(--bone); }
+.stats-totals span { font: 400 12px/1 var(--mono); color: var(--dim); }
+.stats-bars { display: block; width: 100%; height: 120px; background: var(--stone); }
+.stats-bars rect { fill: var(--accent); }
+.stats-bars rect:hover { fill: var(--bone); }
+.stats-bars .day-line { stroke: var(--seam); stroke-width: .3; vector-effect: non-scaling-stroke; }
+.spark .stats-bars { height: 28px; min-width: 140px; background: none; }
+.stats-grid-wrap { overflow-x: auto; margin-top: 10px; }
+.stats-grid { border-collapse: collapse; font: 400 11px/1 var(--mono); color: var(--bone); }
+.stats-grid th, .stats-grid td { padding: 5px 4px; text-align: center; min-width: 26px; border: 1px solid var(--seam); }
+.stats-grid th { color: var(--dim); font-weight: 400; white-space: nowrap; }
+.stats-grid td { background: rgba(var(--accent-rgb), var(--a, 0)); }
+.stats-grid .sum, .stats-grid tr.sum td { color: var(--accent); font-weight: 700; background: none; }
+.stats-paths { width: 100%; border-collapse: collapse; font-size: 14px; }
+.stats-paths th { text-align: left; font: 400 11px/1 var(--mono); color: var(--dim); padding: 8px 6px; border-bottom: 1px solid var(--seam); }
+.stats-paths td { padding: 7px 6px; border-bottom: 1px solid var(--seam); vertical-align: middle; text-align: left; }
+.stats-paths .n { text-align: right; font-family: var(--mono); color: var(--bone); white-space: nowrap; }
+.stats-paths code { color: var(--bone); word-break: break-all; }
+.stats-path { cursor: pointer; }
+.stats-path:hover, .stats-path.open { background: var(--hover); }
+.stats-detail > td { background: var(--hover); }
+@media (max-width: 640px) { .stats-paths thead th:last-child, .stats-paths .spark { display: none; } }
+
 /* Game tags (lib/gametags.js): outlined chips after a game's meta line or in a Tags column. */
 .gtags { display: inline-flex; flex-wrap: wrap; gap: 4px; margin-left: 6px; vertical-align: 1px; }
 td .gtags, .hist-games .gtags { margin-left: 4px; }
