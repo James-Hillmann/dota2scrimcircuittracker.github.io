@@ -111,6 +111,13 @@ export class CosmeticsVault {
       if(!row)return json({error:'Not found.'},404);
       return new Response(row.bytes,{headers:{'Content-Type':row.type}});
     }
+    // A comment's picture: ?post and ?comment.
+    if(url.pathname==='/cmedia') {
+      const post=url.searchParams.get('post'),comment=url.searchParams.get('comment');
+      const row=isPostId(post)&&post.startsWith('u:')&&/^[a-z0-9]+-\d{1,10}$/.test(comment??'')&&await this.ctx.storage.get(`cmedia:${post}:${comment}`);
+      if(!row)return json({error:'Not found.'},404);
+      return new Response(row.bytes,{headers:{'Content-Type':row.type}});
+    }
     // The Feed (lib/feed.js): FEED_PAGE posts older than ?before, newest first, or the one ?post,
     // each with its reactions and comments, plus the shown nickname of everyone in them. ?account
     // keeps one player's posts (their profile's Feed tab). ?type keeps one kind (FEED_TYPES), and
@@ -266,8 +273,13 @@ export class CosmeticsVault {
           } else if(body.action==='comment') {
             const now=Date.now();
             if(now-(saved.lastCommentAt??0)<COMMENT_GAP)throw new Error('Wait a moment before commenting again.');
-            const {comments,comment,parent}=addComment(await txn.get(`comments:${post}`),{account,text:body.text,at:now,reply:body.reply});
+            const image=body.image==null?null:decodeImage(body.image);
+            const before=await txn.get(`comments:${post}`);
+            const {comments,comment,parent}=addComment(before,{account,text:body.text,at:now,reply:body.reply,image});
             await txn.put(`comments:${post}`,comments);
+            if(image)await txn.put(`cmedia:${post}:${comment.id}`,{type:comment.image.type,bytes:image});
+            // The oldest comments fall off the end of the list; their pictures go with them.
+            for(const gone of (before??[]).filter(c=>c.image&&!comments.some(x=>x.id===c.id)))await txn.delete(`cmedia:${post}:${gone.id}`);
             const notify=(to,kind)=>this.notify(txn,to,{kind,post,from:account,fromName:shownNickname(saved),text:plainMentions(comment.text).slice(0,120),at:now});
             if(parent&&parent.account!==account)await notify(parent.account,'reply');
             if(owner!==account&&owner!==parent?.account)await notify(owner,'comment');
@@ -279,8 +291,10 @@ export class CosmeticsVault {
             await txn.put(`comments:${post}`,comments);
             result={state:saved,post,comments};
           } else {
-            const comments=deleteComment(await txn.get(`comments:${post}`),String(body.comment??''),account,{owner,admin:isAdmin(account)});
+            const before=await txn.get(`comments:${post}`);
+            const comments=deleteComment(before,String(body.comment??''),account,{owner,admin:isAdmin(account)});
             await txn.put(`comments:${post}`,comments);
+            for(const gone of before.filter(c=>c.image&&!comments.find(x=>x.id===c.id)?.image))await txn.delete(`cmedia:${post}:${gone.id}`);
             result={state:saved,post,comments};
           }
         }
@@ -317,6 +331,7 @@ export class CosmeticsVault {
           const stored=await this.postById(post,txn),row=post.startsWith('p:')?`pull:${post.slice(2)}`:`post:${post}`;
           if(!stored)throw new Error('That post is gone.');
           for(let i=0;i<(stored.images?.length??0);i++)await txn.delete(`media:${post}:${i}`);
+          for(const c of await txn.get(`comments:${post}`)??[])if(c.image)await txn.delete(`cmedia:${post}:${c.id}`);
           for(const k of [row,`react:${post}`,`comments:${post}`,`poll:${post}`])await txn.delete(k);
           if(await txn.get('feed-pin')===post)await txn.delete('feed-pin');
           result={state:saved,removed:post};
@@ -391,6 +406,11 @@ export async function cosmeticsRequest(req,env,allowedOrigins) {
     const r=await vault.fetch(`https://vault/media?post=${encodeURIComponent(media[1])}&n=${media[2]}`);
     return new Response(r.body,{status:r.status,headers:{'Content-Type':r.headers.get('content-type'),'Access-Control-Allow-Origin':'*','Cache-Control':r.ok?'public, max-age=31536000, immutable':'no-store','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'none'; sandbox"}});
   }
+  const cmedia=/^\/cosmetics\/cmedia\/(u:\d{1,10}:\d{1,15})\/([a-z0-9]+-\d{1,10})$/.exec(url.pathname.replace(/%3A/gi,':'));
+  if(req.method==='GET' && cmedia) {
+    const r=await vault.fetch(`https://vault/cmedia?post=${encodeURIComponent(cmedia[1])}&comment=${cmedia[2]}`);
+    return new Response(r.body,{status:r.status,headers:{'Content-Type':r.headers.get('content-type'),'Access-Control-Allow-Origin':'*','Cache-Control':r.ok?'public, max-age=31536000, immutable':'no-store','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'none'; sandbox"}});
+  }
   const publicAccount=/^\/cosmetics\/collection\/(\d{1,10})$/.exec(url.pathname)?.[1];
   if(req.method==='GET' && publicAccount) return respond(await vault.fetch(`https://vault/collection?account=${publicAccount}`));
   const ratedAccount=/^\/cosmetics\/ratings\/(\d{1,10})$/.exec(url.pathname)?.[1];
@@ -413,7 +433,7 @@ export async function cosmeticsRequest(req,env,allowedOrigins) {
     const body=await req.text();if(body.length>limit) return respond(json({error:'Request too large.'},413));
     // Images are checked by the AI filter (image-check.js) before the vault sees the post.
     if(url.pathname==='/cosmetics/post') {
-      let images;try {images=JSON.parse(body).images;} catch {return respond(json({error:'Invalid request.'},400));}
+      let images;try {const b=JSON.parse(body);images=b.action==='comment'?(typeof b.image==='string'?[b.image]:[]):b.images;} catch {return respond(json({error:'Invalid request.'},400));}
       try {await checkImages(env.AI,Array.isArray(images)?images.slice(0,MAX_IMAGES):[]);} catch(e) {return respond(json({error:e.message},400));}
     }
     return respond(await vault.fetch(new Request(`https://vault/action?account=${account}`,{method:'POST',headers:{'Content-Type':'application/json'},body})));

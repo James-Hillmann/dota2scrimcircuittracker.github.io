@@ -4,7 +4,7 @@
 // any post. collection.js passes in its swatch drawing and the viewer.
 import { esc, dur, SOURCES, allLoad } from '../core.js';
 import { listCards } from '../lib/store.js';
-import { feedPosts, feedMediaUrl, collectionState, cardRatings, myCardVotes } from '../lib/cosmetics.js';
+import { feedPosts, feedMediaUrl, feedCommentMediaUrl, createFeedComment, collectionState, cardRatings, myCardVotes } from '../lib/cosmetics.js';
 import { designKey } from '../lib/card-ratings.js';
 import { mountRating } from './card-rating.js';
 import { shownNickname } from '../lib/cosmetics-engine.js';
@@ -13,7 +13,7 @@ import { REACTIONS, REACTION_ART, topReaction, rankedReactions, reactionTally, c
 import { screenArt } from '../lib/card-art.js';
 import { playerLine, gameAchievements } from '../lib/highlights.js';
 import { heroImg } from '../lib/hero-meta.js';
-import { composerHtml, wireComposer } from './feed-compose.js';
+import { composerHtml, wireComposer, shrinkImage, base64 } from './feed-compose.js';
 import { dotaEmoticonSrc, dotaEmoticonLabel, emoticonParts, emoticonCompletion, insertEmoticon } from '../lib/dota-emoticons.js';
 import { isAdmin } from '../lib/pack-gifts.js';
 import { createPlayerCards, PAINT_FILTER, wirePlayerCards } from './player-card.js';
@@ -147,12 +147,12 @@ export async function drawFeed(body, { viewer, signIn, action, swatch, colors, t
   // Threads are one level deep (lib/feed.js commentThreads): replies sit under their comment. A
   // removed comment that still has replies shows as a placeholder.
   const commentLineHtml = (p, c) => c.removed ? `<div class="feed-comment feed-comment-removed"><em>Comment removed</em></div>`
-    : `<div class="feed-comment">${who(c.account)} <span class="feed-text">${commentTextHtml(c.text)}</span> ${when(c.at)}${commentReactHtml(p, c)}${me != null ? ` <button type="button" class="link-btn" data-reply-to="${esc(c.id)}">Reply</button>` : ''}${me != null && (c.account === me || p.account === me || admin) ? ' <button type="button" class="link-btn" data-remove>Remove</button>' : ''}${admin && c.account !== me ? ` <button type="button" class="link-btn feed-ban" data-ban="${esc(c.account)}" data-ban-from="comment">Ban</button>` : ''}</div>`;
+    : `<div class="feed-comment">${who(c.account)} ${c.text ? `<span class="feed-text">${commentTextHtml(c.text)}</span>` : ''} ${when(c.at)}${c.image ? `<button type="button" class="feed-comment-image" data-zoom="${esc(feedCommentMediaUrl(p.id, c.id))}" aria-label="Open image"><img src="${esc(feedCommentMediaUrl(p.id, c.id))}" alt="" loading="lazy"></button>` : ''}${commentReactHtml(p, c)}${me != null ? ` <button type="button" class="link-btn" data-reply-to="${esc(c.id)}">Reply</button>` : ''}${me != null && (c.account === me || p.account === me || admin) ? ' <button type="button" class="link-btn" data-remove>Remove</button>' : ''}${admin && c.account !== me ? ` <button type="button" class="link-btn feed-ban" data-ban="${esc(c.account)}" data-ban-from="comment">Ban</button>` : ''}</div>`;
   const threadsHtml = (p) => {
     const threads = commentThreads(p.comments);
     return threads.length ? `<ol>${threads.map((c) => `<li data-comment="${esc(c.id)}">${commentLineHtml(p, c)}${c.replies.length ? `<ol class="feed-replies">${c.replies.map((r) => `<li data-comment="${esc(r.id)}">${commentLineHtml(p, r)}</li>`).join('')}</ol>` : ''}</li>`).join('')}</ol>` : '';
   };
-  const replyFormHtml = (reply = null) => `<form class="feed-reply${reply ? ' feed-reply-thread' : ''}"${reply ? ` data-reply="${esc(reply.id)}"` : ''}><div class="feed-reply-compose"><input name="text" maxlength="${MAX_COMMENT}" placeholder="${reply ? `Reply to ${esc(nameOf(reply.account))}` : 'Add a comment'} · @ to mention, : for emoticons" aria-label="${reply ? 'Write a reply' : 'Add a comment'}" aria-autocomplete="list" aria-expanded="false" autocomplete="off" required><div class="feed-emote-suggest" role="listbox" aria-label="Dota emoticon suggestions" hidden></div></div><button type="submit">${reply ? 'Reply' : 'Post'}</button></form>`;
+  const replyFormHtml = (reply = null) => `<form class="feed-reply${reply ? ' feed-reply-thread' : ''}"${reply ? ` data-reply="${esc(reply.id)}"` : ''}><div class="feed-reply-compose"><input name="text" maxlength="${MAX_COMMENT}" placeholder="${reply ? `Reply to ${esc(nameOf(reply.account))}` : 'Add a comment'} · @ to mention, : for emoticons" aria-label="${reply ? 'Write a reply' : 'Add a comment'}" aria-autocomplete="list" aria-expanded="false" autocomplete="off"><div class="feed-emote-suggest" role="listbox" aria-label="Dota emoticon suggestions" hidden></div></div><label class="feed-reply-image" title="Add an image or GIF"><input type="file" name="image" accept="image/png,image/jpeg,image/webp,image/gif" hidden>Image</label><button type="submit">${reply ? 'Reply' : 'Post'}</button><span class="feed-reply-picked" hidden><img alt=""><button type="button" data-unpick-reply aria-label="Remove image">×</button></span></form>`;
   const commentsHtml = (p) => `<div class="feed-threads">${threadsHtml(p)}</div>
     ${me == null ? '<p class="feed-signin"><button type="button" class="linkish" data-signin>Sign in with Steam</button> to react and comment.</p>' : replyFormHtml()}`;
   const badgesHtml = (list) => list.map((a) => `<span class="feed-badge feed-badge-${a.tier}" title="${esc(a.tip)}">${esc(a.label)}</span>`).join('');
@@ -609,6 +609,8 @@ export async function drawFeed(body, { viewer, signIn, action, swatch, colors, t
       closePickers(); react.disabled = true;
       return reactTo(article, react.dataset.react, comment);
     }
+    const unpick = e.target.closest('[data-unpick-reply]');
+    if (unpick) return clearPicked(unpick.closest('.feed-reply'));
     // Reply opens a box under the thread; replying to a reply joins the same thread.
     const replyTo = e.target.closest('[data-reply-to]');
     if (replyTo) {
@@ -626,15 +628,40 @@ export async function drawFeed(body, { viewer, signIn, action, swatch, colors, t
       refresh(id, 'comments');
     }
   };
+  // A comment's picked image or GIF, per form: { blob, url, draft }.
+  const picked = new WeakMap();
+  const clearPicked = (form) => {
+    const pick = picked.get(form); if (pick) URL.revokeObjectURL(pick.url);
+    picked.delete(form);
+    const chip = form.querySelector('.feed-reply-picked'); if (chip) chip.hidden = true;
+    form.elements.namedItem('image').value = '';
+  };
+  body.onchange = async (e) => {
+    const file = e.target.closest('.feed-reply input[name="image"]'); if (!file) return;
+    const form = file.closest('.feed-reply'), article = form.closest('[data-post]');
+    const f = file.files[0]; if (!f) return;
+    fail(article, '');
+    try {
+      const blob = await shrinkImage(f);
+      const old = picked.get(form); if (old) URL.revokeObjectURL(old.url);
+      const url = URL.createObjectURL(blob);
+      picked.set(form, { blob, url, draft: {} });
+      const chip = form.querySelector('.feed-reply-picked');
+      chip.querySelector('img').src = url; chip.hidden = false;
+    } catch (err) { file.value = ''; fail(article, err.message); }
+  };
   body.onsubmit = async (e) => {
     const form = e.target.closest('.feed-reply'); if (!form) return;
     e.preventDefault();
     const article = form.closest('[data-post]'), id = article.dataset.post, input = form.elements.namedItem('text'), button = form.querySelector('button[type="submit"]');
     button.disabled = true; fail(article, '');
     try {
-      const { text, pings } = mentionsOf(input);
-      const data = await action('comment', { post: id, text, ...(pings.length ? { mentions: pings } : {}), ...(form.dataset.reply ? { reply: form.dataset.reply } : {}) });
+      const { text, pings } = mentionsOf(input), pick = picked.get(form);
+      if (!pick && !text.trim()) throw new Error('Write a comment first.');
+      const details = { post: id, text, ...(pings.length ? { mentions: pings } : {}), ...(form.dataset.reply ? { reply: form.dataset.reply } : {}) };
+      const data = pick ? await createFeedComment(pick.draft, { ...details, image: await base64(pick.blob) }) : await action('comment', details);
       forgetMentions(input);
+      if (pick) clearPicked(form);
       posts.get(id).comments = data.comments;
       if (me != null && !(me in nicknames)) nicknames[me] = shownNickname(data.state);
       if (!form.dataset.reply) { input.value = ''; button.disabled = false; }

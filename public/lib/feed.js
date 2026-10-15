@@ -128,15 +128,24 @@ export function cleanComment(text) {
 // Threads are one level deep: a comment may carry `reply`, the id of the top-level comment it
 // answers. Replying to a reply joins the same thread. `parent` is the comment being answered, so
 // the caller can tell its writer.
-export function addComment(comments, { account, text, at, reply = null }) {
+// `image` is the decoded bytes of one picture or GIF; the comment keeps only its type (the Worker
+// stores the bytes), and may then have no text.
+export function addComment(comments, { account, text, at, reply = null, image = null }) {
   const list = comments ?? [];
+  let media = null;
+  if (image) {
+    const type = imageType(image);
+    if (!type) throw new Error('Images can be JPEG, PNG, GIF or WebP.');
+    if (image.length > MAX_IMAGE_BYTES) throw new Error(`Each image must be under ${Math.round(MAX_IMAGE_BYTES / 1024)} KB.`);
+    media = { type, size: image.length };
+  }
   let parent = null, thread = null;
   if (reply != null && reply !== '') {
     parent = list.find((x) => x.id === String(reply));
     if (!parent || parent.removed) throw new Error('That comment is gone.');
     thread = parent.reply ?? parent.id;
   }
-  const comment = { id: `${at.toString(36)}-${account}`, account, text: cleanComment(text), at, ...(thread ? { reply: thread } : {}) };
+  const comment = { id: `${at.toString(36)}-${account}`, account, text: media && !String(text ?? '').trim() ? '' : cleanComment(text), at, ...(media ? { image: media } : {}), ...(thread ? { reply: thread } : {}) };
   return { comments: [...list, comment].slice(-MAX_COMMENTS), comment, parent };
 }
 // The writer, the post's owner or Fav can remove a comment. One with replies stays as a

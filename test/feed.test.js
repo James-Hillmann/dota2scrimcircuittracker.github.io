@@ -420,3 +420,12 @@ test('vault: poll posts take votes, show them in the feed, and drop them on dele
   await act('101',{action:'post-delete',post:id});
   assert.equal([...rows.keys()].some(k=>k.includes(id)),false);
 });
+
+test('a comment can be a picture or GIF alone; the bytes are checked',()=>{
+  const gif=Uint8Array.from([0x47,0x49,0x46,0x38,0x39,0x61,1,2,3]);
+  const {comment}=addComment([],{account:'1',text:'',at:5,image:gif});
+  assert.equal(comment.text,'');
+  assert.equal(comment.image.type,'image/gif');
+  assert.throws(()=>addComment([],{account:'1',text:'',at:5}),/Write a comment/);
+  assert.throws(()=>addComment([],{account:'1',text:'hi',at:5,image:Uint8Array.from([60,115,118,103])}),/JPEG, PNG, GIF or WebP/);
+});

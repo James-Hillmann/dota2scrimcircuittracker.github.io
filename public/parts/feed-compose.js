@@ -28,7 +28,7 @@ export async function shrinkImage(file) {
   bitmap.close?.();
   throw new Error(`${file.name || 'That image'} is too large even after shrinking.`);
 }
-const base64 = (blob) => new Promise((done, fail) => {
+export const base64 = (blob) => new Promise((done, fail) => {
   const r = new FileReader();
   r.onload = () => done(String(r.result).split(',')[1]); r.onerror = () => fail(new Error('That image could not be read.'));
   r.readAsDataURL(blob);

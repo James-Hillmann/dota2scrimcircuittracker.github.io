@@ -74,6 +74,17 @@ export async function createFeedPost(draft,{text,mentions=[],clip,game,images,po
   if(!r.ok){if(r.status<500)draft.requestId=null;throw new Error(data.error??'Could not post.');}
   draft.requestId=null;state=data.state;return data;
 }
+// A comment with a picture or GIF (base64 image): the same larger-limit path as a post. A lost
+// response isn't retried automatically, so the request ID lives on the draft like createFeedPost.
+export async function createFeedComment(draft,{post,text,mentions=[],reply=null,image}) {
+  const token=await steamIdToken();if(!token)throw new Error('Sign in with Steam to comment.');
+  draft.requestId??=crypto.randomUUID();
+  const r=await fetch(`${COLLECTION_API}/post`,{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},body:JSON.stringify({action:'comment',post,text,...(mentions.length?{mentions}:{}),...(reply?{reply}:{}),image,requestId:draft.requestId})});
+  const data=await r.json().catch(()=>({error:r.status===413?'That image is too large.':'Could not comment.'}));
+  if(!r.ok){if(r.status<500)draft.requestId=null;throw new Error(data.error??'Could not comment.');}
+  draft.requestId=null;state=data.state;return data;
+}
+export const feedCommentMediaUrl=(post,comment)=>`${COLLECTION_API}/cmedia/${encodeURIComponent(post)}/${comment}`;
 export const feedMediaUrl=(post,n)=>`${COLLECTION_API}/media/${encodeURIComponent(post)}/${n}`;
 // The signed-in player's own votes, "<owner>:<design key>" → rating; empty when signed out.
 export async function myCardVotes() {
