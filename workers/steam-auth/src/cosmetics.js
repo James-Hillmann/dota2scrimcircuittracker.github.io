@@ -4,6 +4,7 @@ import { DEFAULT_EQUIPMENT, itemByKey } from '../../../public/lib/cosmetics-cata
 import { isAdmin, giftPacks, clearGifts } from '../../../public/lib/pack-gifts.js';
 import { checkImages } from './image-check.js';
 import { isPostId, postOwner, toggleReaction, reactionTally, addComment, deleteComment, reactToComment, pushNotice, markNoticesSeen, cardPostId, FEED_PAGE, COMMENT_GAP, POST_GAP, MAX_IMAGES, MAX_IMAGE_BYTES, userPostId, buildUserPost, canRemovePost, feedAutoOf, setFeedAuto, pullPost, setFollow, setBan, isBanned, feedTypeOf, feedSortOf, FEED_TYPES, postScore, sortFeed, castPollVote, pollTally } from '../../../public/lib/feed.js';
+import { pingTargets, plainMentions } from '../../../public/lib/mentions.js';
 
 const json=(value,status=200)=>Response.json(value,{status});
 const secureRandom=()=>crypto.getRandomValues(new Uint32Array(1))[0]/4294967296;
@@ -68,6 +69,11 @@ export class CosmeticsVault {
   async postById(id,storage=this.ctx.storage) {
     if(id.startsWith('c:')||id.startsWith('u:')){const p=await storage.get(`post:${id}`);return p&&{id,...p};}
     const p=await storage.get(`pull:${id.slice(2)}`);return p&&{id,kind:'pull',...p};
+  }
+  // A Feed notice (lib/feed.js pushNotice) for a player who has a collection; others never signed in.
+  async notify(txn,to,notice) {
+    const toState=await txn.get(`user:${to}`);
+    if(toState)await txn.put(`user:${to}`,pushNotice(toState,notice));
   }
   async fetch(req) {
     const url=new URL(req.url);
@@ -254,12 +260,11 @@ export class CosmeticsVault {
             if(now-(saved.lastCommentAt??0)<COMMENT_GAP)throw new Error('Wait a moment before commenting again.');
             const {comments,comment,parent}=addComment(await txn.get(`comments:${post}`),{account,text:body.text,at:now,reply:body.reply});
             await txn.put(`comments:${post}`,comments);
-            const notify=async(to,kind)=>{
-              const toState=await txn.get(`user:${to}`);
-              if(toState)await txn.put(`user:${to}`,pushNotice(toState,{kind,post,from:account,fromName:shownNickname(saved),text:comment.text.slice(0,120),at:now}));
-            };
+            const notify=(to,kind)=>this.notify(txn,to,{kind,post,from:account,fromName:shownNickname(saved),text:plainMentions(comment.text).slice(0,120),at:now});
             if(parent&&parent.account!==account)await notify(parent.account,'reply');
             if(owner!==account&&owner!==parent?.account)await notify(owner,'comment');
+            // @mentions (lib/mentions.js): anyone not already told above.
+            for(const to of pingTargets(comment.text,body.mentions,account))if(to!==parent?.account&&to!==owner)await notify(to,'mention');
             result={state:{...saved,lastCommentAt:now},post,comments};
           } else if(body.action==='comment-react') {
             const comments=reactToComment(await txn.get(`comments:${post}`),String(body.comment??''),account,body.emoji);
@@ -281,6 +286,7 @@ export class CosmeticsVault {
           const post=buildUserPost({account,at:now,text:body.text,clip:body.clip,game:body.game,images,poll:body.poll??null});
           await txn.put(`post:${id}`,post);
           for(let i=0;i<images.length;i++)await txn.put(`media:${id}:${i}`,{type:post.images[i].type,bytes:images[i]});
+          for(const to of pingTargets(post.text,body.mentions,account))await this.notify(txn,to,{kind:'mention',post:id,from:account,fromName:shownNickname(saved),text:plainMentions(post.text).slice(0,120),at:now});
           result={state:{...saved,lastPostAt:now},post:{id,...post,...(post.poll?{poll:{...post.poll,votes:pollTally({},post.poll)}}:{}),reactions:{},comments:[]}};
         }
         // A vote on a poll post (lib/feed.js castPollVote): one choice each, changeable until it

@@ -9,6 +9,7 @@
 
 import { DOTA_EMOTICONS, dotaEmoticonLabel, dotaEmoticonSrc } from './dota-emoticons.js';
 import { checkText } from './moderation.js';
+import { plainMentions } from './mentions.js';
 
 const CORE_REACTIONS = ['❤️', '🔥', '😂', '😮', '👏', '💀', '😡', '😢', '😎', '🤦', '😭', '🏳️'];
 // The larger in-game catalog uses its Dota chat code as the stored key. Keeping the original
@@ -118,7 +119,7 @@ export function sortFeed(posts, sort, now) {
 export function cleanComment(text) {
   const clean = String(text ?? '').replace(/\s+/g, ' ').trim();
   if (!clean) throw new Error('Write a comment first.');
-  if (clean.length > MAX_COMMENT) throw new Error(`Keep comments to ${MAX_COMMENT} characters.`);
+  if (plainMentions(clean).length > MAX_COMMENT) throw new Error(`Keep comments to ${MAX_COMMENT} characters.`);
   return checkText(clean);
 }
 // Threads are one level deep: a comment may carry `reply`, the id of the top-level comment it
@@ -188,7 +189,7 @@ export const userPostId = (account, at) => `u:${account}:${at}`;
 export function cleanPostText(text) {
   const clean = String(text ?? '').replace(/\r\n?/g, '\n').split('\n').map((l) => l.replace(/[ \t\f\v]+/g, ' ').trim())
     .join('\n').replace(/\n{3,}/g, '\n\n').trim();
-  if (clean.length > MAX_POST_TEXT) throw new Error(`Keep posts to ${MAX_POST_TEXT} characters.`);
+  if (plainMentions(clean).length > MAX_POST_TEXT) throw new Error(`Keep posts to ${MAX_POST_TEXT} characters.`);
   return checkText(clean);
 }
 

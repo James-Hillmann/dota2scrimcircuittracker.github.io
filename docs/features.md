@@ -717,7 +717,11 @@ play the whole Heroic/Aegis game. Predict's "Your name" bar hides on this tab (F
   **Poll** turns the post into a question with 2 to 6 choices and a time limit (1 hour, 6 hours, 1 day, 3 days or 1 week). Signed-in players pick one choice and can change or take back their vote until it ends; the bars and percentages show once you've voted or it has ended (hover a choice for who picked it). Polls take reactions and comments like any post, and each vote counts a point toward Top and Trending. Delete any of your own posts, saved cards and pulls included. React to a post with a tap (hold for all the Dota emoticons) and
   comment under it. **Comment threads**: **Reply** under any comment (one level; replying to a
   reply joins its thread), and each comment has a small reaction button that works the same
-  way. A comment's writer hears about replies, a post's owner about new comments. The writer,
+  way. A comment's writer hears about replies, a post's owner about new comments. **Mentions**: type **@** in the post box or a comment
+  box and part of a name to pick a roster player or a team (Enter, Tab or click). It shows as a
+  gold link to their page, highlighted when it reaches you. A mentioned player gets a "mentioned
+  you" notice; a team mention reaches everyone on its roster (up to 25 pings). Stored as
+  `@[Name](p:<account>)` / `@[Team](t:<league>:<id>)` (lib/mentions.js). The writer,
   the post's owner or Fav can **Remove** a comment; one with replies shows "Comment removed"
   and goes once its last reply does. **Unfollow** on anyone's post hides all their posts from your Feed;
   the "unfollowed players" list above the feed follows them again. Moderation: posts and

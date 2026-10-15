@@ -18,6 +18,8 @@ import { dotaEmoticonSrc, dotaEmoticonLabel, emoticonParts, emoticonCompletion, 
 import { isAdmin } from '../lib/pack-gifts.js';
 import { createPlayerCards, PAINT_FILTER, wirePlayerCards } from './player-card.js';
 import { steamName } from './me.js';
+import { mentionParts, mentionDirectory } from '../lib/mentions.js';
+import { wireMentions, mentionsOf, forgetMentions } from './feed-mentions.js';
 import { strangerNames } from '../lib/scout.js';
 
 // Loading screens in pull posts, in the colour of the screen pack.
@@ -48,6 +50,7 @@ export async function drawFeed(body, { viewer, signIn, action, swatch, colors, t
   } catch (e) { body.innerHTML = `<p>${esc(e.message)}</p>`; return; }
   if (!body.isConnected || body._feedToken !== token || body.dataset.collectionView !== 'feed') return;
   const me = viewer == null ? null : String(viewer), admin = isAdmin(viewer);
+  const directory = mentionDirectory(teams);
   const roster = new Map(teams.flatMap((t) => t.players.map((p) => [String(p.account_id), { name: p.name, team: t.name, league: t.league }])));
   const renderer = createPlayerCards(matches, { cards: overrides, teams });
   const nicknames = { ...first.nicknames, ...focused?.nicknames };
@@ -129,8 +132,16 @@ export async function drawFeed(body, { viewer, signIn, action, swatch, colors, t
       <div class="feed-react-picker" role="menu" aria-label="Choose a Dota reaction" hidden></div>
     </div>`;
   };
-  const commentTextHtml = (text) => emoticonParts(text).map((part) => typeof part === 'string' ? esc(part)
+  const emoteHtml = (text) => emoticonParts(text).map((part) => typeof part === 'string' ? esc(part)
     : `<img class="feed-inline-emote" src="${dotaEmoticonSrc(part.name)}" alt=":${esc(part.name)}:" title="${esc(dotaEmoticonLabel(part.name))}" loading="lazy">`).join('');
+  // @mentions (lib/mentions.js) open the player's or team's page; ones that reach you stand out.
+  const mentionHtml = (m) => {
+    const team = m.kind === 't' ? teams.find((t) => t.league === m.league && String(t.id) === m.id) : null;
+    const mine = me != null && (m.kind === 'p' ? m.account === me : !!team?.players.some((p) => String(p.account_id) === me));
+    const href = m.kind === 'p' ? `${SOURCES[roster.get(m.account)?.league]?.root ?? '#/all'}/player/${m.account}` : `${SOURCES[m.league]?.root ?? '#/all'}/teams/${m.id}`;
+    return `<a class="feed-mention${mine ? ' feed-mention-me' : ''}" href="${esc(href)}">@${esc(m.name)}</a>`;
+  };
+  const commentTextHtml = (text) => mentionParts(text).map((part) => typeof part === 'string' ? emoteHtml(part) : mentionHtml(part)).join('');
   // Threads are one level deep (lib/feed.js commentThreads): replies sit under their comment. A
   // removed comment that still has replies shows as a placeholder.
   const commentLineHtml = (p, c) => c.removed ? `<div class="feed-comment feed-comment-removed"><em>Comment removed</em></div>`
@@ -139,7 +150,7 @@ export async function drawFeed(body, { viewer, signIn, action, swatch, colors, t
     const threads = commentThreads(p.comments);
     return threads.length ? `<ol>${threads.map((c) => `<li data-comment="${esc(c.id)}">${commentLineHtml(p, c)}${c.replies.length ? `<ol class="feed-replies">${c.replies.map((r) => `<li data-comment="${esc(r.id)}">${commentLineHtml(p, r)}</li>`).join('')}</ol>` : ''}</li>`).join('')}</ol>` : '';
   };
-  const replyFormHtml = (reply = null) => `<form class="feed-reply${reply ? ' feed-reply-thread' : ''}"${reply ? ` data-reply="${esc(reply.id)}"` : ''}><div class="feed-reply-compose"><input name="text" maxlength="${MAX_COMMENT}" placeholder="${reply ? `Reply to ${esc(nameOf(reply.account))}` : 'Add a comment'} · type : for Dota emoticons" aria-label="${reply ? 'Write a reply' : 'Add a comment'}" aria-autocomplete="list" aria-expanded="false" autocomplete="off" required><div class="feed-emote-suggest" role="listbox" aria-label="Dota emoticon suggestions" hidden></div></div><button type="submit">${reply ? 'Reply' : 'Post'}</button></form>`;
+  const replyFormHtml = (reply = null) => `<form class="feed-reply${reply ? ' feed-reply-thread' : ''}"${reply ? ` data-reply="${esc(reply.id)}"` : ''}><div class="feed-reply-compose"><input name="text" maxlength="${MAX_COMMENT}" placeholder="${reply ? `Reply to ${esc(nameOf(reply.account))}` : 'Add a comment'} · @ to mention, : for emoticons" aria-label="${reply ? 'Write a reply' : 'Add a comment'}" aria-autocomplete="list" aria-expanded="false" autocomplete="off" required><div class="feed-emote-suggest" role="listbox" aria-label="Dota emoticon suggestions" hidden></div></div><button type="submit">${reply ? 'Reply' : 'Post'}</button></form>`;
   const commentsHtml = (p) => `<div class="feed-threads">${threadsHtml(p)}</div>
     ${me == null ? '<p class="feed-signin"><button type="button" class="linkish" data-signin>Sign in with Steam</button> to react and comment.</p>' : replyFormHtml()}`;
   const badgesHtml = (list) => list.map((a) => `<span class="feed-badge feed-badge-${a.tier}" title="${esc(a.tip)}">${esc(a.label)}</span>`).join('');
@@ -277,7 +288,7 @@ export async function drawFeed(body, { viewer, signIn, action, swatch, colors, t
     }
   };
   const composer = body.querySelector('.feed-compose');
-  if (composer) wireComposer(composer, { matches, me, badgesHtml, onPosted: (p, state) => {
+  if (composer) wireComposer(composer, { matches, me, badgesHtml, mentions: directory, onPosted: (p, state) => {
     if (!(me in nicknames)) nicknames[me] = shownNickname(state);
     posts.set(p.id, p);
     list.insertAdjacentHTML('afterbegin', postHtml(p));
@@ -506,6 +517,11 @@ export async function drawFeed(body, { viewer, signIn, action, swatch, colors, t
     if (button && ['ArrowUp', 'ArrowDown'].includes(e.key)) { e.preventDefault(); openPicker(button); }
     if (e.key === 'Escape') { closePickers(); button?.focus(); }
   };
+  // The @ suggestions join each comment box the first time it's used.
+  body.addEventListener('focusin', (e) => {
+    const input = e.target.closest('.feed-reply input[name="text"]');
+    if (input) wireMentions(input, directory);
+  });
   body.oninput = (e) => {
     const input = e.target.closest('.feed-reply input[name="text"]');
     if (input) drawSuggestions(input);
@@ -606,7 +622,9 @@ export async function drawFeed(body, { viewer, signIn, action, swatch, colors, t
     const article = form.closest('[data-post]'), id = article.dataset.post, input = form.elements.namedItem('text'), button = form.querySelector('button[type="submit"]');
     button.disabled = true; fail(article, '');
     try {
-      const data = await action('comment', { post: id, text: input.value, ...(form.dataset.reply ? { reply: form.dataset.reply } : {}) });
+      const { text, pings } = mentionsOf(input);
+      const data = await action('comment', { post: id, text, ...(pings.length ? { mentions: pings } : {}), ...(form.dataset.reply ? { reply: form.dataset.reply } : {}) });
+      forgetMentions(input);
       posts.get(id).comments = data.comments;
       if (me != null && !(me in nicknames)) nicknames[me] = shownNickname(data.state);
       if (!form.dataset.reply) { input.value = ''; button.disabled = false; }

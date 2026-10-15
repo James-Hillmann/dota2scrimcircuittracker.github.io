@@ -5,6 +5,7 @@ import { esc, dur } from '../core.js';
 import { createFeedPost } from '../lib/cosmetics.js';
 import { MAX_POST_TEXT, MAX_IMAGES, MAX_IMAGE_BYTES, parseClip, MIN_POLL_OPTIONS, MAX_POLL_OPTIONS, MAX_POLL_OPTION, POLL_HOURS, DEFAULT_POLL_HOURS, buildPoll } from '../lib/feed.js';
 import { highlightableGames, playerLine, gameAchievements } from '../lib/highlights.js';
+import { wireMentions, mentionsOf, forgetMentions } from './feed-mentions.js';
 
 const MAX_SIDE = 1600;
 
@@ -46,7 +47,7 @@ export function composerHtml(matches, me) {
   const games = highlightableGames(matches, me).slice(0, 60);
   return `<form class="feed-compose" novalidate>
     <label class="sr-only" for="feed-compose-text">Write a post</label>
-    <textarea id="feed-compose-text" name="text" maxlength="${MAX_POST_TEXT}" rows="2" placeholder="Share a highlight, a clip or a screenshot…"></textarea>
+    <div class="feed-compose-text"><textarea id="feed-compose-text" name="text" maxlength="${MAX_POST_TEXT}" rows="2" placeholder="Share a highlight, a clip or a screenshot… @ to mention a player or team"></textarea></div>
     <div class="feed-compose-images" hidden></div>
     <div class="feed-compose-extra" data-extra="clip" hidden><input name="clip" type="url" inputmode="url" placeholder="YouTube, Twitch, Streamable, Medal or Allstar link" aria-label="Clip link"></div>
     <div class="feed-compose-extra" data-extra="game" hidden>
@@ -73,7 +74,7 @@ export function composerHtml(matches, me) {
 }
 
 // onPosted(post) gets the new post as the Worker stored it.
-export function wireComposer(form, { matches, me, onPosted, badgesHtml }) {
+export function wireComposer(form, { matches, me, onPosted, badgesHtml, mentions = [] }) {
   const images = [], draft = {};
   const box = form.querySelector('.feed-compose-images'), error = form.querySelector('.feed-compose-error');
   const text = form.elements.namedItem('text'), count = form.querySelector('.feed-compose-count');
@@ -93,6 +94,7 @@ export function wireComposer(form, { matches, me, onPosted, badgesHtml }) {
     }
     changed(); drawImages();
   };
+  wireMentions(text, mentions);
   const autosize = () => { text.style.height = 'auto'; text.style.height = `${Math.min(text.scrollHeight, 320)}px`; };
   text.addEventListener('input', () => {
     autosize(); changed();
@@ -116,7 +118,7 @@ export function wireComposer(form, { matches, me, onPosted, badgesHtml }) {
   const resetPoll = () => {
     choices.innerHTML = Array.from({ length: MIN_POLL_OPTIONS }, (_, i) => pollChoiceHtml(i)).join('');
     form.querySelector('[data-add-choice]').hidden = false;
-    text.placeholder = 'Share a highlight, a clip or a screenshot…';
+    text.placeholder = 'Share a highlight, a clip or a screenshot… @ to mention a player or team';
   };
   const renumber = () => {
     choices.querySelectorAll('li').forEach((li, i) => {
@@ -159,9 +161,10 @@ export function wireComposer(form, { matches, me, onPosted, badgesHtml }) {
     const button = form.querySelector('.feed-compose-post');
     button.disabled = true; button.textContent = 'Posting…';
     try {
-      const data = await createFeedPost(draft, { text: text.value, clip, game: select.value || null, images: await Promise.all(images.map((i) => base64(i.blob))), poll });
+      const { text: body, pings } = mentionsOf(text);
+      const data = await createFeedPost(draft, { text: body, mentions: pings, clip, game: select.value || null, images: await Promise.all(images.map((i) => base64(i.blob))), poll });
       images.splice(0).forEach((i) => URL.revokeObjectURL(i.url));
-      form.reset(); drawImages(); autosize(); count.textContent = '';
+      form.reset(); forgetMentions(text); drawImages(); autosize(); count.textContent = '';
       form.querySelectorAll('[data-extra]').forEach((x) => { x.hidden = true; });
       form.querySelectorAll('[data-toggle]').forEach((x) => x.setAttribute('aria-pressed', 'false'));
       form.querySelector('.feed-compose-badges').innerHTML = '';
