@@ -232,7 +232,8 @@ export class CosmeticsVault {
         // comments; a comment notifies the post's owner, a reply the comment's writer.
         else if(['react','comment','comment-delete','comment-react'].includes(body.action)) {
           const post=String(body.post??''),owner=postOwner(post);
-          if(body.action!=='comment-delete'&&isBanned(await txn.get('feed-bans'),account,Date.now()))throw new Error('Fav has banned you from the Feed.');
+          const kind=body.action==='comment'?'comment':'react';
+          if(body.action!=='comment-delete'&&isBanned(await txn.get('feed-bans'),account,Date.now(),kind))throw new Error(kind==='comment'?'Fav has banned you from commenting.':'Fav has banned you from reacting.');
           if(!await this.postById(post,txn))throw new Error('That post is gone.');
           if(body.action==='react') {
             const reactions=toggleReaction(await txn.get(`react:${post}`),account,body.emoji);
@@ -263,7 +264,7 @@ export class CosmeticsVault {
         // A player's own Feed post: text, images, a clip link and a highlighted game (lib/feed.js).
         else if(body.action==='post') {
           const now=Date.now();
-          if(isBanned(await txn.get('feed-bans'),account,now))throw new Error('Fav has banned you from posting.');
+          if(isBanned(await txn.get('feed-bans'),account,now,'post'))throw new Error('Fav has banned you from posting.');
           if(now-(saved.lastPostAt??0)<POST_GAP)throw new Error('Wait a moment before posting again.');
           if(!Array.isArray(body.images??[]))throw new Error('Choose images to add.');
           const images=(body.images??[]).slice(0,MAX_IMAGES+1).map(decodeImage),id=userPostId(account,now);
@@ -283,13 +284,14 @@ export class CosmeticsVault {
           for(const k of [row,`react:${post}`,`comments:${post}`])await txn.delete(k);
           result={state:saved,removed:post};
         }
-        // Fav bans a player from posting, commenting and reacting, for some days or until lifted.
+        // Fav bans a player from posting, commenting or reacting (body.scope, all three when left
+        // out), for some days or until lifted.
         else if(body.action==='ban') {
           if(!isAdmin(account))throw new Error('Only Fav can ban players.');
           if(String(body.target)===account)throw new Error("You can't ban yourself.");
           const days=body.days==null?null:Number(body.days);
           if(days!=null&&!(Number.isInteger(days)&&days>0&&days<=365))throw new Error('Choose 1 to 365 days.');
-          const bans=setBan(await txn.get('feed-bans'),body.target,body.banned!==false,{at:Date.now(),days});
+          const bans=setBan(await txn.get('feed-bans'),body.target,body.banned!==false,{at:Date.now(),days,...(body.scope==null?{}:{scope:body.scope})});
           await txn.put('feed-bans',bans);
           result={state:saved,bans};
         }

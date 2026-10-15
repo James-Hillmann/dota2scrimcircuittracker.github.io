@@ -187,6 +187,25 @@ test('vault: Fav bans, unbans and removes any post; banned players cannot post o
   assert.equal((await act(ADMIN_ACCOUNT,{action:'post-delete',post:mine})).removed,mine);
   assert.equal([...rows.keys()].some(k=>k.includes(card)||k.includes(mine)),false);
 });
+test('vault: a ban can cover posting, commenting and reacting separately',async()=>{
+  const {ADMIN_ACCOUNT}=await import('../public/lib/pack-gifts.js');
+  const {setBan,isBanned}=await import('../public/lib/feed.js');
+  assert.equal(isBanned({5:{at:0,until:null}},5,1,'react'),true); // rows from before scopes ban everything
+  assert.throws(()=>setBan({},5,true,{at:0,scope:[]}),/Choose what/);
+  const rows=new Map(),storage={get:async k=>structuredClone(rows.get(k)),put:async(k,v)=>rows.set(k,structuredClone(v)),delete:async k=>rows.delete(k),list:async({prefix})=>new Map([...rows].filter(([k])=>k.startsWith(prefix)))};storage.transaction=fn=>fn(storage);
+  const vault=new CosmeticsVault({storage});
+  let n=0;const act=(account,body)=>vault.fetch(new Request(`https://vault/action?account=${account}`,{method:'POST',body:JSON.stringify({requestId:`scope-test-request-${String(++n).padStart(5,'0')}`,...body})})).then(async r=>({status:r.status,...await r.json()}));
+  for(const a of ['101','202',ADMIN_ACCOUNT])await act(a,{action:'session'});
+  const post=(await act('101',{action:'post',text:'hello'})).post.id;
+  assert.equal((await act(ADMIN_ACCOUNT,{action:'ban',target:'202',scope:['comment']})).status,200);
+  assert.match((await act('202',{action:'comment',post,text:'hi'})).error,/commenting/);
+  assert.equal((await act('202',{action:'react',post,emoji:'❤️'})).status,200);
+  assert.equal((await act('202',{action:'post',text:'mine'})).status,200);
+  await act(ADMIN_ACCOUNT,{action:'ban',target:'202',scope:['post','react']});
+  assert.match((await act('202',{action:'react',post,emoji:'❤️'})).error,/reacting/);
+  assert.equal((await act('202',{action:'comment',post,text:'hi'})).status,200);
+  assert.deepEqual((await act(ADMIN_ACCOUNT,{action:'feed-bans'})).bans['202'].scope,['post','react']);
+});
 test('image filter: refuses what the model flags, and fails closed',async()=>{
   const {checkImages,readVerdict}=await import('../workers/steam-auth/src/image-check.js');
   assert.equal(readVerdict(' SAFE.'),'safe');assert.equal(readVerdict('Unsafe'),'unsafe');assert.equal(readVerdict('maybe'),null);

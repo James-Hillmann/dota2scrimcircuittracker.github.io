@@ -34,7 +34,10 @@ export async function collectionAction(action,details={}) {
   const data=await r.json();
   if(!r.ok){if(r.status<500){try {localStorage.removeItem(retryKey);}catch{}pending=null;}throw new Error(data.error??'Could not update your collection.');}
   try {localStorage.removeItem(retryKey);}catch{}
-  pending=null;state=data.state;
+  pending=null;
+  // Read-only actions (Fav's ban list) don't send your collection back; keep the one we have.
+  if(!data.state)return data;
+  state=data.state;
   syncPackOfferClaims(state);
   appearances.set(String(account),cardAppearance(state));
   setPlayerNickname(account,shownNickname(state));

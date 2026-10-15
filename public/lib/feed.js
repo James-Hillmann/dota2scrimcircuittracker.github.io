@@ -250,16 +250,27 @@ export function pullPost(rewards, screens, auto, rarityOf) {
   return items.length || shown.length ? { items, ...(shown.length ? { screens: shown } : {}) } : null;
 }
 
-// Bans: Fav stops a player posting, commenting and reacting. Stored on the vault as one
-// "feed-bans" row: account → { at, until } (until null = until lifted).
-export function setBan(bans, target, banned, { at, days = null } = {}) {
+// Bans: Fav stops a player posting, commenting or reacting, any mix of the three. Stored on the
+// vault as one "feed-bans" row: account → { at, until, scope } (until null = until lifted; a row
+// with no scope, from before scopes, bans all three).
+export const BAN_SCOPES = ['post', 'comment', 'react'];
+export const BAN_LABELS = { post: 'posts', comment: 'comments', react: 'reactions' };
+export function setBan(bans, target, banned, { at, days = null, scope = BAN_SCOPES } = {}) {
   const who = String(target ?? '');
   if (!/^\d{1,10}$/.test(who)) throw new Error('Choose a player.');
   const next = { ...(bans ?? {}) };
-  if (banned) next[who] = { at, until: days ? at + days * 86400000 : null }; else delete next[who];
+  if (!banned) { delete next[who]; return next; }
+  const kinds = BAN_SCOPES.filter((k) => Array.isArray(scope) && scope.includes(k));
+  if (!kinds.length) throw new Error('Choose what to ban them from.');
+  next[who] = { at, until: days ? at + days * 86400000 : null, scope: kinds };
   return next;
 }
-export const isBanned = (bans, account, now) => { const b = bans?.[String(account)]; return !!b && (b.until == null || b.until > now); };
+export const banScope = (b) => (Array.isArray(b?.scope) && b.scope.length ? b.scope : BAN_SCOPES);
+// Banned at all (no kind), or from that kind of action.
+export const isBanned = (bans, account, now, kind = null) => {
+  const b = bans?.[String(account)];
+  return !!b && (b.until == null || b.until > now) && (kind == null || banScope(b).includes(kind));
+};
 
 // Following: everyone in the league is followed to start with. Unfollowing a player hides their
 // posts (their own, saved cards and pulls) from your Feed; following again brings them back.

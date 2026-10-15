@@ -723,8 +723,9 @@ play the whole Heroic/Aegis game. Predict's "Your name" bar hides on this tab (F
   the "unfollowed players" list above the feed follows them again. Moderation: posts and
   comments go through a word filter (slurs and explicit terms, disguises undone; ordinary
   swearing passes), images through an AI check (nudity, real gore, hate symbols), and Fav can
-  delete any post and **Ban** a player from posting, commenting and reacting for some days or
-  until lifted (list with Unban above the feed). **Gallery** sub-tab (`#/<league>/gallery/gallery`) is every saved card
+  delete any post and **Ban** a player (on their post or comment) from posting, commenting or
+  reacting, any mix of the three, for some days or until lifted (list with what each ban covers,
+  Change and Unban above the feed). **Gallery** sub-tab (`#/<league>/gallery/gallery`) is every saved card
   anyone in the league has changed from the default, each with its ratings and the same vote
   buttons as the profile. The other sub-tabs (Packs, Collection, Customize, Recycle;
   `#/<league>/gallery/<tab>`) are your own collection on a full page, the same as the collection

@@ -7,7 +7,7 @@ import { listCards } from '../lib/store.js';
 import { feedPosts, feedMediaUrl, collectionState } from '../lib/cosmetics.js';
 import { shownNickname } from '../lib/cosmetics-engine.js';
 import { itemByKey } from '../lib/cosmetics-catalog.js';
-import { REACTIONS, REACTION_ART, topReaction, reactionTally, commentThreads, MAX_COMMENT, clipEmbed, clipLink, canRemovePost, feedAutoOf, PULL_RARITIES } from '../lib/feed.js';
+import { REACTIONS, REACTION_ART, topReaction, reactionTally, commentThreads, MAX_COMMENT, clipEmbed, clipLink, canRemovePost, feedAutoOf, PULL_RARITIES, BAN_SCOPES, BAN_LABELS, banScope } from '../lib/feed.js';
 import { screenArt } from '../lib/card-art.js';
 import { playerLine, gameAchievements } from '../lib/highlights.js';
 import { heroImg } from '../lib/hero-meta.js';
@@ -61,7 +61,7 @@ export async function drawFeed(body, { viewer, signIn, action, swatch, colors, t
     const other = String(p.account) !== me, out = [];
     if (canRemovePost(p.id, me, admin)) out.push('<button type="button" class="link-btn" data-remove-post>Delete</button>');
     if (other && account == null) out.push(`<button type="button" class="link-btn" data-unfollow="${esc(p.account)}" title="Hide ${esc(nameOf(p.account))}'s posts from your Feed">Unfollow</button>`);
-    if (other && admin) out.push(`<button type="button" class="link-btn feed-ban" data-ban="${esc(p.account)}">Ban</button>`);
+    if (other && admin) out.push(`<button type="button" class="link-btn feed-ban" data-ban="${esc(p.account)}" data-ban-from="post">Ban</button>`);
     return out.length ? ` <span class="feed-tools">${out.join('')}</span>` : '';
   };
 
@@ -111,7 +111,7 @@ export async function drawFeed(body, { viewer, signIn, action, swatch, colors, t
   // Threads are one level deep (lib/feed.js commentThreads): replies sit under their comment. A
   // removed comment that still has replies shows as a placeholder.
   const commentLineHtml = (p, c) => c.removed ? `<div class="feed-comment feed-comment-removed"><em>Comment removed</em></div>`
-    : `<div class="feed-comment">${who(c.account)} <span class="feed-text">${commentTextHtml(c.text)}</span> ${when(c.at)}${commentReactHtml(p, c)}${me != null ? ` <button type="button" class="link-btn" data-reply-to="${esc(c.id)}">Reply</button>` : ''}${me != null && (c.account === me || p.account === me || admin) ? ' <button type="button" class="link-btn" data-remove>Remove</button>' : ''}</div>`;
+    : `<div class="feed-comment">${who(c.account)} <span class="feed-text">${commentTextHtml(c.text)}</span> ${when(c.at)}${commentReactHtml(p, c)}${me != null ? ` <button type="button" class="link-btn" data-reply-to="${esc(c.id)}">Reply</button>` : ''}${me != null && (c.account === me || p.account === me || admin) ? ' <button type="button" class="link-btn" data-remove>Remove</button>' : ''}${admin && c.account !== me ? ` <button type="button" class="link-btn feed-ban" data-ban="${esc(c.account)}" data-ban-from="comment">Ban</button>` : ''}</div>`;
   const threadsHtml = (p) => {
     const threads = commentThreads(p.comments);
     return threads.length ? `<ol>${threads.map((c) => `<li data-comment="${esc(c.id)}">${commentLineHtml(p, c)}${c.replies.length ? `<ol class="feed-replies">${c.replies.map((r) => `<li data-comment="${esc(r.id)}">${commentLineHtml(p, r)}</li>`).join('')}</ol>` : ''}</li>`).join('')}</ol>` : '';
@@ -188,7 +188,14 @@ export async function drawFeed(body, { viewer, signIn, action, swatch, colors, t
     ${me == null ? '<p class="feed-compose-signin"><button type="button" class="linkish" data-signin>Sign in with Steam</button> to post screenshots, clips and your best games.</p>' : composerHtml(matches, me)}`
     : `<div class="feed-head"><h3>${mine ? 'Your feed' : `${esc(nameOf(account))}'s feed`}</h3><p>${mine ? 'Your posts, card designs and pack pulls. Delete any of them here.' : `Posts, card designs and pack pulls by ${esc(nameOf(account))}.`} <a href="${SOURCES[roster.get(account)?.league]?.root ?? '#/all'}/cards">${mine ? 'Write a post in Cards › Feed' : 'The whole league in Cards › Feed'}</a></p></div>
     ${mine ? autoFormHtml(feedAutoOf(collectionState())) : ''}`}
-    <div class="feed-hidden"></div>${admin ? '<div class="feed-bans"></div>' : ''}
+    <div class="feed-hidden"></div>${admin ? `<div class="feed-bans"></div>
+    <dialog class="feed-ban-dialog" aria-label="Ban a player"><form method="dialog">
+      <h4>Ban <span></span></h4>
+      <fieldset><legend>Stop them</legend>${BAN_SCOPES.map((k) => `<label><input type="checkbox" name="${k}"> ${{ post: 'Posting', comment: 'Commenting', react: 'Reacting' }[k]}</label>`).join('')}</fieldset>
+      <label>For <input name="days" type="number" min="1" max="365" step="1" placeholder="until lifted"> days</label>
+      <p class="feed-ban-note" role="alert"></p>
+      <div class="feed-ban-buttons"><button value="cancel" formnovalidate>Cancel</button><button value="ban" class="feed-ban-go">Ban</button></div>
+    </form></dialog>` : ''}
     ${PAINT_FILTER}<div class="feed-list"></div><div class="feed-more" aria-live="polite"></div>
     <dialog class="feed-zoom" aria-label="Image"><form method="dialog"><button aria-label="Close">×</button></form><img alt=""></dialog>`;
   const list = body.querySelector('.feed-list'), moreBox = body.querySelector('.feed-more');
@@ -220,15 +227,40 @@ export async function drawFeed(body, { viewer, signIn, action, swatch, colors, t
     hiddenBox.innerHTML = unfollowed.size ? `<details><summary>${unfollowed.size} unfollowed player${unfollowed.size === 1 ? '' : 's'} hidden from your Feed</summary><ul>${[...unfollowed].map((a) => `<li>${who(a)} <button type="button" class="link-btn" data-follow="${esc(a)}">Follow</button></li>`).join('')}</ul></details>` : '';
   };
   drawHidden();
-  // Fav: who is banned from the Feed, with Unban.
+  // Fav: who is banned from the Feed and from what, with Change and Unban.
   const bansBox = body.querySelector('.feed-bans');
+  let bans = {};
+  const scopeText = (b) => banScope(b).length === BAN_SCOPES.length ? 'everything' : banScope(b).map((k) => BAN_LABELS[k]).join(' and ');
   const drawBans = async () => {
     if (!bansBox) return;
     let data;
     try { data = await action('feed-bans'); } catch (e) { bansBox.innerHTML = `<p>${esc(e.message)}</p>`; return; }
     Object.assign(nicknames, Object.fromEntries(Object.entries(data.nicknames ?? {}).filter(([, v]) => v)));
-    const rows = Object.entries(data.bans ?? {}).filter(([, b]) => b.until == null || b.until > Date.now());
-    bansBox.innerHTML = rows.length ? `<details><summary>${rows.length} player${rows.length === 1 ? '' : 's'} banned from the Feed</summary><ul>${rows.map(([a, b]) => `<li>${who(a)} <small>${b.until ? `until ${new Date(b.until).toLocaleDateString()}` : 'until lifted'}</small> <button type="button" class="link-btn" data-unban="${esc(a)}">Unban</button></li>`).join('')}</ul></details>` : '';
+    bans = data.bans ?? {};
+    const rows = Object.entries(bans).filter(([, b]) => b.until == null || b.until > Date.now());
+    bansBox.innerHTML = rows.length ? `<details><summary>${rows.length} player${rows.length === 1 ? '' : 's'} banned in the Feed</summary><ul>${rows.map(([a, b]) => `<li>${who(a)} <small>from ${scopeText(b)} · ${b.until ? `until ${new Date(b.until).toLocaleDateString()}` : 'until lifted'}</small> <button type="button" class="link-btn" data-ban="${esc(a)}">Change</button> <button type="button" class="link-btn" data-unban="${esc(a)}">Unban</button></li>`).join('')}</ul></details>` : '';
+  };
+  // The ban form: what to stop them doing (ticked from their current ban, plus posting or
+  // commenting when opened from a post or a comment) and for how many days.
+  const banDialog = body.querySelector('.feed-ban-dialog');
+  const openBan = (target, from) => {
+    const form = banDialog.querySelector('form'), f = form.elements, now = bans[target], live = now && (now.until == null || now.until > Date.now());
+    banDialog.querySelector('h4 span').textContent = nameOf(target);
+    for (const k of BAN_SCOPES) f.namedItem(k).checked = live ? banScope(now).includes(k) || k === from : k === from;
+    f.namedItem('days').value = live && now.until ? Math.max(1, Math.ceil((now.until - Date.now()) / 86400000)) : '';
+    banDialog.querySelector('.feed-ban-note').textContent = '';
+    form.onsubmit = async (e) => {
+      if (e.submitter?.value !== 'ban') return;
+      e.preventDefault();
+      const note = banDialog.querySelector('.feed-ban-note'), scope = BAN_SCOPES.filter((k) => f.namedItem(k).checked);
+      const days = f.namedItem('days').value.trim() ? Number(f.namedItem('days').value) : null;
+      if (!scope.length) { note.textContent = 'Tick at least one.'; return; }
+      if (days != null && !(Number.isInteger(days) && days >= 1 && days <= 365)) { note.textContent = 'Enter 1 to 365 days, or leave it empty.'; return; }
+      note.textContent = 'Saving…';
+      try { await action('ban', { target, banned: true, days, scope }); } catch (err) { note.textContent = err.message; return; }
+      banDialog.close(); drawBans();
+    };
+    banDialog.showModal();
   };
   drawBans();
   function add(batch, pinned = false) {
@@ -261,6 +293,7 @@ export async function drawFeed(body, { viewer, signIn, action, swatch, colors, t
   const closePickers = (except = null) => body.querySelectorAll('.feed-react-picker:not([hidden])').forEach((picker) => {
     if (picker === except) return;
     picker.hidden = true;
+    picker.removeAttribute('style');
     picker.replaceChildren(); // don't keep 100 animated GIFs alive for every post
     picker.previousElementSibling?.setAttribute('aria-expanded', 'false');
   });
@@ -298,8 +331,30 @@ export async function drawFeed(body, { viewer, signIn, action, swatch, colors, t
     closePickers(picker);
     if (!picker.childElementCount) picker.innerHTML = REACTIONS.map((e) => reactionButton(e, tally[e] ?? [], 'feed-react-choice')).join('');
     picker.hidden = false; button.setAttribute('aria-expanded', 'true');
+    placePicker(button, picker);
     picker.querySelector('button')?.focus({ preventScroll: true });
   };
+  // Posts clip what spills out of them, so an open picker is fixed to the screen instead: above
+  // its button, or below when there's more room there, kept inside the window. Measured at 0,0
+  // first in case an ancestor makes the fixed box relative to itself.
+  const placePicker = (button, picker) => {
+    const edge = 8, gap = 6;
+    Object.assign(picker.style, { position: 'fixed', top: '0px', left: '0px', right: 'auto', bottom: 'auto', animation: 'none', maxHeight: '' });
+    const origin = picker.getBoundingClientRect(), b = button.getBoundingClientRect();
+    const roomAbove = b.top - gap - edge, roomBelow = innerHeight - b.bottom - gap - edge;
+    const above = origin.height <= roomAbove || roomAbove >= roomBelow, h = Math.min(origin.height, Math.max(80, above ? roomAbove : roomBelow));
+    const left = Math.min(Math.max(edge, b.right - origin.width), innerWidth - edge - origin.width);
+    Object.assign(picker.style, { maxHeight: `${h}px`, top: `${(above ? b.top - gap - h : b.bottom + gap) - origin.top}px`, left: `${left - origin.left}px`, animation: '' });
+  };
+  // A fixed picker would float while the page scrolls under it, so scrolling closes it.
+  const onScroll = (e) => {
+    if (!body.isConnected) return body._feedScroll?.();
+    if (!e.target?.closest?.('.feed-react-picker')) closePickers();
+  };
+  body._feedScroll?.(); // a redraw of the same Feed replaces the last listeners
+  addEventListener('scroll', onScroll, { capture: true, passive: true });
+  addEventListener('resize', onScroll);
+  body._feedScroll = () => { removeEventListener('scroll', onScroll, true); removeEventListener('resize', onScroll); body._feedScroll = null; };
   const refresh = (id, part) => body.querySelectorAll(`[data-post="${CSS.escape(id)}"]`).forEach((article) => {
     const p = posts.get(id);
     if (part === 'reacts') {
@@ -377,15 +432,9 @@ export async function drawFeed(body, { viewer, signIn, action, swatch, colors, t
     if (e.target.closest('[data-more]')) return loadMore();
     if (e.target.closest('[data-signin]')) return signIn();
     const ban = e.target.closest('[data-ban]'), unban = e.target.closest('[data-unban]');
-    if (ban || unban) {
-      const target = ban ? ban.dataset.ban : unban.dataset.unban, article = e.target.closest('[data-post]');
-      let days = null;
-      if (ban) {
-        const answer = prompt(`Ban ${nameOf(target)} from posting, commenting and reacting for how many days? Leave empty to ban until you lift it.`);
-        if (answer == null) return;
-        if (answer.trim()) { days = Number(answer); if (!Number.isInteger(days) || days < 1) { if (article) fail(article, 'Enter a whole number of days.'); return; } }
-      }
-      try { await action('ban', { target, banned: !!ban, days }); } catch (err) { if (article) fail(article, err.message); return; }
+    if (ban) return openBan(ban.dataset.ban, ban.dataset.banFrom ?? null);
+    if (unban) {
+      try { await action('ban', { target: unban.dataset.unban, banned: false }); } catch (err) { bansBox.insertAdjacentHTML('beforeend', `<p>${esc(err.message)}</p>`); return; }
       return drawBans();
     }
     const unfollow = e.target.closest('[data-unfollow]'), follow = e.target.closest('[data-follow]');
