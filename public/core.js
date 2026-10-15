@@ -452,7 +452,8 @@ export function sortableTable(el, columns, rows, sortKey, { toolbar = false, dir
     const sorted = [...rows].sort((a, b) => {
       const x = a[key], y = b[key];
       if (nullsLast && (x == null || y == null)) return x == null ? (y == null ? 0 : 1) : -1;
-      if (typeof x === "string") return dir * -x.localeCompare(y);
+      // Text columns: blanks go last either way (null minus a string is NaN, which jumbles the sort).
+      if (typeof x === "string" || typeof y === "string") return x == null ? (y == null ? 0 : 1) : y == null ? -1 : dir * -String(x).localeCompare(String(y));
       return dir * ((x ?? -Infinity) - (y ?? -Infinity));
     });
     const bar = toolbar ? `<div class="sort-bar">
