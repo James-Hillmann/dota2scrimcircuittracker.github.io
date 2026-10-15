@@ -522,10 +522,14 @@ export async function drawFeed(body, { viewer, signIn, action, swatch, colors, t
     if (e.key === 'Escape') { closePickers(); button?.focus(); }
   };
   // The @ suggestions join each comment box the first time it's used.
-  body.addEventListener('focusin', (e) => {
+  // drawFeed reuses this body, so drop the last render's listener first; otherwise one more stacks
+  // up (holding that whole render) on every redraw, and the oldest directory wins.
+  if (body._feedFocusIn) body.removeEventListener('focusin', body._feedFocusIn);
+  body._feedFocusIn = (e) => {
     const input = e.target.closest('.feed-reply input[name="text"]');
     if (input) wireMentions(input, directory);
-  });
+  };
+  body.addEventListener('focusin', body._feedFocusIn);
   body.oninput = (e) => {
     const input = e.target.closest('.feed-reply input[name="text"]');
     if (input) drawSuggestions(input);
