@@ -10,6 +10,7 @@ import { pageTabs, HEROES_PAGE_TABS } from "../lib/pagetabs.js";
 import { loading, errorBox } from "../parts/lanes.js";
 import { heroRanks } from "../parts/ranks.js";
 import { tierRef } from "../parts/tiers.js";
+import { heroRatings } from "../lib/tiers.js";
 import { heroTierSection, heroPowerSection } from "../parts/herotiers.js";
 
 export async function renderHeroes(src) {
@@ -19,7 +20,10 @@ export async function renderHeroes(src) {
   const matches = all.filter(hasDetails);
   const rows = heroStats(matches);
   const ratings = matches.length ? heroRanks(matches, await tierRef(src)) : null;
-  const ht = ratings && heroTierSection(src, ratings), hp = ratings && heroPowerSection(src, ratings);
+  const ht = ratings && heroTierSection(src, ratings);
+  const model = ratings && await tierRef(src), byPos = new Map();
+  const ratingsAt = (n) => byPos.get(n) ?? byPos.set(n, heroRatings(matches, { model, pos: n })).get(n);
+  const hp = ratings && heroPowerSection(src, ratings, ratingsAt);
   // Captains Mode drafts (AD2L replays) add the by-phase columns and the highlight cards.
   const a = draftAnalysis(all);
   const byHero = new Map(a.games ? a.heroes.map((h) => [h.hero, h]) : []);

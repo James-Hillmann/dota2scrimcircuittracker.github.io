@@ -767,11 +767,12 @@ export function tierList(matches, { minGames = MIN_GAMES, model = null, pos = nu
 // league's model (so a hero rating reads on the same curve as the tier rating). Opponent
 // strength still comes from all the league's games. Returns hero -> players, best first. No
 // minimum games: the rating already pulls small samples toward the average.
-export function heroRatings(matches, { model = null, minGames = MIN_GAMES } = {}) {
+export function heroRatings(matches, { model = null, minGames = MIN_GAMES, pos = null } = {}) {
   model ??= tierModel(matches, { minGames });
   const rows = matches.flatMap(gameRows).map((r) => scoreRow(r, model));
   const teams = teamGames(rows), byHero = new Map();
-  for (const r of rows) (byHero.get(r.p.hero) ?? byHero.set(r.p.hero, []).get(r.p.hero)).push(r);
+  // `pos` (1–5): only the games played there (team strength still from every game).
+  for (const r of rows) if (!pos || r.pos === pos) (byHero.get(r.p.hero) ?? byHero.set(r.p.hero, []).get(r.p.hero)).push(r);
   return new Map([...byHero].map(([hero, rs]) => [hero, scorePlayers(rs, model, { teams })
     .map((p) => { const rating_exact = ratingOf(p.score, model.curve); return { ...p, hero, rating_exact, rating: Math.round(rating_exact), curve: model.curve }; })
     .sort((a, b) => b.score - a.score)]));

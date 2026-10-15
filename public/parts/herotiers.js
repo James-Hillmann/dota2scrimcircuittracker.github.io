@@ -10,7 +10,7 @@ import { tierBreakdown, tenths, meter } from "./tiers.js";
 const SHOWN = 24; // chips per band before "+N more"
 // open = tiers shown in full; cards = cards whose breakdown is open
 const st = { role: "all", min: HERO_TIER_MIN, hero: "", open: new Set(), cards: new Set() };
-const hs = { min: MIN_GAMES, open: new Set(), cards: new Set() };
+const hs = { pos: 0, min: MIN_GAMES, open: new Set(), cards: new Set() };
 
 // The S–D board: one band per tier, the first SHOWN chips, then a "+N more" toggle. An open
 // card always shows, even past the cut.
@@ -93,13 +93,14 @@ function heroBreakdown(src, h, curve) {
 }
 
 // The heroes themselves. `ratings` = heroRatings for the page's games.
-export function heroPowerSection(src, ratings) {
+// `ratingsAt(pos)` = heroRatings for just that position (1–5).
+export function heroPowerSection(src, ratings, ratingsAt) {
   const steps = [1, 2, 3, 5, 10];
   let min = floorFor(hs.min, [...ratings.values()].map((ps) => ps.reduce((s, p) => s + p.games, 0)), steps);
   const draw = () => {
     const el = document.getElementById("hero-power");
     if (!el) return;
-    const list = heroPowerList(ratings, { minGames: min });
+    const list = heroPowerList(hs.pos ? ratingsAt(hs.pos) : ratings, { minGames: min });
     const bands = list.tiers.map(({ tier, heroes }) => ({ tier, items: heroes }));
     const total = bands.reduce((n, b) => n + b.items.length, 0);
     const chip = (h, i) => {
@@ -114,10 +115,12 @@ export function heroPowerSection(src, ratings) {
         ${caret(open)}${open ? heroBreakdown(src, h, list.curve) : ""}
       </div>`;
     };
-    el.innerHTML = `<div class="row segs hchip-bar"><label class="min-bar">Heroes picked at least ${minSelect("hp-min", steps, min)} times</label></div>
-      ${total ? board(bands, chip, hs.open, (h) => hs.cards.has(h.hero)) : `<p class="table-note keep">No hero has ${min}+ games yet.</p>`}
+    const seg = (k, label) => `<button type="button" class="seg${hs.pos === k ? " on" : ""}" data-pos="${k}">${label}</button>`;
+    el.innerHTML = `<div class="row segs hchip-bar">${seg(0, "All")}${[1, 2, 3, 4, 5].map((n) => seg(n, `Pos ${n}`)).join("")}<label class="min-bar">Heroes picked at least ${minSelect("hp-min", steps, min)} times</label></div>
+      ${total ? board(bands, chip, hs.open, (h) => hs.cards.has(h.hero)) : `<p class="table-note keep">No hero has ${min}+ games${hs.pos ? ` at position ${hs.pos}` : ""} yet.</p>`}
       <p class="table-note">${total} hero${total === 1 ? "" : "es"}. Rating: the average hero rating of everyone who played it (weighted by games, padded with ${K_HERO} average games), on a curve fitted to the heroes. It ranks how well players do on the hero, not its win rate.</p>`;
     el.querySelector("#hp-min").onchange = (e) => { hs.min = min = +e.target.value; draw(); };
+    el.querySelectorAll(".seg").forEach((b) => (b.onclick = () => { hs.pos = +b.dataset.pos; draw(); }));
     wireMore(el, hs.open, draw);
     wireCards(el, hs.cards, draw);
   };

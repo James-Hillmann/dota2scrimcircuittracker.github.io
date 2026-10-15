@@ -136,3 +136,12 @@ test("heroPowerList: heroes by padded games-weighted hero rating, on a curve, at
   assert.ok(heroes.every((h) => h.of === heroes.length));
   assert.equal(heroPowerList(ratings, { minGames: 1 }).tiers.flatMap((t) => t.heroes).length, 11);
 });
+
+test("heroRatings: pos keeps only that position's games", () => {
+  const games = [0, 1, 2, 3].map((i) => game(i));
+  const model = tierModel(games);
+  for (const pos of [1, 2, 3, 4, 5]) {
+    const all = [...heroRatings(games, { model, pos }).values()].flat();
+    assert.ok(all.length && all.every((p) => p.pos === pos));
+  }
+});

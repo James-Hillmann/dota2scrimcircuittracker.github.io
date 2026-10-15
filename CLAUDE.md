@@ -21,6 +21,11 @@ Vanilla ES modules under `public/`. Tests in `test/` (`npm test`). Dev server: `
 - Skip the preview, screenshot and browser loop when a change isn't visual (logic, data, workers, docs, tests).
   Run `npm test` or the relevant script instead.
 
+## Testing
+
+- Keep the dev server (`scrim-league`, localhost:3000) running at all times. Start it at the beginning of work if it's down. Never stop it.
+- After any change the user can see, end with clickable localhost links to the exact pages to test, e.g. http://localhost:3000/#/all/heroes?tab=tiers.
+
 ## Site map
 
 Router: `route()` in `public/app.js`. Hash URLs. `core.js` is shared helpers and loads first.
