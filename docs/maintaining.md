@@ -291,7 +291,7 @@ from them; max 4 × 700 KB), served at `GET /cosmetics/media/<post>/<n>` sandbox
 for good. Posting goes to `POST /cosmetics/post` (larger size limit than `/cosmetics`); the
 Worker first runs each image past Workers AI (`src/image-check.js`, binding `AI`, model
 `@cf/mistralai/mistral-small-3.1-24b-instruct`) and refuses the post if any image is flagged or
-can't be checked. The word filter is `lib/moderation.js`. Bans are the vault's `feed-bans` row,
+can't be checked. A post may carry `poll: {options, ends}` (`lib/feed.js` `buildPoll`); votes are the `poll:<post>` row, account → option index (action `poll-vote`, refused after `ends` and for players banned from reacting), served in the feed as `poll.votes`, one list of accounts per option. The word filter is `lib/moderation.js`. Bans are the vault's `feed-bans` row,
 account → `{at, until, scope}` with scope any of `post`, `comment`, `react` (a row with no scope
 bans all three; Fav: actions `ban` with `scope`, `feed-bans`); unfollows are each player's `unfollowed` list (action
 `follow`). Auto-posts follow each player's `feedAuto` (`lib/feed.js` `feedAutoOf`, action

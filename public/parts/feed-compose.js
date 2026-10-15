@@ -1,9 +1,9 @@
 // The Feed's post box (parts/feed.js): text, up to MAX_IMAGES images (picked, dropped or pasted),
-// a clip link and one of your league games to highlight. Images are shrunk here before upload;
+// a clip link, one of your league games to highlight and a poll (the text is its question). Images are shrunk here before upload;
 // the Worker checks everything again (lib/feed.js buildUserPost).
 import { esc, dur } from '../core.js';
 import { createFeedPost } from '../lib/cosmetics.js';
-import { MAX_POST_TEXT, MAX_IMAGES, MAX_IMAGE_BYTES, parseClip } from '../lib/feed.js';
+import { MAX_POST_TEXT, MAX_IMAGES, MAX_IMAGE_BYTES, parseClip, MIN_POLL_OPTIONS, MAX_POLL_OPTIONS, MAX_POLL_OPTION, POLL_HOURS, DEFAULT_POLL_HOURS, buildPoll } from '../lib/feed.js';
 import { highlightableGames, playerLine, gameAchievements } from '../lib/highlights.js';
 
 const MAX_SIDE = 1600;
@@ -40,6 +40,8 @@ export function gameLabel(m, account) {
   return `${p.team === m.winner ? 'Won' : 'Lost'} · ${p.hero} ${p.kills}/${p.deaths}/${p.assists} vs ${opp ?? 'unknown'}${day ? ` · ${day}` : ''}${m.duration_sec ? ` · ${dur(m.duration_sec)}` : ''}`;
 }
 
+const pollChoiceHtml = (i) => `<li><input name="poll-choice" maxlength="${MAX_POLL_OPTION}" placeholder="Choice ${i + 1}" aria-label="Poll choice ${i + 1}">${i >= MIN_POLL_OPTIONS ? `<button type="button" data-drop-choice aria-label="Remove choice ${i + 1}">×</button>` : ''}</li>`;
+
 export function composerHtml(matches, me) {
   const games = highlightableGames(matches, me).slice(0, 60);
   return `<form class="feed-compose" novalidate>
@@ -51,9 +53,17 @@ export function composerHtml(matches, me) {
       <select name="game" aria-label="Highlight one of your games"><option value="">Pick one of your games…</option>${games.map((m) => `<option value="${esc(m.id)}">${esc(gameLabel(m, me))}</option>`).join('')}</select>
       <p class="feed-compose-badges"></p>
     </div>
+    <div class="feed-compose-extra feed-compose-poll" data-extra="poll" hidden>
+      <ol class="feed-poll-choices">${Array.from({ length: MIN_POLL_OPTIONS }, (_, i) => pollChoiceHtml(i)).join('')}</ol>
+      <div class="feed-poll-setup">
+        <button type="button" class="feed-compose-tool" data-add-choice>+ Add a choice</button>
+        <label>Ends in <select name="poll-hours">${Object.entries(POLL_HOURS).map(([h, label]) => `<option value="${h}"${Number(h) === DEFAULT_POLL_HOURS ? ' selected' : ''}>${label}</option>`).join('')}</select></label>
+      </div>
+    </div>
     <div class="feed-compose-bar">
       <label class="feed-compose-tool" title="Add images (or paste / drop them)"><input type="file" name="files" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden>Image</label>
       <button type="button" class="feed-compose-tool" data-toggle="clip" aria-pressed="false">Clip</button>
+      <button type="button" class="feed-compose-tool" data-toggle="poll" aria-pressed="false">Poll</button>
       <button type="button" class="feed-compose-tool" data-toggle="game" aria-pressed="false"${games.length ? '' : ' disabled title="No league games found for your account"'}>Highlight a game</button>
       <span class="feed-compose-count" aria-live="polite"></span>
       <button type="submit" class="feed-compose-post">Post</button>
@@ -100,13 +110,40 @@ export function wireComposer(form, { matches, me, onPosted, badgesHtml }) {
     const m = matches.find((g) => g.id === select.value);
     form.querySelector('.feed-compose-badges').innerHTML = m ? badgesHtml(gameAchievements(matches, m, me)) || '<small>No badges in this one, but you can still share it.</small>' : '';
   });
+  // The poll: its choices (empty ones are left out) and time limit, or null when the Poll box is shut.
+  const pollBox = form.querySelector('[data-extra="poll"]'), choices = pollBox.querySelector('.feed-poll-choices');
+  const pollOf = () => pollBox.hidden ? null : { options: [...choices.querySelectorAll('input')].map((i) => i.value), hours: Number(form.elements.namedItem('poll-hours').value) };
+  const resetPoll = () => {
+    choices.innerHTML = Array.from({ length: MIN_POLL_OPTIONS }, (_, i) => pollChoiceHtml(i)).join('');
+    form.querySelector('[data-add-choice]').hidden = false;
+    text.placeholder = 'Share a highlight, a clip or a screenshot…';
+  };
+  const renumber = () => {
+    choices.querySelectorAll('li').forEach((li, i) => {
+      const input = li.querySelector('input'); input.placeholder = `Choice ${i + 1}`; input.setAttribute('aria-label', `Poll choice ${i + 1}`);
+      li.querySelector('[data-drop-choice]')?.setAttribute('aria-label', `Remove choice ${i + 1}`);
+    });
+    form.querySelector('[data-add-choice]').hidden = choices.childElementCount >= MAX_POLL_OPTIONS;
+  };
+  pollBox.addEventListener('input', changed);
   form.addEventListener('click', (e) => {
+    if (e.target.closest('[data-add-choice]')) {
+      if (choices.childElementCount < MAX_POLL_OPTIONS) choices.insertAdjacentHTML('beforeend', pollChoiceHtml(choices.childElementCount));
+      renumber(); choices.lastElementChild.querySelector('input').focus(); changed(); return;
+    }
+    const drop = e.target.closest('[data-drop-choice]');
+    if (drop) { drop.closest('li').remove(); renumber(); changed(); return; }
     const unpick = e.target.closest('[data-unpick]');
     if (unpick) { const [img] = images.splice(Number(unpick.dataset.unpick), 1); URL.revokeObjectURL(img.url); changed(); drawImages(); return; }
     const toggle = e.target.closest('[data-toggle]');
     if (toggle) {
       const extra = form.querySelector(`[data-extra="${toggle.dataset.toggle}"]`), open = extra.hidden;
       extra.hidden = !open; toggle.setAttribute('aria-pressed', String(open));
+      if (toggle.dataset.toggle === 'poll') {
+        changed();
+        if (open) { text.placeholder = 'Ask a question…'; choices.querySelector('input').focus(); } else resetPoll();
+        return;
+      }
       if (open) extra.querySelector('input,select').focus();
       else {
         extra.querySelector('input,select').value = ''; changed();
@@ -117,16 +154,18 @@ export function wireComposer(form, { matches, me, onPosted, badgesHtml }) {
   form.addEventListener('submit', async (e) => {
     e.preventDefault(); say('');
     const clip = form.elements.namedItem('clip').value.trim();
-    try { parseClip(clip); } catch (err) { say(err.message); return; }
+    const poll = pollOf();
+    try { parseClip(clip); if (poll) { buildPoll(poll, Date.now()); if (!text.value.trim()) throw new Error("Write the poll's question."); } } catch (err) { say(err.message); return; }
     const button = form.querySelector('.feed-compose-post');
     button.disabled = true; button.textContent = 'Posting…';
     try {
-      const data = await createFeedPost(draft, { text: text.value, clip, game: select.value || null, images: await Promise.all(images.map((i) => base64(i.blob))) });
+      const data = await createFeedPost(draft, { text: text.value, clip, game: select.value || null, images: await Promise.all(images.map((i) => base64(i.blob))), poll });
       images.splice(0).forEach((i) => URL.revokeObjectURL(i.url));
       form.reset(); drawImages(); autosize(); count.textContent = '';
       form.querySelectorAll('[data-extra]').forEach((x) => { x.hidden = true; });
       form.querySelectorAll('[data-toggle]').forEach((x) => x.setAttribute('aria-pressed', 'false'));
       form.querySelector('.feed-compose-badges').innerHTML = '';
+      resetPoll();
       onPosted(data.post, data.state);
     } catch (err) { say(err.message); }
     button.disabled = false; button.textContent = 'Post';

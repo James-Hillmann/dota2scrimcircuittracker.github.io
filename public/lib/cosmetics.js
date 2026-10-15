@@ -66,10 +66,10 @@ export async function feedPosts({before=null,post=null,account=null,type='all',s
 // A player's own Feed post (lib/feed.js buildUserPost). Images are base64 and can be megabytes,
 // so this skips collectionAction's stored retry key: the request ID lives on the draft object, so
 // pressing Post again after a lost response can't post twice.
-export async function createFeedPost(draft,{text,clip,game,images}) {
+export async function createFeedPost(draft,{text,clip,game,images,poll=null}) {
   const token=await steamIdToken();if(!token)throw new Error('Sign in with Steam to post.');
   draft.requestId??=crypto.randomUUID();
-  const r=await fetch(`${COLLECTION_API}/post`,{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},body:JSON.stringify({action:'post',text,clip,game,images,requestId:draft.requestId})});
+  const r=await fetch(`${COLLECTION_API}/post`,{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},body:JSON.stringify({action:'post',text,clip,game,images,...(poll?{poll}:{}),requestId:draft.requestId})});
   const data=await r.json().catch(()=>({error:r.status===413?'Those images are too large.':'Could not post.'}));
   if(!r.ok){if(r.status<500)draft.requestId=null;throw new Error(data.error??'Could not post.');}
   draft.requestId=null;state=data.state;return data;

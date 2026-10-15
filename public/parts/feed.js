@@ -9,7 +9,7 @@ import { designKey } from '../lib/card-ratings.js';
 import { mountRating } from './card-rating.js';
 import { shownNickname } from '../lib/cosmetics-engine.js';
 import { itemByKey } from '../lib/cosmetics-catalog.js';
-import { REACTIONS, REACTION_ART, topReaction, rankedReactions, reactionTally, commentThreads, MAX_COMMENT, clipEmbed, clipLink, canRemovePost, feedAutoOf, PULL_RARITIES, BAN_SCOPES, BAN_LABELS, banScope, FEED_TYPES, FEED_SORTS } from '../lib/feed.js';
+import { REACTIONS, REACTION_ART, topReaction, rankedReactions, reactionTally, commentThreads, MAX_COMMENT, clipEmbed, clipLink, canRemovePost, feedAutoOf, PULL_RARITIES, BAN_SCOPES, BAN_LABELS, banScope, FEED_TYPES, FEED_SORTS, pollOpen, pollTimeLeft } from '../lib/feed.js';
 import { screenArt } from '../lib/card-art.js';
 import { playerLine, gameAchievements } from '../lib/highlights.js';
 import { heroImg } from '../lib/hero-meta.js';
@@ -162,10 +162,28 @@ export async function drawFeed(body, { viewer, signIn, action, swatch, colors, t
     const thumb = clip.site === 'youtube' ? `<img src="https://i.ytimg.com/vi/${clip.id}/hqdefault.jpg" alt="" loading="lazy">` : '';
     return `<button type="button" class="feed-clip" data-play-clip="${esc(embed)}" aria-label="Play the ${site} clip">${thumb}<span class="feed-clip-play">▶</span><small>${site} clip</small></button>`;
   }
+  // A poll: before you vote (and while it runs) each choice is a button; once you've voted, or it
+  // has ended, the bars show how the votes fell. Tapping your choice again takes your vote back.
+  function pollHtml(p) {
+    const poll = p.poll, votes = poll.votes ?? poll.options.map(() => []), total = votes.reduce((n, l) => n + l.length, 0);
+    const open = pollOpen(poll, Date.now()), mine = me == null ? -1 : votes.findIndex((l) => l.includes(me));
+    const shown = !open || mine >= 0, top = Math.max(...votes.map((l) => l.length));
+    return `<div class="feed-poll${shown ? ' feed-poll-shown' : ''}${open ? '' : ' feed-poll-ended'}" role="group" aria-label="Poll">
+      ${poll.options.map((o, i) => {
+        const n = votes[i].length, pct = total ? Math.round(100 * n / total) : 0;
+        const tip = n ? ` title="${esc(votes[i].map(nameOf).join(', '))}"` : '';
+        const inner = `<span class="feed-poll-bar" style="width:${shown ? pct : 0}%"></span><span class="feed-poll-label">${mine === i ? '<b aria-hidden="true">✓</b> ' : ''}${commentTextHtml(o)}</span>${shown ? `<span class="feed-poll-pct">${pct}%</span>` : ''}`;
+        const cls = `feed-poll-choice${mine === i ? ' feed-poll-mine' : ''}${shown && n && n === top ? ' feed-poll-top' : ''}`;
+        return open ? `<button type="button" class="${cls}" data-poll-vote="${i}" aria-pressed="${mine === i}"${tip}>${inner}</button>` : `<div class="${cls}"${tip}>${inner}</div>`;
+      }).join('')}
+      <p class="feed-poll-foot">${total} vote${total === 1 ? '' : 's'} · ${open ? `${pollTimeLeft(poll, Date.now())}${mine >= 0 ? ' · tap your choice again to take back your vote' : ''}` : `Final results · ended ${when(poll.ends)}`}</p>
+    </div>`;
+  }
   const postTextHtml = (text) => text ? `<p class="feed-post-text">${commentTextHtml(text).replace(/\n/g, '<br>')}</p>` : '';
   function userPostHtml(p) {
     const imgs = p.images ?? [];
     return `${postTextHtml(p.text)}
+      ${p.poll ? pollHtml(p) : ''}
       ${p.game ? gameHtml(p) : ''}
       ${p.clip ? clipHtml(p.clip) : ''}
       ${imgs.length ? `<div class="feed-images feed-images-${imgs.length}">${imgs.map((_, i) => `<button type="button" data-zoom="${esc(feedMediaUrl(p.id, i))}" aria-label="Open image ${i + 1}"><img src="${esc(feedMediaUrl(p.id, i))}" alt="" loading="lazy"></button>`).join('')}</div>` : ''}`;
@@ -175,7 +193,7 @@ export async function drawFeed(body, { viewer, signIn, action, swatch, colors, t
     if (p.kind === 'user') {
       return `<article class="feed-post feed-user${pinned ? ' feed-pinned' : ''}" data-post="${esc(p.id)}" data-account="${esc(p.account)}" style="--rarity:#6f6280">
       ${pinned ? '<p class="feed-pin-note">From your notifications</p>' : ''}
-      <header>${who(p.account)} <span>${p.game ? 'highlighted a game' : p.clip ? 'shared a clip' : p.images?.length ? 'posted' : 'wrote'}</span> ${when(p.at)}${toolsHtml(p)}</header>
+      <header>${who(p.account)} <span>${p.poll ? 'started a poll' : p.game ? 'highlighted a game' : p.clip ? 'shared a clip' : p.images?.length ? 'posted' : 'wrote'}</span> ${when(p.at)}${toolsHtml(p)}</header>
       <div class="feed-user-body">${userPostHtml(p)}</div>
       <div class="feed-user-foot"><div class="feed-reacts" role="group" aria-label="Reactions">${reactsHtml(p)}</div>${reactionControlHtml(p)}</div>
       <div class="feed-comments">${commentsHtml(p)}</div>
@@ -544,6 +562,14 @@ export async function drawFeed(body, { viewer, signIn, action, swatch, colors, t
     if (e.target.closest('[data-remove-post]')) {
       if (!confirm('Delete this post? Its images, reactions and comments go too.')) return;
       try { await action('post-delete', { post: id }); posts.delete(id); article.remove(); } catch (err) { fail(article, err.message); }
+      return;
+    }
+    const vote = e.target.closest('[data-poll-vote]');
+    if (vote) {
+      if (me == null) return signIn();
+      article.querySelectorAll('[data-poll-vote]').forEach((b) => { b.disabled = true; });
+      try { p.poll = { ...p.poll, votes: (await action('poll-vote', { post: id, option: Number(vote.dataset.pollVote) })).votes }; } catch (err) { fail(article, err.message); }
+      body.querySelectorAll(`[data-post="${CSS.escape(id)}"] .feed-poll`).forEach((box) => { box.outerHTML = pollHtml(p); });
       return;
     }
     const main = e.target.closest('[data-react-main]');

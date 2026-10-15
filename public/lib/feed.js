@@ -93,6 +93,7 @@ export const FEED_TYPES = Object.freeze({
   clips: { label: 'Clips', match: (p) => p.kind === 'user' && !!p.clip },
   games: { label: 'Games', match: (p) => p.kind === 'user' && !!p.game },
   images: { label: 'Screenshots', match: (p) => p.kind === 'user' && !!p.images?.length },
+  polls: { label: 'Polls', match: (p) => p.kind === 'user' && !!p.poll },
   cards: { label: 'Card designs', match: (p) => p.kind === 'card' },
   pulls: { label: 'Pack pulls', match: (p) => p.kind === 'pull' },
 });
@@ -100,10 +101,11 @@ export const FEED_TYPES = Object.freeze({
 export const FEED_SORTS = Object.freeze({ new: 'Newest', trending: 'Trending', top: 'Top' });
 export const feedTypeOf = (t) => Object.hasOwn(FEED_TYPES, t) ? t : 'all';
 export const feedSortOf = (s) => Object.hasOwn(FEED_SORTS, s) ? s : 'new';
-// A post's score: one point per player who reacted, however many emojis they picked, and two per comment.
-export function postScore(rawReactions, comments) {
+// A post's score: one point per player who reacted, however many emojis they picked, one per poll
+// vote, and two per comment.
+export function postScore(rawReactions, comments, pollVotes = null) {
   const reactors = Object.values(rawReactions ?? {}).filter((list) => list?.length).length;
-  return reactors + 2 * (comments ?? []).filter((c) => !c.removed).length;
+  return reactors + Object.keys(pollVotes ?? {}).length + 2 * (comments ?? []).filter((c) => !c.removed).length;
 }
 export const trendScore = (score, at, now) => score / Math.pow(Math.max(0, now - at) / 3600000 + 2, 1.5);
 // Sorts posts carrying .score (and .at) for one Feed sort. Ties go to the newer post.
@@ -234,9 +236,53 @@ export function imageType(bytes) {
   return null;
 }
 
+// Polls: a player post can carry 2 to MAX_POLL_OPTIONS choices and a time limit. The post's text
+// is the question. Votes are their own "poll:<post>" row, account → the option picked; a player
+// can change or take back their vote until the poll ends.
+export const MIN_POLL_OPTIONS = 2;
+export const MAX_POLL_OPTIONS = 6;
+export const MAX_POLL_OPTION = 80;
+// The time limits offered, in hours: label for the post box.
+export const POLL_HOURS = Object.freeze({ 1: '1 hour', 6: '6 hours', 24: '1 day', 72: '3 days', 168: '1 week' });
+export const DEFAULT_POLL_HOURS = 24;
+export function buildPoll(raw, at) {
+  if (raw == null) return null;
+  if (!Array.isArray(raw.options)) throw new Error('Add the poll\'s choices.');
+  const options = raw.options.map((o) => String(o ?? '').replace(/\s+/g, ' ').trim()).filter(Boolean);
+  if (options.length < MIN_POLL_OPTIONS) throw new Error(`Give the poll at least ${MIN_POLL_OPTIONS} choices.`);
+  if (options.length > MAX_POLL_OPTIONS) throw new Error(`Polls can have up to ${MAX_POLL_OPTIONS} choices.`);
+  if (options.some((o) => o.length > MAX_POLL_OPTION)) throw new Error(`Keep each choice to ${MAX_POLL_OPTION} characters.`);
+  if (new Set(options.map((o) => o.toLowerCase())).size < options.length) throw new Error('Each choice must be different.');
+  options.forEach(checkText);
+  const hours = Number(raw.hours);
+  if (!Object.hasOwn(POLL_HOURS, hours)) throw new Error('Choose how long the poll runs.');
+  return { options, ends: at + hours * 3600000 };
+}
+export const pollOpen = (poll, now) => !!poll && now < poll.ends;
+// Picking the option you already picked takes your vote back; null takes it back too.
+export function castPollVote(votes, account, option, poll, now) {
+  if (!poll) throw new Error('That post has no poll.');
+  if (!pollOpen(poll, now)) throw new Error('This poll has ended.');
+  const next = { ...(votes ?? {}) };
+  if (option == null || next[account] === option) { delete next[account]; return next; }
+  if (!Number.isInteger(option) || option < 0 || option >= poll.options.length) throw new Error('Choose one of the poll\'s choices.');
+  next[account] = option;
+  return next;
+}
+// For each option, the accounts that picked it.
+export const pollTally = (votes, poll) => poll.options.map((_, i) => Object.entries(votes ?? {}).filter(([, o]) => o === i).map(([a]) => a));
+// "3h left", "2d left", "Ended".
+export function pollTimeLeft(poll, now) {
+  const left = poll.ends - now;
+  if (left <= 0) return 'Ended';
+  const m = Math.ceil(left / 60000);
+  return m < 60 ? `${m}m left` : m < 1440 ? `${Math.round(m / 60)}h left` : `${Math.round(m / 1440)}d left`;
+}
+
 // The stored post, from what the browser sent. images is the decoded bytes of each image.
-export function buildUserPost({ account, at, text, clip, game, images = [] }) {
-  const body = cleanPostText(text), parsed = parseClip(clip);
+export function buildUserPost({ account, at, text, clip, game, images = [], poll = null }) {
+  const body = cleanPostText(text), parsed = parseClip(clip), built = buildPoll(poll, at);
+  if (built && !body) throw new Error('Write the poll\'s question.');
   if (images.length > MAX_IMAGES) throw new Error(`Add up to ${MAX_IMAGES} images.`);
   const media = images.map((bytes) => {
     const type = imageType(bytes);
@@ -246,8 +292,8 @@ export function buildUserPost({ account, at, text, clip, game, images = [] }) {
   });
   const match = game == null || game === '' ? null : String(game);
   if (match != null && !/^\d{1,20}$/.test(match)) throw new Error('Choose one of your games.');
-  if (!body && !parsed && !match && !media.length) throw new Error('Write something, or add an image, clip or game.');
-  return { kind: 'user', account, at, text: body, ...(parsed ? { clip: parsed } : {}), ...(match ? { game: match } : {}), ...(media.length ? { images: media } : {}) };
+  if (!body && !parsed && !match && !media.length && !built) throw new Error('Write something, or add an image, clip or game.');
+  return { kind: 'user', account, at, text: body, ...(parsed ? { clip: parsed } : {}), ...(match ? { game: match } : {}), ...(media.length ? { images: media } : {}), ...(built ? { poll: built } : {}) };
 }
 // The poster can remove any of their own posts (saved cards and pulls included); Fav can remove any post.
 export function canRemovePost(id, account, admin = false) {

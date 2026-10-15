@@ -709,12 +709,12 @@ play the whole Heroic/Aegis game. Predict's "Your name" bar hides on this tab (F
   Gallery captions, and your profile title reads "Nickname (in-game name)". Plain text, up to 24.
 - **Gallery** (nav tab in every league, `#/<league>/gallery`; `/cards` still works):
   opens on the **Feed**: player posts, newly saved cards and pack pulls (what each player
-  auto-posts; see Profile Feed), newest first. **Show** filters to one kind (posts, clips, games, screenshots, card designs, pack pulls) and **Newest / Trending / Top** sorts: Top by score (one point per player who reacted, two per comment), Trending by that score fading with age (lib/feed.js sortFeed; the Worker sorts before paging). Profile Feeds have the same bar. Signed in, the post box takes text (Dota emoticon codes work), up to 4 images (pick,
+  auto-posts; see Profile Feed), newest first. **Show** filters to one kind (posts, clips, games, screenshots, polls, card designs, pack pulls) and **Newest / Trending / Top** sorts: Top by score (one point per player who reacted, two per comment), Trending by that score fading with age (lib/feed.js sortFeed; the Worker sorts before paging). Profile Feeds have the same bar. Signed in, the post box takes text (Dota emoticon codes work), up to 4 images (pick,
   paste or drop; shrunk in the browser), a clip link (YouTube, Twitch and Streamable play in the
   post behind a play button; Medal and Allstar show as a link) and **Highlight a game**: one of
   your league games, shown with hero, K/D/A, result and badges worked out from the season's data
   (Rampage, Ultra kill, League-best and Career-high kills/KDA/GPM/damage/last hits, Deathless).
-  Delete any of your own posts, saved cards and pulls included. React to a post with a tap (hold for all the Dota emoticons) and
+  **Poll** turns the post into a question with 2 to 6 choices and a time limit (1 hour, 6 hours, 1 day, 3 days or 1 week). Signed-in players pick one choice and can change or take back their vote until it ends; the bars and percentages show once you've voted or it has ended (hover a choice for who picked it). Polls take reactions and comments like any post, and each vote counts a point toward Top and Trending. Delete any of your own posts, saved cards and pulls included. React to a post with a tap (hold for all the Dota emoticons) and
   comment under it. **Comment threads**: **Reply** under any comment (one level; replying to a
   reply joins its thread), and each comment has a small reaction button that works the same
   way. A comment's writer hears about replies, a post's owner about new comments. The writer,

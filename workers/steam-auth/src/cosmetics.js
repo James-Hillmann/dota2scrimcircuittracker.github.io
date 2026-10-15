@@ -3,7 +3,7 @@ import { designKey, castVote, tally } from '../../../public/lib/card-ratings.js'
 import { DEFAULT_EQUIPMENT, itemByKey } from '../../../public/lib/cosmetics-catalog.js';
 import { isAdmin, giftPacks, clearGifts } from '../../../public/lib/pack-gifts.js';
 import { checkImages } from './image-check.js';
-import { isPostId, postOwner, toggleReaction, reactionTally, addComment, deleteComment, reactToComment, pushNotice, markNoticesSeen, cardPostId, FEED_PAGE, COMMENT_GAP, POST_GAP, MAX_IMAGES, MAX_IMAGE_BYTES, userPostId, buildUserPost, canRemovePost, feedAutoOf, setFeedAuto, pullPost, setFollow, setBan, isBanned, feedTypeOf, feedSortOf, FEED_TYPES, postScore, sortFeed } from '../../../public/lib/feed.js';
+import { isPostId, postOwner, toggleReaction, reactionTally, addComment, deleteComment, reactToComment, pushNotice, markNoticesSeen, cardPostId, FEED_PAGE, COMMENT_GAP, POST_GAP, MAX_IMAGES, MAX_IMAGE_BYTES, userPostId, buildUserPost, canRemovePost, feedAutoOf, setFeedAuto, pullPost, setFollow, setBan, isBanned, feedTypeOf, feedSortOf, FEED_TYPES, postScore, sortFeed, castPollVote, pollTally } from '../../../public/lib/feed.js';
 
 const json=(value,status=200)=>Response.json(value,{status});
 const secureRandom=()=>crypto.getRandomValues(new Uint32Array(1))[0]/4294967296;
@@ -125,8 +125,8 @@ export class CosmeticsVault {
         posts=[...cards,...pulls].filter(FEED_TYPES[type].match);
         if(sort==='new')posts=posts.filter(p=>p.at<before).sort((a,b)=>b.at-a.at);
         else {
-          const reacts=await this.ctx.storage.list({prefix:'react:'}),comments=await this.ctx.storage.list({prefix:'comments:'});
-          for(const p of posts)p.score=postScore(reacts.get(`react:${p.id}`),comments.get(`comments:${p.id}`));
+          const reacts=await this.ctx.storage.list({prefix:'react:'}),comments=await this.ctx.storage.list({prefix:'comments:'}),polls=await this.ctx.storage.list({prefix:'poll:'});
+          for(const p of posts)p.score=postScore(reacts.get(`react:${p.id}`),comments.get(`comments:${p.id}`),polls.get(`poll:${p.id}`));
           posts=sortFeed(posts,sort,Date.now()).slice(offset);
         }
       }
@@ -135,6 +135,7 @@ export class CosmeticsVault {
       for(const p of posts) {
         p.reactions=reactionTally(await this.ctx.storage.get(`react:${p.id}`));
         p.comments=await this.ctx.storage.get(`comments:${p.id}`)??[];
+        if(p.poll)p.poll={...p.poll,votes:pollTally(await this.ctx.storage.get(`poll:${p.id}`),p.poll)};
         for(const a of [p.account,...p.comments.map(c=>c.account)])if(!(a in nicknames))nicknames[a]=shownNickname(await this.ctx.storage.get(`user:${a}`));
       }
       return json({posts,more,nicknames});
@@ -189,6 +190,7 @@ export class CosmeticsVault {
           if(old.action==='react')return {...old.result,state:saved,reactions:reactionTally(await txn.get(`react:${old.result.post}`))};
           if(old.action==='post')return {state:saved,post:await this.postById(old.result.post,txn)};
           if(old.action==='post-delete')return {state:saved,removed:old.result.post};
+          if(old.action==='poll-vote'){const p=await this.postById(old.result.post,txn);return {state:saved,post:old.result.post,votes:p?.poll?pollTally(await txn.get(`poll:${old.result.post}`),p.poll):[]};}
           if(['comment','comment-delete','comment-react'].includes(old.action))return {...old.result,state:saved,comments:await txn.get(`comments:${old.result.post}`)??[]};
           return {...old.result,state:saved};
         }
@@ -276,10 +278,22 @@ export class CosmeticsVault {
           if(now-(saved.lastPostAt??0)<POST_GAP)throw new Error('Wait a moment before posting again.');
           if(!Array.isArray(body.images??[]))throw new Error('Choose images to add.');
           const images=(body.images??[]).slice(0,MAX_IMAGES+1).map(decodeImage),id=userPostId(account,now);
-          const post=buildUserPost({account,at:now,text:body.text,clip:body.clip,game:body.game,images});
+          const post=buildUserPost({account,at:now,text:body.text,clip:body.clip,game:body.game,images,poll:body.poll??null});
           await txn.put(`post:${id}`,post);
           for(let i=0;i<images.length;i++)await txn.put(`media:${id}:${i}`,{type:post.images[i].type,bytes:images[i]});
-          result={state:{...saved,lastPostAt:now},post:{id,...post,reactions:{},comments:[]}};
+          result={state:{...saved,lastPostAt:now},post:{id,...post,...(post.poll?{poll:{...post.poll,votes:pollTally({},post.poll)}}:{}),reactions:{},comments:[]}};
+        }
+        // A vote on a poll post (lib/feed.js castPollVote): one choice each, changeable until it
+        // ends. Banned from reacting means banned from voting.
+        else if(body.action==='poll-vote') {
+          const post=String(body.post??''),now=Date.now();
+          if(!isPostId(post)||!post.startsWith('u:'))throw new Error('Choose a poll.');
+          if(isBanned(await txn.get('feed-bans'),account,now,'react'))throw new Error('Fav has banned you from voting.');
+          const stored=await txn.get(`post:${post}`);
+          if(!stored)throw new Error('That post is gone.');
+          const votes=castPollVote(await txn.get(`poll:${post}`),account,body.option??null,stored.poll,now);
+          await txn.put(`poll:${post}`,votes);
+          result={state:saved,post,votes:pollTally(votes,stored.poll)};
         }
         // The poster removes their post; Fav removes any (a saved card's or a pull's too), with its
         // images, reactions and comments.
@@ -289,7 +303,7 @@ export class CosmeticsVault {
           const stored=await this.postById(post,txn),row=post.startsWith('p:')?`pull:${post.slice(2)}`:`post:${post}`;
           if(!stored)throw new Error('That post is gone.');
           for(let i=0;i<(stored.images?.length??0);i++)await txn.delete(`media:${post}:${i}`);
-          for(const k of [row,`react:${post}`,`comments:${post}`])await txn.delete(k);
+          for(const k of [row,`react:${post}`,`comments:${post}`,`poll:${post}`])await txn.delete(k);
           result={state:saved,removed:post};
         }
         // Fav bans a player from posting, commenting or reacting (body.scope, all three when left
@@ -324,7 +338,7 @@ export class CosmeticsVault {
         if(['equip','card-settings','nickname'].includes(body.action)) await txn.put(`appearance:${account}`,cardAppearance(result.state));
         const openedAt=Date.now();
         // Feed receipts keep only the post: its comments can be long and are read fresh anyway.
-        await txn.put(receipt,{action:body.action,result:['react','comment','comment-delete','comment-react'].includes(body.action)?{post:result.post}:body.action==='post'?{post:result.post.id}:body.action==='post-delete'?{post:result.removed}:result,...(body.action==='open'?{openedAt,packType:saved.packs[body.packIndex]}:{})});
+        await txn.put(receipt,{action:body.action,result:['react','comment','comment-delete','comment-react','poll-vote'].includes(body.action)?{post:result.post}:body.action==='post'?{post:result.post.id}:body.action==='post-delete'?{post:result.removed}:result,...(body.action==='open'?{openedAt,packType:saved.packs[body.packIndex]}:{})});
         const pull=body.action==='open'&&autoPullRow(saved,account,openedAt,saved.packs[body.packIndex],result);
         if(pull)await txn.put(pullKey(openedAt,account,body.requestId),pull);
         return result;

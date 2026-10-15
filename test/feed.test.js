@@ -357,3 +357,36 @@ test('vault: auto-post settings decide card and pull posts; a profile reads one 
   assert.equal((await act('202',{action:'post-delete',post:cardId})).status,200);
   assert.equal((await feed('')).posts.length,0);
 });
+test('polls: 2 to 6 distinct choices, a set time limit, one changeable vote until it ends',async()=>{
+  const {buildPoll,castPollVote,pollTally,pollTimeLeft,buildUserPost}=await import('../public/lib/feed.js');
+  const poll=buildPoll({options:[' Axe ','Pudge',''],hours:6},1000);
+  assert.deepEqual(poll,{options:['Axe','Pudge'],ends:1000+6*3600000});
+  assert.throws(()=>buildPoll({options:['only'],hours:6},0),/at least 2/);
+  assert.throws(()=>buildPoll({options:['a','b','c','d','e','f','g'],hours:6},0),/up to 6/);
+  assert.throws(()=>buildPoll({options:['a','A'],hours:6},0),/different/);
+  assert.throws(()=>buildPoll({options:['a','b'],hours:5},0),/how long/);
+  assert.throws(()=>buildUserPost({account:'1',at:0,text:'',poll:{options:['a','b'],hours:1}}),/question/);
+  let v=castPollVote(null,'1',0,poll,2000);v=castPollVote(v,'2',1,poll,2000);v=castPollVote(v,'1',1,poll,2000);
+  assert.deepEqual(pollTally(v,poll),[[],['1','2']]);
+  v=castPollVote(v,'1',1,poll,2000);assert.deepEqual(pollTally(v,poll),[[],['2']]);
+  assert.throws(()=>castPollVote(v,'1',2,poll,2000),/choices/);
+  assert.throws(()=>castPollVote(v,'1',0,poll,poll.ends),/ended/);
+  assert.equal(pollTimeLeft(poll,poll.ends-90*60000),'2h left');assert.equal(pollTimeLeft(poll,poll.ends),'Ended');
+});
+test('vault: poll posts take votes, show them in the feed, and drop them on delete',async()=>{
+  const rows=new Map(),storage={get:async k=>structuredClone(rows.get(k)),put:async(k,v)=>rows.set(k,structuredClone(v)),delete:async k=>rows.delete(k),list:async({prefix})=>new Map([...rows].filter(([k])=>k.startsWith(prefix)))};storage.transaction=fn=>fn(storage);
+  const vault=new CosmeticsVault({storage});
+  let n=0;const act=(account,body)=>vault.fetch(new Request(`https://vault/action?account=${account}`,{method:'POST',body:JSON.stringify({requestId:`poll-test-request-${String(++n).padStart(4,'0')}`,...body})})).then(async r=>({status:r.status,...await r.json()}));
+  await act('101',{action:'session'});await act('202',{action:'session'});
+  const made=await act('101',{action:'post',text:'Best carry?',poll:{options:['Medusa','Spectre'],hours:24}});
+  assert.equal(made.status,200);const id=made.post.id;assert.deepEqual(made.post.poll.votes,[[],[]]);
+  assert.deepEqual((await act('202',{action:'poll-vote',post:id,option:1})).votes,[[],['202']]);
+  await act('101',{action:'poll-vote',post:id,option:1});
+  const feed=await (await vault.fetch(new Request('https://vault/feed?type=polls'))).json();
+  assert.equal(feed.posts.length,1);assert.deepEqual(feed.posts[0].poll.votes,[[],['101','202']]);
+  // Ended polls refuse votes.
+  const row=rows.get(`post:${id}`);row.poll.ends=Date.now()-1;rows.set(`post:${id}`,row);
+  assert.match((await act('202',{action:'poll-vote',post:id,option:0})).error,/ended/);
+  await act('101',{action:'post-delete',post:id});
+  assert.equal([...rows.keys()].some(k=>k.includes(id)),false);
+});
