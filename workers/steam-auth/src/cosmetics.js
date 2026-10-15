@@ -432,8 +432,14 @@ export async function cosmeticsRequest(req,env,allowedOrigins) {
     if(Number(req.headers.get('content-length')??0)>limit) return respond(json({error:'Request too large.'},413));
     const body=await req.text();if(body.length>limit) return respond(json({error:'Request too large.'},413));
     // Images are checked by the AI filter (image-check.js) before the vault sees the post.
+    // Anything carrying a picture (a post, or a comment with an image) must come through
+    // /cosmetics/post, so it can't reach the vault from /cosmetics without being checked.
+    let parsed;try {parsed=JSON.parse(body);} catch {parsed=null;}
+    const hasImages=parsed?.action==='post'||(parsed?.action==='comment'&&parsed.image!=null);
+    if(hasImages && url.pathname!=='/cosmetics/post') return respond(json({error:'Invalid request.'},400));
     if(url.pathname==='/cosmetics/post') {
-      let images;try {const b=JSON.parse(body);images=b.action==='comment'?(typeof b.image==='string'?[b.image]:[]):b.images;} catch {return respond(json({error:'Invalid request.'},400));}
+      if(!['post','comment'].includes(parsed?.action)) return respond(json({error:'Invalid request.'},400));
+      const images=parsed.action==='comment'?(typeof parsed.image==='string'?[parsed.image]:[]):parsed.images;
       try {await checkImages(env.AI,Array.isArray(images)?images.slice(0,MAX_IMAGES):[]);} catch(e) {return respond(json({error:e.message},400));}
     }
     return respond(await vault.fetch(new Request(`https://vault/action?account=${account}`,{method:'POST',headers:{'Content-Type':'application/json'},body})));
