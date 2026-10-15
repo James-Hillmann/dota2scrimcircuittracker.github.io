@@ -2,7 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {DEFAULT_EQUIPMENT} from '../public/lib/cosmetics-catalog.js';
 import {existsSync} from 'node:fs';
-import {isPostId,postOwner,toggleReaction,reactionTally,topReaction,cleanComment,addComment,deleteComment,reactToComment,commentThreads,pushNotice,unreadNotices,markNoticesSeen,cardPostId,REACTIONS,REACTION_ART,MAX_COMMENT,MAX_NOTICES,REPOST_WINDOW} from '../public/lib/feed.js';
+import {isPostId,postOwner,toggleReaction,reactionTally,topReaction,rankedReactions,cleanComment,addComment,deleteComment,reactToComment,commentThreads,pushNotice,unreadNotices,markNoticesSeen,cardPostId,REACTIONS,REACTION_ART,MAX_COMMENT,MAX_NOTICES,REPOST_WINDOW} from '../public/lib/feed.js';
 import {DOTA_EMOTICONS,emoticonParts,emoticonCompletion,insertEmoticon} from '../public/lib/dota-emoticons.js';
 import {CosmeticsVault} from '../workers/steam-auth/src/cosmetics.js';
 
@@ -38,6 +38,9 @@ test('only the most-used reaction is featured; heart wins a tie and is the defau
   assert.equal(topReaction({}),null);
   assert.deepEqual(topReaction({'🔥':['1','2'],'❤️':['3','4']}),{emoji:'❤️',count:2});
   assert.deepEqual(topReaction({'🔥':['1','2','3'],'❤️':['4']}),{emoji:'🔥',count:3});
+  // The row under a post shows every reaction, most-used first, ties in picker order.
+  assert.deepEqual(rankedReactions({}),[]);
+  assert.deepEqual(rankedReactions({'😂':['1'],'🔥':['2'],'❤️':['3','4'],'💀':[]}),['❤️','🔥','😂']);
 });
 test('comments: one tidy line, length capped; writer, owner or Fav may remove',()=>{
   assert.equal(cleanComment('  nice\n\n card  '),'nice card');

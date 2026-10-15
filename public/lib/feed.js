@@ -81,6 +81,10 @@ export function topReaction(tally) {
   }
   return top == null ? null : { emoji: top, count };
 }
+// Every reaction a post has, most-used first. Ties follow the picker order.
+export function rankedReactions(tally) {
+  return REACTIONS.filter((e) => tally?.[e]?.length).sort((a, b) => tally[b].length - tally[a].length);
+}
 
 // One line of text: whitespace runs fold to a space; empty or too long is refused.
 export function cleanComment(text) {

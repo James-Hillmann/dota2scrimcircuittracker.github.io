@@ -218,6 +218,7 @@
 .feed-reacts button span{font:600 12px var(--mono,monospace);color:#c4b9cf}
 .feed-reacts button[aria-pressed=true]{border-color:#eac47e;background:color-mix(in srgb,#eac47e 18%,#17131c)}
 .feed-reacts button:disabled{opacity:.7;cursor:default}
+.collection-dialog .feed-reacts .feed-reacts-more,.feed-reacts .feed-reacts-more{color:#c4b9cf;font:600 12px var(--mono,monospace)}.collection-dialog .feed-reacts button[hidden],.feed-reacts button[hidden]{display:none}
 .feed-comments{padding:12px 16px 14px}.feed-comments ol{list-style:none;margin:0 0 10px;padding:0;display:grid;gap:6px}
 .feed-comments li{line-height:1.45;overflow-wrap:anywhere}.feed-comments li time{margin-left:4px}.feed-comments .link-btn{font-size:12px}
 /* Comment threads: one level of replies, each comment with a small reaction button (parts/feed.js). */

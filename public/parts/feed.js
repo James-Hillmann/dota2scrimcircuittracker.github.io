@@ -9,7 +9,7 @@ import { designKey } from '../lib/card-ratings.js';
 import { mountRating } from './card-rating.js';
 import { shownNickname } from '../lib/cosmetics-engine.js';
 import { itemByKey } from '../lib/cosmetics-catalog.js';
-import { REACTIONS, REACTION_ART, topReaction, reactionTally, commentThreads, MAX_COMMENT, clipEmbed, clipLink, canRemovePost, feedAutoOf, PULL_RARITIES, BAN_SCOPES, BAN_LABELS, banScope } from '../lib/feed.js';
+import { REACTIONS, REACTION_ART, topReaction, rankedReactions, reactionTally, commentThreads, MAX_COMMENT, clipEmbed, clipLink, canRemovePost, feedAutoOf, PULL_RARITIES, BAN_SCOPES, BAN_LABELS, banScope } from '../lib/feed.js';
 import { screenArt } from '../lib/card-art.js';
 import { playerLine, gameAchievements } from '../lib/highlights.js';
 import { heroImg } from '../lib/hero-meta.js';
@@ -75,12 +75,26 @@ export async function drawFeed(body, { viewer, signIn, action, swatch, colors, t
     const mine = me != null && list.includes(me), art = REACTION_ART[e];
     return `<button type="button" class="${cls}" data-react="${e}" aria-label="${art?.label ?? e}${list.length ? `, ${list.length}` : ''}" aria-pressed="${mine}"${list.length ? ` title="${esc(list.map(nameOf).join(', '))}"` : ''}>${reactionIcon(e)}${list.length ? `<span>${list.length}</span>` : ''}</button>`;
   };
-  // Keep the post compact: only its most-used reaction is shown below the media. All choices
-  // remain in the hold picker; ties follow REACTIONS order, where heart is first.
-  const reactsHtml = (p) => {
-    const top = topReaction(p.reactions);
-    return top ? reactionButton(top.emoji, p.reactions[top.emoji]) : '';
+  // Every reaction on the post, most-used first. fitReacts caps the row at two lines.
+  const reactsHtml = (p) => rankedReactions(p.reactions).map((e) => reactionButton(e, p.reactions[e])).join('');
+  // Past two lines, the last chips hide behind a "+N" chip that shows them all.
+  const fitReacts = (box) => {
+    box.querySelector('[data-reacts-more]')?.remove();
+    const chips = [...box.querySelectorAll('[data-react]')];
+    chips.forEach((c) => { c.hidden = false; });
+    if (box.dataset.open || !chips.length) return;
+    const tops = [...new Set(chips.map((c) => c.offsetTop))];
+    if (tops.length <= 2) return;
+    const more = document.createElement('button');
+    more.type = 'button'; more.dataset.reactsMore = ''; more.className = 'feed-reacts-more';
+    box.append(more);
+    let shown = chips.filter((c) => c.offsetTop <= tops[1]);
+    chips.filter((c) => !shown.includes(c)).forEach((c) => { c.hidden = true; });
+    const label = () => { const n = chips.length - shown.length; more.textContent = `+${n}`; more.setAttribute('aria-label', `Show ${n} more reactions`); };
+    label();
+    while (more.offsetTop > tops[1] && shown.length) { shown.pop().hidden = true; label(); }
   };
+  const fitAllReacts = () => body.querySelectorAll('.feed-reacts').forEach(fitReacts);
   // The button shows your reaction on the post: the one you picked last, else heart. A tap
   // toggles the reaction it shows. Holding it opens all the Dota reactions. A comment's button
   // works the same way but falls back to its most-used reaction, so a tap adds to the crowd.
@@ -243,6 +257,7 @@ export async function drawFeed(body, { viewer, signIn, action, swatch, colors, t
     posts.set(p.id, p);
     list.insertAdjacentHTML('afterbegin', postHtml(p));
     mountCardRatings();
+    fitAllReacts();
     moreBox.querySelector('p:only-child')?.remove();
   } });
   let oldest = Infinity, more = false, loading = false;
@@ -299,6 +314,7 @@ export async function drawFeed(body, { viewer, signIn, action, swatch, colors, t
     }
     wirePlayerCards(list, { openOnCard: true });
     mountCardRatings();
+    fitAllReacts();
   }
   const drawMore = () => { moreBox.innerHTML = more ? '<button type="button" data-more>Load more</button>' : posts.size ? '<p>You reached the start of the feed.</p>' : account != null ? '<p>No posts yet.</p>' : '<p>Nothing here yet. Write the first post, save a card design or open a pack.</p>'; };
   async function loadMore() {
@@ -379,12 +395,14 @@ export async function drawFeed(body, { viewer, signIn, action, swatch, colors, t
   };
   body._feedScroll?.(); // a redraw of the same Feed replaces the last listeners
   addEventListener('scroll', onScroll, { capture: true, passive: true });
-  addEventListener('resize', onScroll);
-  body._feedScroll = () => { removeEventListener('scroll', onScroll, true); removeEventListener('resize', onScroll); body._feedScroll = null; };
+  const onResize = (e) => { onScroll(e); if (body.isConnected) fitAllReacts(); };
+  addEventListener('resize', onResize);
+  body._feedScroll = () => { removeEventListener('scroll', onScroll, true); removeEventListener('resize', onResize); body._feedScroll = null; };
   const refresh = (id, part) => body.querySelectorAll(`[data-post="${CSS.escape(id)}"]`).forEach((article) => {
     const p = posts.get(id);
     if (part === 'reacts') {
-      article.querySelector('.feed-reacts').innerHTML = reactsHtml(p);
+      const box = article.querySelector('.feed-reacts');
+      box.innerHTML = reactsHtml(p); fitReacts(box);
       article.querySelector('.feed-react-control:not(.feed-comment-react)').outerHTML = reactionControlHtml(p);
     } else if (part === 'comments') article.querySelector('.feed-threads').innerHTML = threadsHtml(p);
     else {
@@ -456,6 +474,8 @@ export async function drawFeed(body, { viewer, signIn, action, swatch, colors, t
     if (!e.target.closest('.feed-reply-compose')) closeSuggestions();
     if (!e.target.closest('.feed-react-control')) closePickers();
     if (e.target.closest('[data-more]')) return loadMore();
+    const reactsMore = e.target.closest('[data-reacts-more]');
+    if (reactsMore) { const box = reactsMore.parentElement; box.dataset.open = 'true'; return fitReacts(box); }
     if (e.target.closest('[data-signin]')) return signIn();
     const ban = e.target.closest('[data-ban]'), unban = e.target.closest('[data-unban]');
     if (ban) return openBan(ban.dataset.ban, ban.dataset.banFrom ?? null);
