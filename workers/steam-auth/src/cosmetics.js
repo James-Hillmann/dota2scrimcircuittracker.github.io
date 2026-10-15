@@ -3,7 +3,7 @@ import { designKey, castVote, tally } from '../../../public/lib/card-ratings.js'
 import { DEFAULT_EQUIPMENT, itemByKey } from '../../../public/lib/cosmetics-catalog.js';
 import { isAdmin, giftPacks, clearGifts } from '../../../public/lib/pack-gifts.js';
 import { checkImages } from './image-check.js';
-import { isPostId, postOwner, toggleReaction, reactionTally, addComment, deleteComment, reactToComment, pushNotice, markNoticesSeen, cardPostId, FEED_PAGE, COMMENT_GAP, POST_GAP, MAX_IMAGES, MAX_IMAGE_BYTES, userPostId, buildUserPost, canRemovePost, feedAutoOf, setFeedAuto, pullPost, setFollow, setBan, isBanned } from '../../../public/lib/feed.js';
+import { isPostId, postOwner, toggleReaction, reactionTally, addComment, deleteComment, reactToComment, pushNotice, markNoticesSeen, cardPostId, FEED_PAGE, COMMENT_GAP, POST_GAP, MAX_IMAGES, MAX_IMAGE_BYTES, userPostId, buildUserPost, canRemovePost, feedAutoOf, setFeedAuto, pullPost, setFollow, setBan, isBanned, feedTypeOf, feedSortOf, FEED_TYPES, postScore, sortFeed } from '../../../public/lib/feed.js';
 
 const json=(value,status=200)=>Response.json(value,{status});
 const secureRandom=()=>crypto.getRandomValues(new Uint32Array(1))[0]/4294967296;
@@ -107,10 +107,12 @@ export class CosmeticsVault {
     }
     // The Feed (lib/feed.js): FEED_PAGE posts older than ?before, newest first, or the one ?post,
     // each with its reactions and comments, plus the shown nickname of everyone in them. ?account
-    // keeps one player's posts (their profile's Feed tab).
+    // keeps one player's posts (their profile's Feed tab). ?type keeps one kind (FEED_TYPES), and
+    // ?sort=top or trending ranks by score (postScore), paged by ?offset instead of ?before.
     if(url.pathname==='/feed') {
       await this.backfillPulls();await this.backfillPosts();
       const one=url.searchParams.get('post'),before=Number(url.searchParams.get('before'))||Infinity,who=url.searchParams.get('account');
+      const type=feedTypeOf(url.searchParams.get('type')),sort=feedSortOf(url.searchParams.get('sort')),offset=Math.max(0,Math.floor(Number(url.searchParams.get('offset'))||0));
       if(who!=null&&!/^\d{1,10}$/.test(who))return json({error:'Invalid account.'},400);
       let posts;
       if(one) {
@@ -120,7 +122,13 @@ export class CosmeticsVault {
         const rows=who==null?[...await this.ctx.storage.list({prefix:'post:'})]:[...await this.ctx.storage.list({prefix:`post:c:${who}:`}),...await this.ctx.storage.list({prefix:`post:u:${who}:`})];
         const cards=rows.map(([k,v])=>({id:k.slice(5),...v}));
         const pulls=[...(await this.ctx.storage.list({prefix:'pull:'}))].map(([k,v])=>({id:`p:${k.slice(5)}`,kind:'pull',...v})).filter(p=>who==null||String(p.account)===who);
-        posts=[...cards,...pulls].filter(p=>p.at<before).sort((a,b)=>b.at-a.at);
+        posts=[...cards,...pulls].filter(FEED_TYPES[type].match);
+        if(sort==='new')posts=posts.filter(p=>p.at<before).sort((a,b)=>b.at-a.at);
+        else {
+          const reacts=await this.ctx.storage.list({prefix:'react:'}),comments=await this.ctx.storage.list({prefix:'comments:'});
+          for(const p of posts)p.score=postScore(reacts.get(`react:${p.id}`),comments.get(`comments:${p.id}`));
+          posts=sortFeed(posts,sort,Date.now()).slice(offset);
+        }
       }
       const more=posts.length>FEED_PAGE;posts=posts.slice(0,FEED_PAGE);
       const nicknames={};

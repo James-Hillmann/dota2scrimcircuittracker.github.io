@@ -86,6 +86,32 @@ export function rankedReactions(tally) {
   return REACTIONS.filter((e) => tally?.[e]?.length).sort((a, b) => tally[b].length - tally[a].length);
 }
 
+// The Feed's filters: which kind of post to show. 'all' shows everything.
+export const FEED_TYPES = Object.freeze({
+  all: { label: 'Everything', match: () => true },
+  posts: { label: 'Posts', match: (p) => p.kind === 'user' },
+  clips: { label: 'Clips', match: (p) => p.kind === 'user' && !!p.clip },
+  games: { label: 'Games', match: (p) => p.kind === 'user' && !!p.game },
+  images: { label: 'Screenshots', match: (p) => p.kind === 'user' && !!p.images?.length },
+  cards: { label: 'Card designs', match: (p) => p.kind === 'card' },
+  pulls: { label: 'Pack pulls', match: (p) => p.kind === 'pull' },
+});
+// Newest first; Top by score; Trending by score that fades with age (half after about a day).
+export const FEED_SORTS = Object.freeze({ new: 'Newest', trending: 'Trending', top: 'Top' });
+export const feedTypeOf = (t) => Object.hasOwn(FEED_TYPES, t) ? t : 'all';
+export const feedSortOf = (s) => Object.hasOwn(FEED_SORTS, s) ? s : 'new';
+// A post's score: one point per player who reacted, however many emojis they picked, and two per comment.
+export function postScore(rawReactions, comments) {
+  const reactors = Object.values(rawReactions ?? {}).filter((list) => list?.length).length;
+  return reactors + 2 * (comments ?? []).filter((c) => !c.removed).length;
+}
+export const trendScore = (score, at, now) => score / Math.pow(Math.max(0, now - at) / 3600000 + 2, 1.5);
+// Sorts posts carrying .score (and .at) for one Feed sort. Ties go to the newer post.
+export function sortFeed(posts, sort, now) {
+  const key = sort === 'top' ? (p) => p.score : sort === 'trending' ? (p) => trendScore(p.score, p.at, now) : () => 0;
+  return [...posts].sort((a, b) => key(b) - key(a) || b.at - a.at);
+}
+
 // One line of text: whitespace runs fold to a space; empty or too long is refused.
 export function cleanComment(text) {
   const clean = String(text ?? '').replace(/\s+/g, ' ').trim();

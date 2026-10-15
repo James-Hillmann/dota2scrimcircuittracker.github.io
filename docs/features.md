@@ -709,7 +709,7 @@ play the whole Heroic/Aegis game. Predict's "Your name" bar hides on this tab (F
   Gallery captions, and your profile title reads "Nickname (in-game name)". Plain text, up to 24.
 - **Gallery** (nav tab in every league, `#/<league>/gallery`; `/cards` still works):
   opens on the **Feed**: player posts, newly saved cards and pack pulls (what each player
-  auto-posts; see Profile Feed), newest first. Signed in, the post box takes text (Dota emoticon codes work), up to 4 images (pick,
+  auto-posts; see Profile Feed), newest first. **Show** filters to one kind (posts, clips, games, screenshots, card designs, pack pulls) and **Newest / Trending / Top** sorts: Top by score (one point per player who reacted, two per comment), Trending by that score fading with age (lib/feed.js sortFeed; the Worker sorts before paging). Profile Feeds have the same bar. Signed in, the post box takes text (Dota emoticon codes work), up to 4 images (pick,
   paste or drop; shrunk in the browser), a clip link (YouTube, Twitch and Streamable play in the
   post behind a play button; Medal and Allstar show as a link) and **Highlight a game**: one of
   your league games, shown with hero, K/D/A, result and badges worked out from the season's data

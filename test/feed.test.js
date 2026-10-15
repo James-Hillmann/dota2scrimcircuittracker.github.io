@@ -278,6 +278,37 @@ test('vault: replies notify the comment writer; comment reactions are stored and
   assert.equal(one.comments[0].removed,true);assert.equal(one.comments[0].text,undefined);assert.equal(one.comments[1].text,'agreed');
 });
 
+test('feed sorts: score counts reactors and comments; trending fades with age',async()=>{
+  const {postScore,sortFeed,trendScore,feedTypeOf,feedSortOf,FEED_TYPES}=await import('../public/lib/feed.js');
+  assert.equal(postScore({1:['❤️','🔥'],2:['❤️'],3:[]},[{text:'gg'},{removed:true}]),4);
+  assert.equal(postScore(undefined,undefined),0);
+  const h=3600000,now=100*h,posts=[{id:'old',at:now-72*h,score:9},{id:'new',at:now-h,score:3},{id:'quiet',at:now,score:0}];
+  assert.deepEqual(sortFeed(posts,'top',now).map(p=>p.id),['old','new','quiet']);
+  assert.deepEqual(sortFeed(posts,'trending',now).map(p=>p.id),['new','old','quiet']);
+  assert.deepEqual(sortFeed(posts,'new',now).map(p=>p.id),['quiet','new','old']);
+  assert.ok(trendScore(4,0,0)>trendScore(4,0,24*h));
+  assert.equal(feedTypeOf('clips'),'clips');assert.equal(feedTypeOf('constructor'),'all');assert.equal(feedSortOf('x'),'new');
+  assert.equal(FEED_TYPES.clips.match({kind:'user',clip:{}}),true);assert.equal(FEED_TYPES.clips.match({kind:'user'}),false);
+  assert.equal(FEED_TYPES.pulls.match({kind:'pull'}),true);
+});
+test('vault: the feed filters by kind and pages Top by score',async()=>{
+  const rows=new Map(),storage={get:async k=>structuredClone(rows.get(k)),put:async(k,v)=>rows.set(k,structuredClone(v)),delete:async k=>rows.delete(k),list:async({prefix})=>new Map([...rows].filter(([k])=>k.startsWith(prefix)))};storage.transaction=fn=>fn(storage);
+  const vault=new CosmeticsVault({storage});
+  let n=0;const act=(account,body)=>vault.fetch(new Request(`https://vault/action?account=${account}`,{method:'POST',body:JSON.stringify({requestId:`sort-test-request-${String(++n).padStart(4,'0')}`,...body})})).then(async r=>({status:r.status,...await r.json()}));
+  const feed=async(q='')=>(await vault.fetch(new Request(`https://vault/feed${q}`))).json();
+  for(const a of ['101','202','303'])await act(a,{action:'session'});
+  const loved=(await act('101',{action:'post',text:'loved'})).post.id;
+  await act('202',{action:'post',text:'clip',clip:'https://youtu.be/dQw4w9WgXcQ'});
+  await act('303',{action:'post',text:'newest'});
+  await act('202',{action:'react',post:loved,emoji:'❤️'});await act('303',{action:'comment',post:loved,text:'nice'});
+  const top=await feed('?sort=top');
+  assert.equal(top.posts[0].id,loved);assert.equal(top.posts.length,3);assert.equal(top.more,false);
+  assert.deepEqual((await feed('?sort=top&offset=1')).posts.map(p=>p.id),top.posts.slice(1).map(p=>p.id));
+  assert.deepEqual((await feed('?type=clips')).posts.map(p=>p.text),['clip']);
+  assert.equal((await feed('?type=cards')).posts.length,0);
+  assert.equal((await feed('?type=bogus')).posts.length,3);
+});
+
 test('auto-post settings: defaults, checking, and what a pack posts',async()=>{
   const {feedAutoOf,setFeedAuto,pullPost,FEED_AUTO_DEFAULT}=await import('../public/lib/feed.js');
   assert.deepEqual(feedAutoOf({}),{cards:true,rarities:['epic','legendary'],screens:false});

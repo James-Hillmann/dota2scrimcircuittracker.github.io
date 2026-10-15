@@ -9,7 +9,7 @@ import { designKey } from '../lib/card-ratings.js';
 import { mountRating } from './card-rating.js';
 import { shownNickname } from '../lib/cosmetics-engine.js';
 import { itemByKey } from '../lib/cosmetics-catalog.js';
-import { REACTIONS, REACTION_ART, topReaction, rankedReactions, reactionTally, commentThreads, MAX_COMMENT, clipEmbed, clipLink, canRemovePost, feedAutoOf, PULL_RARITIES, BAN_SCOPES, BAN_LABELS, banScope } from '../lib/feed.js';
+import { REACTIONS, REACTION_ART, topReaction, rankedReactions, reactionTally, commentThreads, MAX_COMMENT, clipEmbed, clipLink, canRemovePost, feedAutoOf, PULL_RARITIES, BAN_SCOPES, BAN_LABELS, banScope, FEED_TYPES, FEED_SORTS } from '../lib/feed.js';
 import { screenArt } from '../lib/card-art.js';
 import { playerLine, gameAchievements } from '../lib/highlights.js';
 import { heroImg } from '../lib/hero-meta.js';
@@ -29,6 +29,13 @@ const autoFormHtml = (auto) => `<form class="feed-auto"><fieldset><legend>Auto-p
   <label><input type="checkbox" name="screens"${auto.screens ? ' checked' : ''}> Loading screens</label>
   <small class="feed-auto-note" role="status" aria-live="polite">Changes apply to new posts. Old posts stay until you delete them.</small></fieldset></form>`;
 
+// The kind of post and the order the Feed shows; kept while you browse, so a redraw keeps them.
+const view = { type: 'all', sort: 'new' };
+const viewBarHtml = () => `<div class="feed-view" role="group" aria-label="Filter and sort the feed">
+  <label class="feed-view-type">Show <select name="type">${Object.entries(FEED_TYPES).map(([k, t]) => `<option value="${k}"${view.type === k ? ' selected' : ''}>${t.label}</option>`).join('')}</select></label>
+  <div class="feed-view-sort" role="radiogroup" aria-label="Sort">${Object.entries(FEED_SORTS).map(([k, label]) => `<button type="button" role="radio" data-feed-sort="${k}" aria-checked="${view.sort === k}">${label}</button>`).join('')}</div>
+</div>`;
+
 // account: one player's Feed (their profile's Feed tab, collection.js mountProfileFeed): only their
 // posts, no post box, and on your own profile your auto-post settings (lib/feed.js feedAutoOf).
 export async function drawFeed(body, { viewer, signIn, action, swatch, colors, typeLabel, ago, focus = null, account = null }) {
@@ -36,7 +43,7 @@ export async function drawFeed(body, { viewer, signIn, action, swatch, colors, t
   body.innerHTML = '<p>Loading feed…</p>';
   let first, focused = null, teams, matches, overrides;
   try {
-    [first, focused, teams, matches, overrides] = await Promise.all([feedPosts({ account }), focus ? feedPosts({ post: focus }).catch(() => null) : null,
+    [first, focused, teams, matches, overrides] = await Promise.all([feedPosts({ account, ...view }), focus ? feedPosts({ post: focus }).catch(() => null) : null,
       SOURCES.all.data().then((d) => d.teams).catch(() => []), allLoad().catch(() => []), listCards().catch(() => new Map())]);
   } catch (e) { body.innerHTML = `<p>${esc(e.message)}</p>`; return; }
   if (!body.isConnected || body._feedToken !== token || body.dataset.collectionView !== 'feed') return;
@@ -234,7 +241,7 @@ export async function drawFeed(body, { viewer, signIn, action, swatch, colors, t
       <p class="feed-ban-note" role="alert"></p>
       <div class="feed-ban-buttons"><button value="cancel" formnovalidate>Cancel</button><button value="ban" class="feed-ban-go">Ban</button></div>
     </form></dialog>` : ''}
-    ${PAINT_FILTER}<div class="feed-list"></div><div class="feed-more" aria-live="polite"></div>
+    ${viewBarHtml()}${PAINT_FILTER}<div class="feed-list"></div><div class="feed-more" aria-live="polite"></div>
     <dialog class="feed-zoom" aria-label="Image"><form method="dialog"><button aria-label="Close">×</button></form><img alt=""></dialog>`;
   const list = body.querySelector('.feed-list'), moreBox = body.querySelector('.feed-more');
   // Your auto-post settings save as soon as a box changes (lib/feed.js setFeedAuto).
@@ -260,7 +267,8 @@ export async function drawFeed(body, { viewer, signIn, action, swatch, colors, t
     fitAllReacts();
     moreBox.querySelector('p:only-child')?.remove();
   } });
-  let oldest = Infinity, more = false, loading = false;
+  // oldest pages Newest by time; served pages Top and Trending by how many posts came so far.
+  let oldest = Infinity, served = 0, more = false, loading = false, viewToken = 0;
   // The players you unfollowed, each with a Follow button to bring them back.
   const hiddenBox = body.querySelector('.feed-hidden');
   const drawHidden = () => {
@@ -304,6 +312,7 @@ export async function drawFeed(body, { viewer, signIn, action, swatch, colors, t
   };
   drawBans();
   function add(batch, pinned = false) {
+    if (!pinned) served += batch.length;
     for (const p of batch) {
       if (!pinned) oldest = Math.min(oldest, p.at);
       if (!pinned && unfollowed.has(String(p.account))) continue;
@@ -316,14 +325,33 @@ export async function drawFeed(body, { viewer, signIn, action, swatch, colors, t
     mountCardRatings();
     fitAllReacts();
   }
-  const drawMore = () => { moreBox.innerHTML = more ? '<button type="button" data-more>Load more</button>' : posts.size ? '<p>You reached the start of the feed.</p>' : account != null ? '<p>No posts yet.</p>' : '<p>Nothing here yet. Write the first post, save a card design or open a pack.</p>'; };
+  const drawMore = () => { moreBox.innerHTML = more ? '<button type="button" data-more>Load more</button>' : posts.size ? `<p>${view.sort === 'new' ? 'You reached the start of the feed.' : 'That is every post.'}</p>` : view.type !== 'all' ? `<p>No ${esc(FEED_TYPES[view.type].label.toLowerCase())} yet.</p>` : account != null ? '<p>No posts yet.</p>' : '<p>Nothing here yet. Write the first post, save a card design or open a pack.</p>'; };
   async function loadMore() {
     if (loading || !more) return;
     loading = true; moreBox.innerHTML = '<p>Loading…</p>';
-    try { const page = await feedPosts({ before: oldest, account }); Object.assign(nicknames, page.nicknames); more = page.more; add(page.posts); }
-    catch (e) { moreBox.innerHTML = `<p>${esc(e.message)}</p>`; loading = false; return; }
+    const mark = viewToken;
+    try {
+      const page = await feedPosts({ account, ...view, ...(view.sort === 'new' ? { before: oldest } : { offset: served }) });
+      if (mark !== viewToken) return;
+      Object.assign(nicknames, page.nicknames); more = page.more; add(page.posts);
+    }
+    catch (e) { if (mark === viewToken) { moreBox.innerHTML = `<p>${esc(e.message)}</p>`; loading = false; } return; }
     loading = false; drawMore();
   }
+  // A new filter or sort starts the list again from its first page.
+  async function changeView() {
+    const mark = ++viewToken;
+    body.querySelectorAll('[data-feed-sort]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.feedSort === view.sort)));
+    list.innerHTML = ''; posts.clear(); oldest = Infinity; served = 0; more = false; loading = true;
+    moreBox.innerHTML = '<p>Loading…</p>';
+    try {
+      const page = await feedPosts({ account, ...view });
+      if (mark !== viewToken || !body.isConnected) return;
+      Object.assign(nicknames, page.nicknames); more = page.more; add(page.posts);
+    } catch (e) { if (mark === viewToken) { moreBox.innerHTML = `<p>${esc(e.message)}</p>`; loading = false; } return; }
+    loading = false; drawMore();
+  }
+  body.querySelector('.feed-view select').onchange = (e) => { view.type = e.target.value; changeView(); };
   if (focused?.posts?.[0]) add(focused.posts, true);
   more = first.more; add(first.posts); drawMore();
   // Scrolling near the end loads the next page; the button is there for when it doesn't.
@@ -474,6 +502,8 @@ export async function drawFeed(body, { viewer, signIn, action, swatch, colors, t
     if (!e.target.closest('.feed-reply-compose')) closeSuggestions();
     if (!e.target.closest('.feed-react-control')) closePickers();
     if (e.target.closest('[data-more]')) return loadMore();
+    const sortBtn = e.target.closest('[data-feed-sort]');
+    if (sortBtn) { if (view.sort !== sortBtn.dataset.feedSort) { view.sort = sortBtn.dataset.feedSort; changeView(); } return; }
     const reactsMore = e.target.closest('[data-reacts-more]');
     if (reactsMore) { const box = reactsMore.parentElement; box.dataset.open = 'true'; return fitReacts(box); }
     if (e.target.closest('[data-signin]')) return signIn();
