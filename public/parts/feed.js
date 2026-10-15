@@ -4,7 +4,9 @@
 // any post. collection.js passes in its swatch drawing and the viewer.
 import { esc, dur, SOURCES, allLoad } from '../core.js';
 import { listCards } from '../lib/store.js';
-import { feedPosts, feedMediaUrl, collectionState } from '../lib/cosmetics.js';
+import { feedPosts, feedMediaUrl, collectionState, cardRatings, myCardVotes } from '../lib/cosmetics.js';
+import { designKey } from '../lib/card-ratings.js';
+import { mountRating } from './card-rating.js';
 import { shownNickname } from '../lib/cosmetics-engine.js';
 import { itemByKey } from '../lib/cosmetics-catalog.js';
 import { REACTIONS, REACTION_ART, topReaction, reactionTally, commentThreads, MAX_COMMENT, clipEmbed, clipLink, canRemovePost, feedAutoOf, PULL_RARITIES, BAN_SCOPES, BAN_LABELS, banScope } from '../lib/feed.js';
@@ -177,10 +179,32 @@ export async function drawFeed(body, { viewer, signIn, action, swatch, colors, t
       ${pinned ? '<p class="feed-pin-note">From your notifications</p>' : ''}
       <header>${who(p.account)} <span>${what}</span> ${when(p.at)}${toolsHtml(p)}</header>
       <div class="feed-media-wrap${p.kind === 'card' ? ' feed-card-wrap' : ''}"><div class="feed-media${p.kind === 'card' ? ' feed-card' : ''}">${media}</div>${reactionControlHtml(p)}</div>
+      ${p.kind === 'card' ? `<div class="feed-card-rating" data-rate-post="${esc(p.id)}"></div>` : ''}
       <div class="feed-reacts" role="group" aria-label="Reactions">${reactsHtml(p)}</div>
       <div class="feed-comments">${commentsHtml(p)}</div>
       <p class="feed-error" role="status" aria-live="polite"></p>
     </article>`;
+  }
+
+  // Rating a card post (parts/card-rating.js): the Worker rates the card's current look, so only a
+  // post that still shows that look gets the buttons; an older look says it was replaced.
+  const ratingsOf = new Map();
+  let myVotes = null;
+  async function mountCardRatings() {
+    const slots = [...list.querySelectorAll('.feed-card-rating[data-rate-post]:not([data-mounted])')];
+    if (!slots.length) return;
+    slots.forEach((el) => { el.dataset.mounted = ''; });
+    myVotes ??= me == null ? Promise.resolve({}) : myCardVotes().catch(() => ({}));
+    const votes = await myVotes;
+    await Promise.all(slots.map(async (el) => {
+      const p = posts.get(el.dataset.ratePost);
+      if (!p) return;
+      if (!ratingsOf.has(p.account)) ratingsOf.set(p.account, cardRatings(p.account).catch(() => null));
+      const r = (await ratingsOf.get(p.account))?.[p.slot];
+      if (!el.isConnected) return;
+      if (r && r.key === designKey(p.design)) mountRating(el, p.account, r, { viewer: me, votes, onVote: (next) => Object.assign(r, next) });
+      else if (r !== undefined) el.innerHTML = '<p class="feed-card-rating-old">This look has since been replaced, so it can\'t be rated.</p>';
+    }));
   }
 
   const mine = account != null && account === me;
@@ -218,6 +242,7 @@ export async function drawFeed(body, { viewer, signIn, action, swatch, colors, t
     if (!(me in nicknames)) nicknames[me] = shownNickname(state);
     posts.set(p.id, p);
     list.insertAdjacentHTML('afterbegin', postHtml(p));
+    mountCardRatings();
     moreBox.querySelector('p:only-child')?.remove();
   } });
   let oldest = Infinity, more = false, loading = false;
@@ -273,6 +298,7 @@ export async function drawFeed(body, { viewer, signIn, action, swatch, colors, t
       if (!pinned) oldest = Math.min(oldest, p.at);
     }
     wirePlayerCards(list, { openOnCard: true });
+    mountCardRatings();
   }
   const drawMore = () => { moreBox.innerHTML = more ? '<button type="button" data-more>Load more</button>' : posts.size ? '<p>You reached the start of the feed.</p>' : account != null ? '<p>No posts yet.</p>' : '<p>Nothing here yet. Write the first post, save a card design or open a pack.</p>'; };
   async function loadMore() {

@@ -1,7 +1,6 @@
 import { esc, SOURCES, allLoad, pageList } from '../core.js';
 import { steamAccount, steamLoginUrl, listCards } from '../lib/store.js';
 import { CATALOG, DEFAULT_EQUIPMENT, PARTICLE_FINISHES, collectionState, collectionAction, publicCollection, applyEquipment, cardRatings, galleryCards, myCardVotes } from '../lib/cosmetics.js';
-import { RATINGS } from '../lib/card-ratings.js';
 import { TIERS, itemByKey } from '../lib/cosmetics-catalog.js';
 import { signatureHtml, renderedName } from '../lib/signatures.js';
 import { createPlayerCards, PAINT_FILTER, wirePlayerCards } from './player-card.js';
@@ -16,6 +15,7 @@ import { FRONT_PARTS, BACK_STATS, MAX_BACK_STATS, MAX_NAME, backStats, applyLayo
 import './pack-gifts.js'; // the "Fav sent you packs" notice
 import './feed-notice.js'; // the "new comments on your posts" notice
 import { drawFeed } from './feed.js';
+import { mountRating } from './card-rating.js';
 import { SCREEN_ART } from '../lib/screen-art-data.js';
 import { strangerNames } from '../lib/scout.js';
 
@@ -468,34 +468,6 @@ export async function mountProfileCollection(host,{account,name,matches,team,tie
   } catch {if(section.isConnected)section.innerHTML='<h3>Card collection</h3><p>Collection service is unavailable. Try again shortly.</p><button type="button">View designs</button>';section.querySelector('button')?.addEventListener('click',()=>openCollection({tab:'collection',viewAccount:account,name}));}
 }
 
-// Ratings under each saved design: the counts and the community's pick for everyone, and for a
-// signed-in player on someone else's card, a vote (one per design; the Worker keeps it to that).
-// Your own votes come from the Worker (myCardVotes), so they follow you between devices.
-const RATING_NAMES={common:'Common',rare:'Rare',epic:'Epic',legendary:'Legendary'};
-function ratingHtml(r,{canVote,viewer,mine}) {
-  return `<div class="card-rating" data-rating-slot="${r.slot}"><p class="card-rating-pick">${r.total?`Rated <b data-rarity="${r.pick}">${RATING_NAMES[r.pick]}</b> · ${r.total} vote${r.total===1?'':'s'}`:'No ratings yet'}</p>
-    <div class="card-rating-bar" aria-hidden="true">${RATINGS.map(k=>`<i data-rarity="${k}" style="flex:${r.counts[k]}"></i>`).join('')}</div>
-    <div class="card-rating-votes" role="group" aria-label="Rate this card">${RATINGS.map(k=>`<button type="button" data-rate="${k}" data-rarity="${k}" aria-pressed="${mine===k}"${canVote?'':' disabled'} title="${canVote?`Rate it ${RATING_NAMES[k]}`:viewer==null?'Sign in with Steam to rate cards':'You can\'t rate your own card'}">${RATING_NAMES[k]} <small>${r.counts[k]}</small></button>`).join('')}</div></div>`;
-}
-// Puts rating r (one of account's designs) under fig and wires its buttons. votes is the viewer's
-// own votes by "<owner>:<key>", updated in place; onVote runs after a vote is saved.
-function mountRating(fig,account,r,{viewer,votes,onVote}) {
-  const canVote=viewer!=null&&String(viewer)!==String(account);
-  const draw=rating=>{
-    fig.querySelector('.card-rating')?.remove();
-    fig.insertAdjacentHTML('beforeend',ratingHtml(rating,{canVote,viewer,mine:votes[`${account}:${rating.key}`]??null}));
-    fig.querySelectorAll('[data-rate]').forEach(b=>b.onclick=async()=>{
-      const pick=b.getAttribute('aria-pressed')==='true'?null:b.dataset.rate;
-      fig.querySelectorAll('[data-rate]').forEach(x=>x.disabled=true);
-      try {
-        const {rating:next}=await collectionAction('rate',{target:Number(account),cardSlot:rating.slot,rating:pick});
-        if(next.mine)votes[`${account}:${next.key}`]=next.mine;else delete votes[`${account}:${next.key}`];
-        draw(next);onVote?.(next);
-      } catch(e) {fig.querySelectorAll('[data-rate]').forEach(x=>x.disabled=!canVote);fig.querySelector('.card-rating-pick').textContent=e.message;}
-    });
-  };
-  draw(r);
-}
 async function mountRatings(section,account) {
   const [cards,viewer]=await Promise.all([cardRatings(account),steamAccount().catch(()=>null)]);
   const votes=viewer==null?{}:await myCardVotes().catch(()=>({}));
