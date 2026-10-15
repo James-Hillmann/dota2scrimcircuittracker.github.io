@@ -24,12 +24,20 @@ export function statsRange(start, end, now = Date.now()) {
 }
 
 // Every path in the range: GoatCounter gives at most 100 a call, then more with exclude_paths.
-export async function goatStats(range, { site = SITE_CODE, key, get = fetch } = {}) {
+// GoatCounter sometimes fails a call it answers fine a moment later, so each call gets TRIES goes.
+export const TRIES = 3;
+export async function goatStats(range, { site = SITE_CODE, key, get = fetch, wait = (ms) => new Promise((r) => setTimeout(r, ms)) } = {}) {
   const base = `https://${site}.goatcounter.com/api/v0`;
-  const call = async (path, params) => {
+  const once = async (path, params) => {
     const r = await get(`${base}${path}?${params}`, { headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' } });
-    if (!r.ok) throw new Error(`GoatCounter ${r.status}`);
+    if (!r.ok) throw new Error(`GoatCounter ${r.status} on ${path}: ${(await r.text().catch(() => '')).replace(/\s+/g, ' ').slice(0, 300)}`);
     return r.json();
+  };
+  const call = async (path, params) => {
+    for (let i = 1; ; i++) {
+      try { return await once(path, params); }
+      catch (e) { if (i >= TRIES) throw e; await wait(400 * i); }
+    }
   };
   const totals = await call('/stats/total', new URLSearchParams(range));
   const paths = [], seen = [];

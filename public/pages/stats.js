@@ -10,6 +10,11 @@ const WORKER = "https://steam-auth.ad2lstats.workers.dev/stats";
 const RANGES = [["24h", "24 hours", 1], ["7d", "7 days", 7], ["30d", "30 days", 30], ["90d", "90 days", 90]];
 const HOUR = 3600e3;
 const fmt = (n) => Number(n).toLocaleString("en-US");
+// The last good answer per range, kept in this browser: GoatCounter fails a load now and then,
+// and the page shows the saved set instead of an error.
+const SAVED = (range) => `stats-last:${range}`;
+const saveLast = (range, data) => { try { localStorage.setItem(SAVED(range), JSON.stringify({ at: Date.now(), data })); } catch {} };
+const loadLast = (range) => { try { return JSON.parse(localStorage.getItem(SAVED(range))); } catch { return null; } };
 
 
 // Thin bar per hour; every bar has a title with day, hour and number.
@@ -55,7 +60,7 @@ export async function renderStats() {
 
 // The page itself; getStats(query) returns the Worker's answer for a start/end query.
 export function mountStats(box, getStats) {
-  let range = "7d", filter = "", open = new Set(), data = null;
+  let range = "7d", filter = "", open = new Set(), data = null, stale = null;
   box.innerHTML = `
     <div class="stats-bar">
       <div class="stats-ranges">${RANGES.map(([k, label]) => `<button type="button" class="seg" data-range="${k}">${label}</button>`).join("")}</div>
@@ -67,7 +72,7 @@ export function mountStats(box, getStats) {
   const draw = () => {
     if (!data) return;
     const paths = data.paths.filter((p) => !filter || `${p.path} ${p.title}`.toLowerCase().includes(filter));
-    body.innerHTML = `
+    body.innerHTML = `${stale ? `<p class="stats-stale">GoatCounter didn't answer (${esc(stale.error)}). Showing the last counts that loaded, from ${esc(new Date(stale.at).toLocaleString())}.</p>` : ""}
       <div class="stats-totals">
         <div><b>${fmt(data.total - data.events)}</b><span>visits</span></div>
         <div><b>${fmt(data.paths.filter((p) => !p.event).length)}</b><span>pages and routes</span></div>
@@ -94,10 +99,19 @@ export function mountStats(box, getStats) {
     body.innerHTML = `<p class="muted">Loading…</p>`;
     const days = RANGES.find(([k]) => k === range)[2], end = Math.ceil(Date.now() / HOUR) * HOUR;
     const q = new URLSearchParams({ start: new Date(end - days * 24 * HOUR).toISOString(), end: new Date(end).toISOString() });
+    const asked = range;
     try {
-      data = await getStats(q);
-      draw();
-    } catch (e) { body.innerHTML = `<p class="err">${esc(e.message)}</p>`; }
+      const out = await getStats(q);
+      if (asked !== range) return;
+      data = out; stale = null;
+      saveLast(range, data);
+    } catch (e) {
+      if (asked !== range) return;
+      const last = loadLast(range);
+      if (!last?.data) { body.innerHTML = `<p class="err">${esc(e.message)}</p>`; return; }
+      data = last.data; stale = { at: last.at, error: e.message };
+    }
+    draw();
   };
 
   box.addEventListener("click", (e) => {

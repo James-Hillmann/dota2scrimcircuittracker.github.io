@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { statsRange, goatStats, MAX_DAYS } from "../workers/steam-auth/src/stats.js";
+import { statsRange, goatStats, MAX_DAYS, TRIES } from "../workers/steam-auth/src/stats.js";
 import worker from "../workers/steam-auth/src/index.js";
 import { hoursOf, byHourOfDay } from "../public/lib/visits.js";
 import { ADMIN_ACCOUNT } from "../public/lib/pack-gifts.js";
@@ -60,4 +60,17 @@ test("stats route: needs a token, refuses other origins and non-admins", async (
     assert.equal((await yes.json()).total, 1);
     assert.equal((await worker.fetch(req({ authorization: "Bearer t" }), { FIREBASE_WEB_API_KEY: "x" })).status, 503);
   } finally { globalThis.fetch = realFetch; }
+});
+
+test("goatStats: retries a failed call, and gives up after TRIES", async () => {
+  let n = 0;
+  const flaky = async (url) => (++n === 1 ? new Response("nope", { status: 404 })
+    : String(url).includes("/stats/total") ? Response.json({ total: 3, total_events: 0, stats: [] }) : Response.json({ hits: [], more: false }));
+  const r = await goatStats({ start: "a", end: "b" }, { site: "demo", key: "k", get: flaky, wait: async () => {} });
+  assert.equal(r.total, 3);
+  assert.equal(n, 3); // failed total, total again, hits
+  let tries = 0;
+  const down = async () => (tries++, new Response("<html>down</html>", { status: 404 }));
+  await assert.rejects(goatStats({ start: "a", end: "b" }, { site: "demo", key: "k", get: down, wait: async () => {} }), /GoatCounter 404 on \/stats\/total: <html>down<\/html>/);
+  assert.equal(tries, TRIES);
 });

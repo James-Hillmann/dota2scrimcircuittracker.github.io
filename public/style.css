@@ -4503,6 +4503,7 @@ html.cb .cmp-c1 { --pc: #56b4e9; } html.cb .cmp-c2 { --pc: #e69f00; } html.cb .c
 .stats-page h2 { margin: 28px 0 10px; font: 800 22px/1.1 var(--display); letter-spacing: .02em; text-transform: uppercase; color: var(--bone); }
 .stats-page h2 small { font: 400 12px/1 var(--mono); text-transform: none; letter-spacing: 0; color: var(--dim); margin-left: 8px; }
 .stats-page .muted { color: var(--dim); font-size: 13px; }
+.stats-stale { margin: 14px 0 0; padding: 10px 12px; border: 1px solid var(--warn); color: var(--bone); font-size: 13px; }
 .stats-bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }
 .stats-ranges { display: flex; flex-wrap: wrap; gap: 6px; }
 .stats-filter { flex: 1 1 220px; max-width: 360px; padding: 8px 10px; background: var(--stone); color: var(--bone); border: 1px solid var(--seam); font: inherit; }
