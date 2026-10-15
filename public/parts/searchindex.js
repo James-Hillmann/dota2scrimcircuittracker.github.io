@@ -1,9 +1,10 @@
-// The search index over every league: each division's trimmed file and the saved scrims,
-// loaded once (the pages reuse the files). A division that can't load is left out rather than
-// failing the search. The header pop-up and the results page share it.
+// The search index over every league: each division's trimmed file, the saved scrims and the
+// Steam players on no roster, loaded once (the pages reuse the files). A division that can't load
+// is left out rather than failing the search. The header pop-up and the results page share it.
 import { DIVISIONS, SOURCES, divLite, allMatches } from "../core.js";
 import { buildSearchIndex } from "../lib/search.js";
-import { loadNicknames } from "../lib/nicknames.js";
+import { loadNicknames, steamAccountIds } from "../lib/nicknames.js";
+import { steamPlayers, strangerNames } from "../lib/scout.js";
 
 let ready = null;
 addEventListener('player-names-change', () => { ready = null; });
@@ -15,7 +16,17 @@ export function loadSearch() {
     })),
     allMatches().catch((e) => { console.warn("search: scrims unavailable", e); return null; }),
     loadNicknames(),
-  ]).then(([leagues, scrims]) => buildSearchIndex(leagues.filter(Boolean), scrims && { label: "Scrims", matches: scrims }))
+    steamPlayers(),
+  ]).then(async ([leagues, scrims, , steam]) => {
+    const ls = leagues.filter(Boolean);
+    // Every Steam account on no roster, named by its saved Steam name or OpenDota (lib/scout.js),
+    // whether or not it has signed in since names were saved.
+    const rostered = new Set(ls.flatMap((l) => l.data.teams.flatMap((t) => t.players.map((p) => String(p.account_id)))));
+    const others = [...new Set([...steamAccountIds(), ...steam.keys()])].filter((a) => !rostered.has(a));
+    const names = await strangerNames(others).catch(() => new Map());
+    return buildSearchIndex(ls, scrims && { label: "Scrims", matches: scrims },
+      { label: "Not in a league", root: SOURCES[Object.keys(DIVISIONS)[0]].root, players: others.filter((a) => names.has(a)).map((a) => ({ account: a, name: names.get(a) })) });
+  })
     .catch((e) => { ready = null; throw e; });
   return ready;
 }

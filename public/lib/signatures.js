@@ -12,6 +12,13 @@ export function japaneseName(text) {
   }
   return out;
 }
+// Hiragana is the katakana reading shifted into the hiragana block.
+export const hiraganaName=text=>japaneseName(text).replace(/[ァ-ヶ]/gu,c=>String.fromCharCode(c.charCodeAt(0)-0x60));
+// Kanji spells the katakana reading with phonetic characters (ateji), one per sound.
+const KANJI_PAIRS={'シャ':'紗','シュ':'朱','ショ':'将','チャ':'茶','チュ':'忠','チョ':'蝶','キャ':'伽','キュ':'久','キョ':'京','ニャ':'若','ニュ':'入','ニョ':'女','リャ':'良','リュ':'竜','リョ':'涼','ジャ':'邪','ジュ':'寿','ジョ':'如','ティ':'帝','トゥ':'斗','ディ':'弟','ドゥ':'堂','ウィ':'威','ウェ':'恵','ウォ':'魚','ファ':'芭','フィ':'妃','フェ':'笛','フォ':'鳳','ヴァ':'婆','ヴィ':'尾','ヴェ':'辺','ヴォ':'墓'};
+const KANJI='ア亜イ伊ウ宇エ恵オ央カ加キ希ク久ケ毛コ子ガ我ギ義グ具ゲ下ゴ呉サ沙シ志ス須セ世ソ蘇ザ座ジ治ズ図ゼ是ゾ蔵タ多チ知ツ都テ天ト斗ダ陀デ出ド土ナ奈ニ仁ヌ奴ネ音ノ乃ハ波ヒ飛フ布ヘ部ホ保バ馬ビ美ブ舞ベ辺ボ母パ巴ピ比プ富ペ平ポ浦マ真ミ美ム夢メ女モ茂ヤ夜ユ由ヨ代ラ羅リ里ル留レ礼ロ路ワ和ン恩ヴ舞ァ亜ィ伊ゥ宇ェ恵ォ央ャ夜ュ由ョ代';
+const KANJI_ONE=Object.fromEntries([...KANJI].flatMap((c,i,a)=>i%2?[]:[[c,a[i+1]]]));
+export const kanjiName=text=>japaneseName(text).replace(/ッ/g,'').replace(/.[ャュョァィゥェォ]?/gu,s=>KANJI_PAIRS[s]??[...s].map(c=>KANJI_ONE[c]??c).join(''));
 const transliterate=(text,map)=>[...text.normalize('NFKD').replace(/\p{M}/gu,'').toLowerCase()].map(c=>map[c]??c).join('');
 const cyrillic={a:'а',b:'б',c:'к',d:'д',e:'е',f:'ф',g:'г',h:'х',i:'и',j:'ж',k:'к',l:'л',m:'м',n:'н',o:'о',p:'п',q:'к',r:'р',s:'с',t:'т',u:'у',v:'в',w:'ш',x:'кс',y:'й',z:'з'};
 const greek={a:'α',b:'β',c:'κ',d:'δ',e:'ε',f:'φ',g:'γ',h:'η',i:'ι',j:'τζ',k:'κ',l:'λ',m:'μ',n:'ν',o:'ο',p:'π',q:'κ',r:'ρ',s:'σ',t:'τ',u:'υ',v:'β',w:'ω',x:'ξ',y:'ψ',z:'ζ'};
@@ -68,7 +75,7 @@ export const thaiName=text=>soundOut(text,c=>c!=='r',({c,v,coda})=>{
   const open={a:C+'า',e:'เ'+C,i:C+'ี',o:'โ'+C,u:C+'ู'},closed={a:C+'ั',e:'เ'+C,i:C+'ิ',o:C+'อ',u:C+'ุ'};
   return (coda?closed:open)[v]+end;
 },' ');
-const renderers={japanese:japaneseName,cyrillic:cyrillicName,greek:greekName,runic:runicName,korean:koreanName,chinese:chineseName,thai:thaiName};
+const renderers={japanese:japaneseName,hiragana:hiraganaName,kanji:kanjiName,cyrillic:cyrillicName,greek:greekName,runic:runicName,korean:koreanName,chinese:chineseName,thai:thaiName};
 // Modifiers whose alphabet has capitals; the player picks lower (the default) or upper case.
 export const CASED_MODIFIERS=['greek','cyrillic'];
 export const LETTER_CASES=['lower','upper'];
@@ -85,5 +92,5 @@ export function signatureHtml(equipment,name) {
   const glyphs=item.rough?[...text].map((c,i)=>`<span class="signature-glyph" style="--glyph-lift:${(i%3)-1}px;--glyph-tilt:${(i%5-2)*2}deg">${escape(c)}</span>`).join(''):escape(text);
   const paths=(PEN_MARKS[item.flourish]??PEN_MARKS.simple).map(d=>`<path d="${d}"/>`).join('');
   const size=Math.min(equipment.size,140/Math.max(8,[...text].length));
-  return `<span class="card-autograph" data-autograph="${item.id}" data-writing="${writingOf(text)}" style="left:${equipment.x}%;top:${equipment.y}%;--signature-size:${size}cqi;--placement-rotation:${equipment.rotation}deg" aria-label="Signature: ${escape(text)}"><span class="autograph-lettering">${glyphs}</span><svg class="signature-penmarks" viewBox="-10 -10 320 105" aria-hidden="true">${paths}</svg></span>`;
+  return `<span class="card-autograph" data-autograph="${item.id}" data-writing="${equipment.translation==='kanji'?'ja':writingOf(text)}" style="left:${equipment.x}%;top:${equipment.y}%;--signature-size:${size}cqi;--placement-rotation:${equipment.rotation}deg" aria-label="Signature: ${escape(text)}"><span class="autograph-lettering">${glyphs}</span><svg class="signature-penmarks" viewBox="-10 -10 320 105" aria-hidden="true">${paths}</svg></span>`;
 }

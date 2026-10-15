@@ -36,10 +36,96 @@ export function showProfileBackground(raw,name) {
   head.parentElement.querySelectorAll(':scope > .pbg-layer, .pp-head > .pbg-layer').forEach(el=>el.remove());
   const bg=profileBackgroundOf(raw),art=bg&&screenArt(bg.id);
   head.classList.toggle('has-bg',!!art&&bg.place==='head');
+  textColour(head,art&&bg.text);
+  stopAutoText?.();stopAutoText=null;
   if(!art)return;
   if(bg.place==='head')head.insertAdjacentHTML('afterbegin',layerHtml(bg,name));
   else head.insertAdjacentHTML('beforebegin',layerHtml(bg,name,' pbg-fixed'));
+  if(bg.text==='auto')stopAutoText=watchAutoText(head,bg);
 }
+
+// The head's text: a picked colour (CSS .pbg-text, --pbg-text), auto (.pbg-auto; watchAutoText
+// marks the pieces that go dark) or the site's own colours ('site' or no background).
+function textColour(el,mode) {
+  const colour=mode&&mode.startsWith('#')?mode:null;
+  el.classList.toggle('pbg-text',!!colour);el.classList.toggle('pbg-auto',mode==='auto');
+  if(colour)el.style.setProperty('--pbg-text',colour);else el.style.removeProperty('--pbg-text');
+}
+
+// Auto text. For each piece of text, the art behind it is drawn small on a canvas (framed, styled
+// and hued as the page shows it, under the dim overlay's colour at that spot), and the piece goes
+// dark (.pbg-ink-dark) when dark text has more contrast there than the site's light text.
+const DARK_INK=[23,20,27];
+const linear=c=>(c/=255)<=.04045?c/12.92:((c+.055)/1.055)**2.4;
+const luminance=([r,g,b])=>.2126*linear(r)+.7152*linear(g)+.0722*linear(b);
+const hexRgb=h=>/^#[0-9a-f]{6}$/i.test(h=h.trim())?[1,3,5].map(i=>parseInt(h.slice(i,i+2),16)):null;
+const siteLight=()=>hexRgb(getComputedStyle(document.documentElement).getPropertyValue('--bone'))??[239,231,218];
+// The dim overlay's opacity at fraction t across (head) or down (page) the layer, as in style.css
+// .pbg-layer::after.
+function overlayAlpha(place,dim,t) {
+  const stops=place==='head'?[[0,Math.min(1,dim+.4)],[.55,dim],[1,dim*.6]]:[[0,dim*.8],[.4,dim],[1,Math.min(1,dim+.15)]];
+  t=Math.max(0,Math.min(1,t));
+  for(let i=1;i<stops.length;i++)if(t<=stops[i][0]){const [t0,a0]=stops[i-1],[t1,a1]=stops[i];return a0+(a1-a0)*(t-t0)/(t1-t0);}
+  return stops.at(-1)[1];
+}
+let canvas;
+// Marks targets (elements over layer's art) dark or not. bg is the background as shown.
+function autoInk(targets,layer,bg) {
+  const img=layer?.querySelector('.ft-art img');if(!img?.naturalWidth)return;
+  canvas??=document.createElement('canvas');const ctx=canvas.getContext('2d',{willReadFrequently:true});
+  const box=img.getBoundingClientRect(),area=layer.getBoundingClientRect(),zoom=bg.zoom,nw=img.naturalWidth,nh=img.naturalHeight;
+  // object-fit: cover at x% y% in the unzoomed box, then scaled by zoom about that same point.
+  const w=box.width/zoom,h=box.height/zoom,s=Math.max(w/nw,h/nh),ox=(w-nw*s)*bg.x/100,oy=(h-nh*s)*bg.y/100;
+  const toImg=(X,Y)=>[((X-box.left)/zoom-ox)/s,((Y-box.top)/zoom-oy)/s];
+  const filter=[getComputedStyle(img).filter,getComputedStyle(img.parentElement).filter].filter(f=>f&&f!=='none').join(' ')||'none';
+  const ink=(getComputedStyle(layer).getPropertyValue('--ink-rgb')||'12,11,10').split(',').map(Number),dim=bg.dim/100;
+  const lightL=luminance(siteLight()),darkL=luminance(DARK_INK);
+  for(const el of targets) {
+    const r=el.getBoundingClientRect();if(!r.width||!r.height)continue;
+    const cw=canvas.width=Math.max(4,Math.round(r.width/3)),ch=canvas.height=Math.max(2,Math.round(r.height/3));
+    const [sx,sy]=toImg(r.left,r.top),[ex,ey]=toImg(r.right,r.bottom);
+    const draw=f=>{ctx.clearRect(0,0,cw,ch);ctx.filter=f;ctx.drawImage(img,sx,sy,ex-sx,ey-sy,0,0,cw,ch);return ctx.getImageData(0,0,cw,ch).data;};
+    let px=draw(filter);
+    // A style filter the canvas can't draw leaves it empty: fall back to the plain image.
+    if(filter!=='none'&&!px.some((v,i)=>i%4===3&&v))px=draw('none');
+    const a=overlayAlpha(bg.place,dim,bg.place==='head'?(r.left+r.width/2-area.left)/area.width:(r.top+r.height/2-area.top)/area.height);
+    let sum=0,n=0;
+    for(let i=0;i<px.length;i+=4){const k=px[i+3]/255;sum+=luminance([0,1,2].map(c=>px[i+c]*k*(1-a)+ink[c]*a));n++;}
+    const L=n?sum/n:0;
+    el.classList.toggle('pbg-ink-dark',(L+.05)/(darkL+.05)>(lightL+.05)/(L+.05));
+  }
+}
+// Keeps the profile head's text marked as the page moves: when the art loads, the head's text
+// changes or settles (its entry animation, the fonts), on resize and (whole-page backgrounds,
+// which stay put) on scroll. Returns the stop function.
+let stopAutoText=null;
+function watchAutoText(head,bg) {
+  const layer=bg.place==='head'?head.querySelector(':scope > .pbg-layer'):head.parentElement.querySelector(':scope > .pbg-layer'),img=layer?.querySelector('.ft-art img');
+  if(!img)return null;
+  let frame=0;
+  const run=()=>{
+    frame=0;if(!head.isConnected)return;
+    // The team, captain and rank line has text between its links: each bare bit gets a span.
+    head.querySelectorAll('.pp-sub').forEach(p=>[...p.childNodes].forEach(n=>{if(n.nodeType===3&&n.textContent.trim()){const s=document.createElement('span');n.replaceWith(s);s.append(n);}}));
+    autoInk(head.querySelectorAll('.kicker li, .h1-name, .pp-sub > *, .pp-tabs button'),layer,bg);
+  };
+  const queue=()=>{frame||=setTimeout(run,60);};
+  if(img.complete)queue();else img.addEventListener('load',queue,{once:true});
+  const ro=new ResizeObserver(queue);ro.observe(head);
+  const mo=new MutationObserver(queue);mo.observe(head,{childList:true,subtree:true,characterData:true});
+  head.addEventListener('animationend',queue);head.addEventListener('transitionend',queue);document.fonts?.ready.then(queue);
+  const later=setTimeout(queue,800);
+  addEventListener('resize',queue);if(bg.place==='page')addEventListener('scroll',queue,{passive:true});
+  return ()=>{
+    clearTimeout(frame);clearTimeout(later);ro.disconnect();mo.disconnect();
+    head.removeEventListener('animationend',queue);head.removeEventListener('transitionend',queue);removeEventListener('resize',queue);removeEventListener('scroll',queue);
+    head.querySelectorAll('.pbg-ink-dark').forEach(el=>el.classList.remove('pbg-ink-dark'));
+  };
+}
+
+// The text colour swatches: auto, the site's own, then a few that read on most screens. Any
+// other colour comes from the picker after them.
+const TEXT_COLOURS=[['auto','Auto'],['site','Default'],['#ffffff','White'],['#f3e9d2','Bone'],['#f2c14e','Gold'],['#9fd8ff','Ice'],['#ff8a7a','Coral'],['#111111','Black']];
 
 // Your own profile: a button that opens the editor. state is your collection state.
 export function mountBackgroundButton(host,{state,name}) {
@@ -75,6 +161,7 @@ export function openBackgroundEditor({state,name,onSaved}) {
         <fieldset class="visual-text-options pbg-sig-options"><legend>Signature style</legend><div>${[{id:'none',name:'No signature'},...sigItems.autograph].map(i=>`<button type="button" data-sig-choice="autograph" data-choice="${i.id}"><span data-sig-preview></span><strong>${esc(i.name)}</strong></button>`).join('')}</div>${sigItems.autograph.length?'':'<p>Open packs to collect signature styles.</p>'}</fieldset>
         ${sigItems.translation.length?`<fieldset class="visual-text-options pbg-sig-options"><legend>Modifier</legend><div>${[{id:'none',name:'No modifier'},...sigItems.translation].map(i=>`<button type="button" data-sig-choice="translation" data-choice="${i.id}"><span data-sig-preview></span><strong>${esc(i.name)}</strong></button>`).join('')}</div></fieldset>${letterCaseHtml()}`:''}
         <fieldset class="pbg-framing" data-sig-sliders><legend>Signature size &amp; angle</legend><p>Drag your signature in the preview to place it.</p>${SIG_SLIDERS.map(([k,label,min,max,step])=>`<label>${label} <output data-sig-out="${k}"></output><input type="range" data-sig-slider="${k}" min="${min}" max="${max}" step="${step}"></label>`).join('')}</fieldset>
+        <fieldset class="pbg-text-colour"><legend>Text colour</legend><p>Your name, links and tabs over the background. Auto turns each one dark where the background behind it is bright.</p><div>${TEXT_COLOURS.map(([c,label])=>`<button type="button" data-text="${c}" title="${label}" aria-label="${label}"${c.startsWith('#')?` style="--swatch:${c}"`:` class="pbg-text-${c}"`}>${c==='auto'?'Auto':c==='site'?'Aa':''}</button>`).join('')}<label title="Any colour"><input type="color" data-text-pick aria-label="Any colour"><span>Custom</span></label></div></fieldset>
         <fieldset class="pbg-framing"><legend>Framing &amp; colour</legend>${SLIDERS.map(([k,label,min,max,step])=>`<label>${label} <output data-out="${k}"></output><input type="range" data-slider="${k}" min="${min}" max="${max}" step="${step}"></label>`).join('')}<button type="button" data-reset>Reset framing &amp; colour</button></fieldset>
         <div class="pbg-savebar"><button type="button" data-cancel>Cancel</button><button type="button" data-save>Save background</button></div>
       </div>
@@ -85,10 +172,19 @@ export function openBackgroundEditor({state,name,onSaved}) {
   const draw=()=>{
     const shown=bg&&{...bg,place,sig};
     preview.dataset.place=place;
-    preview.innerHTML=`${place==='page'?layerHtml(shown,name):''}<div class="pbg-mock-head">${place==='head'?layerHtml(shown,name):''}<span class="pbg-mock-kicker">Players › ${esc(name)}</span><b>${esc(name)}</b><span class="pbg-mock-tabs">Stats · Heroes · Combat · Games</span></div><div class="pbg-mock-body"><i></i><i></i><i></i><i class="wide"></i></div>`;
+    preview.innerHTML=`${place==='page'?layerHtml(shown,name):''}<div class="pbg-mock-head${bg?.text?.startsWith('#')?' pbg-text':''}"${bg?.text?.startsWith('#')?` style="--pbg-text:${bg.text}"`:''}>${place==='head'?layerHtml(shown,name):''}<span class="pbg-mock-kicker">Players › ${esc(name)}</span><b>${esc(name)}</b><span class="pbg-mock-tabs">Stats · Heroes · Combat · Games</span></div><div class="pbg-mock-body"><i></i><i></i><i></i><i class="wide"></i></div>`;
     $$('[data-place]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.place===place)));
     $$('[data-bg]').forEach(b=>b.setAttribute('aria-pressed',String((bg?.id??'')===b.dataset.bg)));
     $$('[data-slider]').forEach(input=>{const k=input.dataset.slider;input.disabled=!bg;input.value=bg?.[k]??fresh(null)[k];$(`[data-out="${k}"]`).textContent=bg?(k==='zoom'?`${Number(bg[k]).toFixed(2)}×`:`${Math.round(bg[k])}${k==='dim'?'%':k==='hue'?'°':''}`):'';});
+    $$('[data-text]').forEach(b=>{b.disabled=!bg;b.setAttribute('aria-pressed',String((bg?.text??'auto')===b.dataset.text));});
+    const pick=$('[data-text-pick]'),custom=!!bg?.text?.startsWith('#')&&!TEXT_COLOURS.some(([c])=>c===bg.text);
+    pick.disabled=!bg;pick.closest('label').classList.toggle('on',custom);if(bg?.text?.startsWith('#'))pick.value=bg.text;
+    // Auto in the preview: its kicker, name and tabs, once the art has loaded.
+    const mock=preview.querySelector('.pbg-mock-head');mock.classList.toggle('pbg-auto',bg?.text==='auto');
+    if(bg?.text==='auto'){
+      const layer=preview.querySelector('.pbg-layer'),img=layer?.querySelector('img'),mark=()=>autoInk(mock.querySelectorAll('.pbg-mock-kicker, b, .pbg-mock-tabs'),layer,shown);
+      if(img)img.complete?mark():img.addEventListener('load',mark,{once:true});
+    }
     drawStyles();drawSig();
     $('[data-reset]').disabled=!bg;
   };
@@ -132,7 +228,9 @@ export function openBackgroundEditor({state,name,onSaved}) {
   });
   $$('[data-bg]').forEach(b=>b.onclick=()=>{const id=b.dataset.bg||null;bg=id?(bg?{...bg,id}:fresh(id)):null;draw();});
   $$('[data-slider]').forEach(input=>input.oninput=()=>{if(!bg)return;bg[input.dataset.slider]=Number(input.value);draw();});
-  $('[data-reset]').onclick=()=>{if(bg){bg={...fresh(bg.id),style:bg.style};draw();}};
+  $$('[data-text]').forEach(b=>b.onclick=()=>{if(bg){bg.text=b.dataset.text;draw();}});
+  $('[data-text-pick]').oninput=e=>{if(bg){bg.text=e.target.value.toLowerCase();draw();}};
+  $('[data-reset]').onclick=()=>{if(bg){bg={...fresh(bg.id),style:bg.style,text:bg.text};draw();}};
   // Drag the preview: moving right shows more of the left of the image. Drag the signature to
   // move it instead.
   preview.onpointerdown=e=>{

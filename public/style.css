@@ -653,6 +653,20 @@ td.name { white-space: normal; min-width: 110px; max-width: 200px; }
 .col-pager .cp-page.on { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 .col-pager .cp-step { padding: 6px 11px; font-size: 14px; line-height: 1; }
 .col-pager .cp-step:disabled { opacity: .35; cursor: default; }
+/* Row pages for long lists and tables (pageList in core.js). */
+.pg-off { display: none !important; }
+.pager { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 10px 0 4px; }
+.pager button {
+  background: var(--stone); border: 1px solid var(--seam-2); color: var(--dust); cursor: pointer;
+  min-width: 36px; padding: 7px 10px; font: 600 12px/1.2 var(--mono); letter-spacing: .06em;
+}
+.pager button:hover:not(:disabled) { color: var(--bone); border-color: var(--dust); }
+.pager button.on { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.pager button:disabled { opacity: .35; cursor: default; }
+.pager .pg-step, .pager .pg-all { text-transform: uppercase; }
+.pager .pg-gap { color: var(--dim); padding: 0 2px; }
+.pager .pg-range { margin-left: auto; color: var(--dim); font: 12px var(--mono); }
+@media (max-width: 760px) { .pager .pg-range { margin-left: 0; width: 100%; order: -1; } }
 td.strip { white-space: normal; min-width: 232px; max-width: 280px; }
 .hero-strip { display: flex; flex-wrap: wrap; gap: 2px; }
 .hero-strip a { position: relative; display: block; line-height: 0; }
@@ -2706,6 +2720,16 @@ button.ga-go:hover:not(:disabled) { background: var(--accent); color: var(--on-a
 :is(.pbg-layer, .pbg-editor) [data-style="plain"] .ft-art img { filter: none; }
 .pbg-layer::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(var(--ink-rgb), min(1, calc(var(--pbg-dim) + .4))) 0%, rgba(var(--ink-rgb), var(--pbg-dim)) 55%, rgba(var(--ink-rgb), calc(var(--pbg-dim) * .6)) 100%); }
 .pbg-layer.pbg-fixed { position: fixed; z-index: -1; }
+/* The head's text in the colour picked in the background editor (--pbg-text), with a shadow so it
+   reads over the art. Unpicked tabs stay a step fainter than the picked one. */
+.pp-head.pbg-text :is(.kicker, .kicker a, .crumbs li::before, .crumbs [aria-current], .h1-name, .h1-name *, .pp-sub, .pp-sub *, .pp-tabs button) { color: var(--pbg-text); text-shadow: 0 1px 2px rgb(0 0 0 / .7), 0 0 10px rgb(0 0 0 / .45); }
+.pp-head.pbg-text .pp-tabs button:not([aria-selected="true"]) { opacity: .72; }
+.pp-head.pbg-text .pp-tabs button:hover { opacity: 1; }
+/* Auto text: the site's colours with a shadow, and dark ink on the pieces over bright art
+   (.pbg-ink-dark, marked by parts/profile-background.js). */
+.pp-head.pbg-auto :is(.kicker li, .h1-name, .pp-sub, .pp-tabs button) { text-shadow: 0 1px 2px rgb(0 0 0 / .6); }
+.pp-head.pbg-auto .pbg-ink-dark, .pp-head.pbg-auto .pbg-ink-dark * { color: #17141b; text-shadow: 0 0 6px rgb(255 255 255 / .45); }
+.pp-head.pbg-auto .kicker li.pbg-ink-dark::before { color: #17141b; }
 .pbg-layer.pbg-fixed::after { background: linear-gradient(rgba(var(--ink-rgb), calc(var(--pbg-dim) * .8)), rgba(var(--ink-rgb), var(--pbg-dim)) 40%, rgba(var(--ink-rgb), min(1, calc(var(--pbg-dim) + .15)))); }
 @media (max-width: 760px) {
   .pp-head .kicker::before { display: none; }

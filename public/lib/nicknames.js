@@ -3,7 +3,9 @@
 // uploads and scrims under those names get this one too.
 export const NICKNAMES = { 19192564: "[REDACTED]" };
 
-const chosen = new Map(), loaded = new Set();
+const chosen = new Map(), loaded = new Set(), steamIds = new Set();
+// Every account that has used the site with Steam (the Worker keeps its card), from loadNicknames.
+export const steamAccountIds = () => [...steamIds];
 let ready = null;
 const accountOf = p => p?.player_key ?? p?.key ?? p?.account_id ?? p?.account;
 export const nicknameOf = id => NICKNAMES[id] ?? chosen.get(String(id)) ?? null;
@@ -19,7 +21,7 @@ export function setPlayerNickname(id, name) {
 export function loadNicknames() {
   return ready ??= fetch('https://steam-auth.ad2lstats.workers.dev/cosmetics/appearances')
     .then(r => { if (!r.ok) throw new Error('Player names unavailable.'); return r.json(); })
-    .then(data => { for (const [id, appearance] of Object.entries(data)) setPlayerNickname(id, appearance.nickname); })
+    .then(data => { for (const [id, appearance] of Object.entries(data)) { steamIds.add(id); setPlayerNickname(id, appearance.nickname); } })
     .catch(() => { ready = null; });
 }
 function applyNames(d) {

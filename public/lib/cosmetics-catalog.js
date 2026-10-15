@@ -744,6 +744,24 @@ export const CATALOG = [
     "preview": "Fav → ファヴ"
   },
   {
+    "id": "hiragana",
+    "key": "translation:hiragana",
+    "name": "Hiragana Signature",
+    "type": "translation",
+    "rarity": "legendary",
+    "description": "A legendary modifier that renders your name phonetically in soft, rounded Japanese hiragana.",
+    "preview": "Fav → ふぁゔ"
+  },
+  {
+    "id": "kanji",
+    "key": "translation:kanji",
+    "name": "Kanji Brush",
+    "type": "translation",
+    "rarity": "legendary",
+    "description": "A legendary modifier that spells your name in kanji, one character per sound, the way Japanese ateji names are written.",
+    "preview": "Fav → 芭舞"
+  },
+  {
     "id": "cyrillic",
     "key": "translation:cyrillic",
     "name": "Cyrillic Etching",

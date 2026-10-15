@@ -52,12 +52,26 @@ export async function cardRatings(account) {
 }
 // Every changed saved design in the league, with its ratings (the Gallery).
 export async function galleryCards() {
-  const r=await fetch(`${COLLECTION_API}/gallery`);if(!r.ok)throw new Error('Gallery unavailable.');return (await r.json()).cards;
+  const r=await fetch(`${COLLECTION_API}/gallery`);if(!r.ok)throw new Error('Cards unavailable.');return (await r.json()).cards;
 }
-// The newest epic and legendary pack pulls across the league, newest first (the Log tab).
-export async function pullLog() {
-  const r=await fetch(`${COLLECTION_API}/pulls`);if(!r.ok)throw new Error('Pull log unavailable.');return (await r.json()).pulls;
+// The Feed (lib/feed.js): a page of posts older than before (ms), or the single post.
+export async function feedPosts({before=null,post=null,account=null}={}) {
+  const params=new URLSearchParams({...(before?{before}:{}),...(account!=null?{account}:{})}).toString();
+  const q=post?`?post=${encodeURIComponent(post)}`:params?`?${params}`:'';
+  const r=await fetch(`${COLLECTION_API}/feed${q}`);if(!r.ok)throw new Error('Feed unavailable.');return r.json();
 }
+// A player's own Feed post (lib/feed.js buildUserPost). Images are base64 and can be megabytes,
+// so this skips collectionAction's stored retry key: the request ID lives on the draft object, so
+// pressing Post again after a lost response can't post twice.
+export async function createFeedPost(draft,{text,clip,game,images}) {
+  const token=await steamIdToken();if(!token)throw new Error('Sign in with Steam to post.');
+  draft.requestId??=crypto.randomUUID();
+  const r=await fetch(`${COLLECTION_API}/post`,{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},body:JSON.stringify({action:'post',text,clip,game,images,requestId:draft.requestId})});
+  const data=await r.json().catch(()=>({error:r.status===413?'Those images are too large.':'Could not post.'}));
+  if(!r.ok){if(r.status<500)draft.requestId=null;throw new Error(data.error??'Could not post.');}
+  draft.requestId=null;state=data.state;return data;
+}
+export const feedMediaUrl=(post,n)=>`${COLLECTION_API}/media/${encodeURIComponent(post)}/${n}`;
 // The signed-in player's own votes, "<owner>:<design key>" → rating; empty when signed out.
 export async function myCardVotes() {
   const token=await steamIdToken().catch(()=>null);if(!token)return {};

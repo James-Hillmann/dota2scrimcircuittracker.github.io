@@ -139,6 +139,7 @@
 [data-writing=greek]{--signature-font:Georgia,'Times New Roman',serif;}
 [data-writing=runic]{--signature-font:'Segoe UI Symbol','Noto Sans Runic',serif;letter-spacing:.04em;}
 [data-writing=thai]{--signature-font:'Leelawadee UI','Thonburi','Noto Sans Thai',sans-serif;}
+.translation-swatch.hiragana,.translation-swatch.kanji,.name-rendering-preview.hiragana,.name-rendering-preview.kanji{font-family:'Autograph Japanese','Yu Mincho',serif}.translation-swatch.hiragana,.name-rendering-preview.hiragana{color:#ffd9e4}.translation-swatch.kanji,.name-rendering-preview.kanji{color:#f4ecdb}
 .signature-sample,.reward-signature{position:relative;display:block;width:100%;text-align:center;min-width:0;line-height:1.4;}
 .signature-sample{--signature-size:25px;transform:rotate(var(--signature-slant));padding:4px 0;}
 .signature-sample .autograph-lettering{padding:0;line-height:1.4;}

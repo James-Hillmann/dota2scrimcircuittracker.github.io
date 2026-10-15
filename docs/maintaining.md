@@ -275,6 +275,30 @@ signs in with it). Only the site and the two localhost previews may receive a to
 key, firebase-adminsdk, set in the Cloudflare dashboard; never in the repo). Tests:
 `test/steam-auth.test.js`.
 
+Steam players on no roster (`src/scout.js`, Durable Object `ScoutStore`): each has an entry
+with their Steam name, avatar and scout report (rank, 30 days of pubs, all-time heroes; the
+sync's `pubs` and `totals` formats). Their own browser builds the report from OpenDota
+(`lib/scout-report.js`) on sign-in when the saved one is missing or over 6 hours old and sends
+it with `POST /scout` (Bearer Firebase ID token; the Worker keeps only the known fields and stamps
+the time); everyone else reads the saved copy with `GET /scout/<account>`. `GET /scout/players`
+lists names for the Gallery, Feed and search. The Worker can't read OpenDota itself: OpenDota
+answers it with 429 "daily api limit exceeded" (its keyless limit is per IP and Cloudflare's IPs
+are shared). Tests: `test/scout.test.js`.
+
+Feed posts (`lib/feed.js`, Worker `src/cosmetics.js`): player posts are `post:u:<account>:<ms>`
+rows next to card posts, each image its own `media:<post>:<n>` row (bytes plus the type read
+from them; max 4 × 700 KB), served at `GET /cosmetics/media/<post>/<n>` sandboxed and cached
+for good. Posting goes to `POST /cosmetics/post` (larger size limit than `/cosmetics`); the
+Worker first runs each image past Workers AI (`src/image-check.js`, binding `AI`, model
+`@cf/mistralai/mistral-small-3.1-24b-instruct`) and refuses the post if any image is flagged or
+can't be checked. The word filter is `lib/moderation.js`. Bans are the vault's `feed-bans` row
+(Fav: actions `ban`, `feed-bans`); unfollows are each player's `unfollowed` list (action
+`follow`). Auto-posts follow each player's `feedAuto` (`lib/feed.js` `feedAutoOf`, action
+`feed-auto`): a saved card posts only with `cards` on; an opened pack's `pull:` row keeps only the
+cards of the chosen rarities, plus `screens` when on, and isn't written if that leaves nothing.
+`GET /cosmetics/feed?account=<id>` is one player's posts (the profile's Feed tab,
+`parts/collection.js` `mountProfileFeed`). Tests: `test/feed.test.js`, `test/highlights.test.js`.
+
 ```bash
 cd workers/steam-auth && npx wrangler deploy     # after changing src/index.js
 npx wrangler secret list                          # FIREBASE_SA should be listed

@@ -1,6 +1,6 @@
-import { esc, SOURCES, allLoad } from '../core.js';
+import { esc, SOURCES, allLoad, pageList } from '../core.js';
 import { steamAccount, steamLoginUrl, listCards } from '../lib/store.js';
-import { CATALOG, DEFAULT_EQUIPMENT, PARTICLE_FINISHES, collectionState, collectionAction, publicCollection, applyEquipment, cardRatings, galleryCards, myCardVotes, pullLog } from '../lib/cosmetics.js';
+import { CATALOG, DEFAULT_EQUIPMENT, PARTICLE_FINISHES, collectionState, collectionAction, publicCollection, applyEquipment, cardRatings, galleryCards, myCardVotes } from '../lib/cosmetics.js';
 import { RATINGS } from '../lib/card-ratings.js';
 import { TIERS, itemByKey } from '../lib/cosmetics-catalog.js';
 import { signatureHtml, renderedName } from '../lib/signatures.js';
@@ -14,7 +14,10 @@ import { startFeedback } from '../lib/feedback.js';
 import { showProfileBackground, mountBackgroundButton, letterCaseHtml, drawLetterCase } from './profile-background.js';
 import { FRONT_PARTS, BACK_STATS, MAX_BACK_STATS, MAX_NAME, backStats, applyLayout, shownByDefault } from '../lib/card-layout.js';
 import './pack-gifts.js'; // the "Fav sent you packs" notice
+import './feed-notice.js'; // the "new comments on your posts" notice
+import { drawFeed } from './feed.js';
 import { SCREEN_ART } from '../lib/screen-art-data.js';
+import { strangerNames } from '../lib/scout.js';
 
 const gift=`<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M4 13h24v6H4zm2 6h20v11H6zm10-6v17M16 13C4 13 5 2 11 4c4 1 5 9 5 9zm0 0c12 0 11-11 5-9-4 1-5 9-5 9z"/></svg>`;
 const colors={common:'#abb3be',rare:'#80c4ff',epic:'#d7a3ff',legendary:'#ffd879'};
@@ -48,19 +51,21 @@ const screenDexHtml=(owned,status,hero,preview,empty='<p>No loading screens matc
 // The collection as a dialog, or with `page` (an element) as a full page: the Gallery tab
 // (pages/gallery.js), whose own sub-tab bar (`tabBar`, the site's tabs, [data-tab] buttons)
 // switches the sections. onTab hears each tab change so the address can follow it.
-export async function openCollection({tab='packs',viewAccount=null,cardHtml=null,name=null,adapter=null,page=null,tabBar=null,onTab=null}={}) {
+// focus: a Feed post to pin at the top (from a comment notice).
+export async function openCollection({tab='packs',viewAccount=null,cardHtml=null,name=null,adapter=null,page=null,tabBar=null,onTab=null,focus=null}={}) {
+  if(tab==='log')tab='feed'; // the Feed replaced the Log
   const own=adapter?.account??await steamAccount().catch(()=>null), target=viewAccount??own, editable=target!=null&&target===own;
   name=name??steamName(target)??'Your Name';
-  let state=editable?(adapter?.state??collectionState()):null, inventory={}, busy=false, filter='all', rarity='all', status='all', rewards=[], rewardScreens=[], rewardRevealed=[];
+  let state=editable?(adapter?.state??collectionState()):null, inventory={}, busy=false, filter='all', rarity='all', status='owned', rewards=[], rewardScreens=[], rewardRevealed=[];
   const action=adapter?.action??collectionAction;
-  let selectedSlot=state?.primaryCard??0, publicDesigns=null, previewItem=null, previewScreen=null, screenHero='all';
+  let selectedSlot=state?.primaryCard??0, publicDesigns=null, previewItem=null, previewScreen=null, screenHero='all', dexPage=0;
   const designs=()=>cardDesignState(state??publicDesigns??{equipment});
   const selectedEquipment=()=>({...DEFAULT_EQUIPMENT,...(designs().cardDesigns[selectedSlot]??state?.equipment??equipment)});
   let clockOffset=0, timerRetryAt=0;
   const dialog=document.createElement(page?'section':'dialog');dialog.className=page?'collection-dialog collection-page':'collection-dialog';dialog.setAttribute('aria-labelledby','collection-title');
   const closeView=()=>{if(!page)dialog.close();}, tabsHost=tabBar??dialog;
   const shownName=()=>shownNickname(state)??name;
-  dialog.innerHTML=`${page?'':`<div class="collection-head"><div><small>AD2L COLLECTION</small><h2 id="collection-title">Your collection</h2></div><div class="collection-head-actions"><button type="button" data-feedback title="Suggest a change: mark up the collection and say what you'd change">Feedback</button><button type="button" data-close aria-label="Close collection">×</button></div></div><nav class="collection-tabs" aria-label="Collection sections">${['packs','collection','customize','recycle','gallery','log'].map(t=>`<button type="button" data-tab="${t}">${t[0].toUpperCase()+t.slice(1)}</button>`).join('')}</nav>`}${page?'<p class="collection-message" role="status" aria-live="polite"></p><div class="collection-body"></div>':'<div class="collection-body"></div><p class="collection-message" role="status" aria-live="polite"></p>'}`;
+  dialog.innerHTML=`${page?'':`<div class="collection-head"><div><small>AD2L COLLECTION</small><h2 id="collection-title">Your collection</h2></div><div class="collection-head-actions"><button type="button" data-feedback title="Suggest a change: mark up the collection and say what you'd change">Feedback</button><button type="button" data-close aria-label="Close collection">×</button></div></div><nav class="collection-tabs" aria-label="Collection sections">${[['feed','Feed'],['gallery','Gallery'],['packs','Packs'],['collection','Collection'],['customize','Customize'],['recycle','Recycle']].map(([t,label])=>`<button type="button" data-tab="${t}">${label}</button>`).join('')}</nav>`}${page?'<p class="collection-message" role="status" aria-live="polite"></p><div class="collection-body"></div>':'<div class="collection-body"></div><p class="collection-message" role="status" aria-live="polite"></p>'}`;
   if(page)page.replaceChildren(dialog);
   else {document.querySelector('dialog.collection-dialog')?.close();document.querySelector('dialog.collection-dialog')?.remove();document.body.append(dialog);dialog.showModal();}
   const body=dialog.querySelector('.collection-body'), message=dialog.querySelector('.collection-message');
@@ -126,8 +131,10 @@ export async function openCollection({tab='packs',viewAccount=null,cardHtml=null
     body.querySelector('[data-shuffle]')?.addEventListener('change',async e=>{const enabled=e.target.checked;const data=await run('card-settings',{shuffleCards:enabled});draw();if(data)say(enabled?'Other viewers will see a shuffled saved design.':'Other viewers will see your primary card.');});
   }
   function draw() {
+    body._feedToken=null; // cancel a Feed request that finishes after another tab was chosen
+    body.dataset.collectionView=tab;
     tabsHost.querySelectorAll('[data-tab]').forEach(b=>{b.setAttribute(tabBar?'aria-selected':'aria-pressed',String(b.dataset.tab===tab));if(tabBar)b.tabIndex=b.dataset.tab===tab?0:-1;b.disabled=busy;});
-    if(tab==='packs')drawPacks();else if(tab==='collection')drawDex();else if(tab==='customize')drawEditor();else if(tab==='gallery')drawGallery(body,{viewer:own,signIn});else if(tab==='log')drawLog(body);else drawRecycle();
+    if(tab==='packs')drawPacks();else if(tab==='collection')drawDex();else if(tab==='customize')drawEditor();else if(tab==='gallery')drawGallery(body,{viewer:own,signIn});else if(tab==='feed'){drawFeed(body,{viewer:own,signIn,action,swatch,colors,typeLabel,ago,focus});focus=null;}else drawRecycle();
   }
   function drawPacks() {
     const packs=state?.packs??[],normal=packs.filter(p=>p==='common').length;
@@ -200,9 +207,13 @@ export async function openCollection({tab='packs',viewAccount=null,cardHtml=null
     body.querySelector('[data-customize-card]')?.addEventListener('click',()=>{equipment={...savedEquipment};initialEquipment=JSON.stringify(equipment);tab='customize';draw();});
     const oldStatus=body.querySelector('[data-status]');oldStatus.parentElement.innerHTML=`<span>Show only collected</span><input type="checkbox" data-status ${status==='owned'?'checked':''}>`;
     const f=body.querySelector('[data-filter]'),s=body.querySelector('[data-status]'),rr=body.querySelector('[data-rarity-filter]'),sh=body.querySelector('[data-screen-hero]');f.value=filter;f.querySelector('option[value="translation"]')?.replaceChildren('modifier');
-    if(rr){rr.value=rarity;rr.onchange=()=>{rarity=rr.value;drawDex();};}
-    if(sh){sh.value=screenHero;sh.onchange=()=>{screenHero=sh.value;drawDex();};}
-    f.onchange=()=>{filter=f.value;drawDex();};s.onchange=()=>{status=s.checked?'owned':'all';drawDex();};
+    // Three rows of designs a page, however many columns fit; a new filter starts at page 1.
+    const grid=body.querySelector('.dex-grid'),cols=getComputedStyle(grid).gridTemplateColumns.split(' ').filter(Boolean).length||4;
+    pageList(grid,{size:cols*3,page:dexPage,onChange:p=>dexPage=p});
+    const refilter=()=>{if(dexPage>0)dexPage=0;drawDex();};
+    if(rr){rr.value=rarity;rr.onchange=()=>{rarity=rr.value;refilter();};}
+    if(sh){sh.value=screenHero;sh.onchange=()=>{screenHero=sh.value;refilter();};}
+    f.onchange=()=>{filter=f.value;refilter();};s.onchange=()=>{status=s.checked?'owned':'all';refilter();};
     body.querySelectorAll('[data-equip]').forEach(b=>{b.onclick=async()=>{
       const item=itemByKey(b.dataset.equip),next={...savedEquipment,[item.type]:item.id};
       const data=await run('equip',{equipment:next});
@@ -432,7 +443,9 @@ addEventListener('collection-change',e=>updateGift(e.detail.state));
 addEventListener('pack-offer-change',()=>updateGift(collectionState()));
 
 export async function mountProfileCollection(host,{account,name,matches,team,tier}) {
-  const section=document.createElement('section');section.className='profile-collection panel';section.innerHTML='<h3>Card collection</h3><p>Loading collection…</p>';host.querySelector('.page-head')?.after(section);
+  const section=document.createElement('section');section.className='profile-collection panel';section.innerHTML='<h3>Card collection</h3><p>Loading collection…</p>';
+  // On a tabbed profile it heads the Feed tab only; the scouted page (no tabs) shows it under the head.
+  const feedTab=host.querySelector('#pp-panel-feed');if(feedTab)feedTab.prepend(section);else host.querySelector('.page-head')?.after(section);
   try {
     const [data,cards]=await Promise.all([publicCollection(account).catch(()=>({inventory:{},unavailable:true})),listCards().catch(()=>new Map())]);if(!section.isConnected)return;
     if(data.equipment)cards.set(account,{...cards.get(account),cosmetics:{...data.equipment,nickname:data.nickname??null}});
@@ -495,7 +508,8 @@ async function mountRatings(section,account) {
 
 // The Gallery: every saved card anyone in the league has changed, with its rating. Sorted by the
 // community's rating (legendary first; among equals, the clearer verdict, then more votes), by
-// votes, by newest change, or by name. "Not rated by me" leaves the cards a signed-in player can still rate.
+// votes, by newest change (the default), or by name; the sort is remembered in this browser. "Not rated
+// by me" leaves the cards a signed-in player can still rate. Three rows a page.
 const PICK_RANK={legendary:4,epic:3,rare:2,common:1};
 async function drawGallery(body,{viewer,signIn}) {
   body.innerHTML='<p>Loading gallery…</p>';
@@ -507,13 +521,27 @@ async function drawGallery(body,{viewer,signIn}) {
   if(!body.isConnected)return;
   const roster=new Map(teams.flatMap(t=>t.players.map(p=>[String(p.account_id),{name:p.name,team:t.name,league:t.league}])));
   const renderer=createPlayerCards(matches,{cards:overrides,teams});
-  const nameOf=c=>c.nickname??roster.get(c.account)?.name??steamName(Number(c.account))??c.design.layout?.name??`Player ${c.account}`;
+  // Players on no roster go by their Steam name (lib/scout.js).
+  const strangers=await strangerNames(cards.map(c=>String(c.account)).filter(a=>!roster.has(a))).catch(()=>new Map());if(!body.isConnected)return;
+  const nameOf=c=>c.nickname??roster.get(c.account)?.name??strangers.get(String(c.account))??steamName(Number(c.account))??c.design.layout?.name??`Player ${c.account}`;
   const share=c=>c.total?c.counts[c.pick]/c.total:0;
   // A card changed since this browser last opened the Gallery is new (highlighted), except your own.
   let lastSeen=0;
   try {lastSeen=Number(localStorage.getItem('gallery-seen'))||0;localStorage.setItem('gallery-seen',String(Date.now()));} catch {}
   const isNew=c=>c.at>lastSeen&&String(c.account)!==String(viewer);
-  let sort='rarity',unrated=false;
+  const SORTS=['newest','rarity','votes','name'];
+  let sort='newest',unrated=false,page=0;
+  try {const saved=localStorage.getItem('gallery-sort');if(SORTS.includes(saved))sort=saved;} catch {}
+  // Pages hold three rows of however many columns fit; a resize re-pages from the same first card.
+  const paginate=()=>{
+    const grid=body.querySelector('.gallery-grid');if(!grid)return;
+    const cols=Math.max(1,getComputedStyle(grid).gridTemplateColumns.split(' ').filter(Boolean).length),size=cols*3;
+    if(grid._size&&grid._size!==size&&page>=0)page=Math.floor(page*grid._size/size);
+    grid._size=size;pageList(grid,{size,page,slack:1,onChange:p=>{page=p;}});
+  };
+  let resizeTimer,width=body.clientWidth;const run=body._galleryRun={};
+  const watch=new ResizeObserver(()=>{if(!body.isConnected||body._galleryRun!==run||body.dataset.collectionView!=='gallery'){watch.disconnect();return;}if(body.clientWidth===width)return;width=body.clientWidth;clearTimeout(resizeTimer);resizeTimer=setTimeout(paginate,150);});
+  watch.observe(body);
   const draw=()=>{
     const shown=cards.filter(c=>!unrated||(String(c.account)!==String(viewer)&&votes[`${c.account}:${c.key}`]==null)).sort((a,b)=>
       (sort==='rarity'?(PICK_RANK[b.pick]??0)-(PICK_RANK[a.pick]??0)||share(b)-share(a)||b.total-a.total
@@ -521,40 +549,42 @@ async function drawGallery(body,{viewer,signIn}) {
       :sort==='newest'?(b.at??0)-(a.at??0)
       :0)||nameOf(a).localeCompare(nameOf(b))||a.slot-b.slot);
     const fresh=shown.filter(isNew).length;
-    body.innerHTML=`<div class="gallery-bar"><label>Sort <select data-gallery-sort><option value="rarity">Rarity (voted)</option><option value="votes">Most votes</option><option value="newest">Newest</option><option value="name">Player name</option></select></label>
+    body.innerHTML=`<div class="gallery-bar"><label>Sort <select data-gallery-sort><option value="newest">Newest</option><option value="rarity">Rarity (voted)</option><option value="votes">Most votes</option><option value="name">Player name</option></select></label>
       ${viewer!=null?`<label class="gallery-unrated"><input type="checkbox" data-gallery-unrated${unrated?' checked':''}> Not rated by me</label>`:'<button type="button" class="linkish" data-signin>Sign in with Steam to rate cards</button>'}
       <span class="gallery-count">${fresh?`<b class="gallery-fresh">${fresh} new</b> · `:''}${shown.length} card${shown.length===1?'':'s'}</span></div>
-      <div class="gallery-grid">${PAINT_FILTER}${shown.map(c=>{
+      ${PAINT_FILTER}<div class="gallery-grid">${shown.map(c=>{
         const r=roster.get(c.account),player={account:Number(c.account),name:nameOf(c),team:r?.team??'AD2L'};
-        const link=r?`${SOURCES[r.league]?.root??'#/all'}/player/${c.account}`:null;
+        const link=`${SOURCES[r?.league]?.root??'#/all'}/player/${c.account}`; // every Steam player has a profile (parts/scouted.js)
         return `<figure data-gallery="${c.account}:${c.slot}"${isNew(c)?' class="gallery-new"':''}>${renderer.card(player,null,{own:true,equipmentOverride:c.design}).replace('data-pick=',`data-design-slot="${c.slot}" data-pick=`)}<figcaption>${isNew(c)?'<span class="gallery-new-tag">New</span> ':''}${link?`<a href="${link}">${esc(player.name)}</a>`:esc(player.name)} · Card ${c.slot+1}${c.primary?' · Primary':''}</figcaption></figure>`;
       }).join('')||`<p>${unrated?"You've rated every card here.":'No custom cards yet.'}</p>`}</div>`;
     body.querySelector('[data-gallery-sort]').value=sort;
-    body.querySelector('[data-gallery-sort]').onchange=e=>{sort=e.target.value;draw();};
-    body.querySelector('[data-gallery-unrated]')?.addEventListener('change',e=>{unrated=e.target.checked;draw();});
+    body.querySelector('[data-gallery-sort]').onchange=e=>{sort=e.target.value;page=0;try {localStorage.setItem('gallery-sort',sort);} catch {}draw();};
+    body.querySelector('[data-gallery-unrated]')?.addEventListener('change',e=>{unrated=e.target.checked;page=0;draw();});
     body.querySelector('[data-signin]')?.addEventListener('click',signIn);
     body.querySelectorAll('.gallery-grid figcaption a').forEach(a=>a.addEventListener('click',()=>body.closest('dialog.collection-dialog')?.close()));
-    const grid=body.querySelector('.gallery-grid');wirePlayerCards(grid);
+    const grid=body.querySelector('.gallery-grid');wirePlayerCards(grid);paginate();
     // A vote updates that card's numbers in place; the order holds until the sort or filter changes.
     for(const c of shown)mountRating(grid.querySelector(`[data-gallery="${c.account}:${c.slot}"]`),c.account,c,{viewer,votes,onVote:next=>Object.assign(c,next)});
   };
   draw();
 }
 
-// The Log: who pulled which epic and legendary cards from packs, newest first. One line per card.
+// "5m ago" for the Feed (parts/feed.js).
 const ago=at=>{const m=Math.round((Date.now()-at)/60000);return m<1?'just now':m<60?`${m}m ago`:m<1440?`${Math.round(m/60)}h ago`:`${Math.round(m/1440)}d ago`;};
-async function drawLog(body) {
-  body.innerHTML='<p>Loading log…</p>';
-  let pulls,teams;
-  try {[pulls,teams]=await Promise.all([pullLog(),SOURCES.all.data().then(d=>d.teams).catch(()=>[])]);}
-  catch(e) {body.innerHTML=`<p>${esc(e.message)}</p>`;return;}
-  if(!body.isConnected)return;
-  const roster=new Map(teams.flatMap(t=>t.players.map(p=>[String(p.account_id),{name:p.name,league:t.league}])));
-  const lines=pulls.flatMap(p=>p.items.map(key=>({...p,item:itemByKey(key)}))).filter(l=>l.item);
-  body.innerHTML=`<div class="pull-log-head"><h3>Epic and legendary pulls</h3><p>Every epic or legendary card anyone has opened from a pack, newest first.</p></div>${lines.length?`<ol class="pull-log">${lines.map(l=>{
-    const r=roster.get(String(l.account)),who=esc(l.nickname??r?.name??steamName(Number(l.account))??`Player ${l.account}`);
-    return `<li style="--rarity:${colors[l.item.rarity]}"><span class="pull-swatch">${swatch(l.item,l.nickname??r?.name??'Name')}</span><span class="pull-text">${r?`<a href="${SOURCES[r.league]?.root??'#/all'}/player/${l.account}">${who}</a>`:`<b>${who}</b>`} pulled <strong>${esc(l.item.name)}</strong> <span class="pull-rarity">${l.item.rarity}</span><small>${esc(typeLabel(l.item.type))}</small></span><time datetime="${new Date(l.at).toISOString()}" title="${new Date(l.at).toLocaleString()}">${ago(l.at)}</time></li>`;
-  }).join('')}</ol>`:'<p>No epic or legendary pulls yet.</p>'}`;
+
+// A profile's Feed tab (parts/feed.js with `account`): that player's posts, and on your own
+// profile your auto-post settings. box sits in the tab's panel; the feed loads the first time the
+// panel shows.
+export async function mountProfileFeed(box,account) {
+  const panel=box.closest('[hidden]')??box.closest('.pp-panel');
+  if(panel?.hidden) {
+    await new Promise(resolve=>{const watch=new MutationObserver(()=>{if(!panel.hidden){watch.disconnect();resolve();}});watch.observe(panel,{attributes:true,attributeFilter:['hidden']});});
+    if(!box.isConnected)return;
+  }
+  const body=document.createElement('div');body.className='collection-body';body.dataset.collectionView='feed';
+  const wrap=document.createElement('section');wrap.className='collection-dialog collection-page profile-feed';wrap.append(body);box.replaceChildren(wrap);
+  const viewer=await steamAccount().catch(()=>null);
+  await drawFeed(body,{viewer,signIn:startSteamSignIn,action:collectionAction,swatch,colors,typeLabel,ago,account:String(account)});
 }
 
 // Your name on the site (lib/cosmetics-engine.js setNickname): a nickname, and which name shows on

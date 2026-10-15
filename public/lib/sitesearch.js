@@ -77,7 +77,8 @@ const RECORD = TOPICS.find((t) => t.id === "record");
 
 // A page type's tab label, and every tab of an entity's page as [label, href] (sitelinks).
 export const tabLabel = (kind, id, league) => tabList(LISTS[kind], { ad2l: league !== "scrim" }).find(([x]) => x === id)?.[1] ?? null;
-export const sitelinks = (e) => tabList(LISTS[e.kind], { ad2l: e.league !== "scrim" }).map(([id, label]) => [label, withAt(e.href, { tab: id })]);
+// A Steam player on no roster (league "steam") has one page with no tabs.
+export const sitelinks = (e) => e.league === "steam" ? [] : tabList(LISTS[e.kind], { ad2l: e.league !== "scrim" }).map(([id, label]) => [label, withAt(e.href, { tab: id })]);
 
 // Per index (it's built once per visit): name runs and the spelling vocabulary.
 const prepared = new WeakMap();
@@ -231,7 +232,7 @@ export function siteSearch({ index, heroes = [], query, league = null, heroHref 
   // Direct links: each whole-name match at each topic its kind of page has.
   const direct = [], covered = new Set();
   for (const e of full) for (const t of topics) {
-    const s = t[e.kind];
+    const s = e.league !== "steam" && t[e.kind];
     if (!s) continue;
     covered.add(t.id);
     direct.push({ entity: e, topic: t, href: withAt(e.href, s), tab: tabLabel(e.kind, s.tab, e.league) });

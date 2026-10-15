@@ -19,7 +19,7 @@ import { tierRef, tierBreakdown } from "../parts/tiers.js";
 import { compareHtml, wireCompare } from "../parts/compare.js";
 import { radarSvg, roleScores } from "../parts/radar.js";
 import { tagContext, gameTags, tagsHtml, tagCells } from "../lib/gametags.js";
-import { mountProfileCollection } from '../parts/collection.js';
+import { mountProfileCollection, mountProfileFeed } from '../parts/collection.js';
 import { mountProfileTickets } from '../parts/profile-tickets.js';
 import { mountGiftPanel } from '../parts/pack-gifts.js';
 import { plusSlot, startPlusLevels } from "../lib/hero-levels.js";
@@ -50,6 +50,11 @@ export async function renderPlayer(src, key) {
   try { matches = await src.load(); if (src.ad2l) await src.data(); } catch (e) { app.innerHTML = `${pageHead(src.kicker, "Player")}${errorBox(e)}`; return; }
   const h = playerHistory(matches, key);
   const back = `<div class="kicker" style="margin-bottom:16px"><a href="${src.root}/players">← All players</a></div>`;
+  // No games here: a Steam player on no roster gets their scout report instead (parts/scouted.js).
+  if (!h && /^\d+$/.test(key) && !src.cache?.()?.teams?.some((t) => t.players.some((p) => String(p.account_id) === key))) {
+    const { renderScoutedPlayer } = await import("../parts/scouted.js");
+    if (await renderScoutedPlayer(src, key).catch(() => false)) return;
+  }
   if (!h) { app.innerHTML = `${back}<div class="panel empty"><strong>No games found for this player</strong>Private scrims don't include players.</div>`; return; }
   const s = h.summary;
 
@@ -125,6 +130,8 @@ export async function renderPlayer(src, key) {
       ["games", `<h2>Every game</h2><p class="table-note">Analyze opens a game in depth on the Stats tab.</p>
         <div id="t"></div>
 `],
+      // Their Feed posts, loaded when the tab opens (parts/collection.js mountProfileFeed).
+      ["feed", /^\d+$/.test(key) ? `<div class="profile-feed-box"></div>` : ""],
   ]));
 
   // One compact header: back link and league on one line, then name, tier, team line and the
@@ -154,6 +161,7 @@ export async function renderPlayer(src, key) {
   const inGameName=h.games[0]?.p.inGameName??roster?.inGameName??s.name;
   if(/^\d+$/.test(key)) mountProfileCollection(app,{account:Number(key),name:inGameName,matches,team:roster?.team?.name??s.team,tier:tierOf}).catch(()=>{});
   if(/^\d+$/.test(key)) mountProfileTickets(app,key).catch(()=>{});
+  if(/^\d+$/.test(key)) mountProfileFeed(app.querySelector(".profile-feed-box"),key).catch(()=>{});
   if(/^\d+$/.test(key)) mountGiftPanel(app,key,s.name).catch(()=>{});
   wireItemHeroes();
   wireCharts(app);

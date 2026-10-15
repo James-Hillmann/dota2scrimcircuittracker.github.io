@@ -1,0 +1,7 @@
+Dota 2 chat emoticons used by the Feed reaction picker.
+
+Source extraction: https://github.com/bontscho/dota2-chat-emoticons
+Original game path: panorama/images/emoticons
+
+The selected files retain their in-game names. All game images and names are property of
+Valve Corporation; this site is not affiliated with Valve.

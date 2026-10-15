@@ -1,9 +1,11 @@
 // The Steam sign-in in the top bar (right, before the settings cog). Signed out: "Sign in". Signed
 // in: your Steam avatar, which opens your player page in the first league whose roster has you
-// (the league you're viewing first), or Predict's Fantasy tab when no roster has you. Avatar and Steam name
-// come from OpenDota's public profile, kept in this browser for a day.
+// (the league you're viewing first). A player on no roster saves a scout of their OpenDota history
+// and their Steam name on the Worker (lib/scout.js), and their page shows it. Avatar and Steam
+// name come from OpenDota's public profile, kept in this browser for a day.
 import { esc, DIVISIONS, SOURCES, divLite, playerHref, navigate, here, bySlug, myTeam, setMyTeam, myTeamAutoOk } from "../core.js";
 import { steamAccount, steamLoginUrl } from "../lib/store.js";
+import { saveMyScout } from "../lib/scout.js";
 
 const PROFILE_KEY = "steam-profile";
 const DAY = 864e5;
@@ -50,10 +52,11 @@ async function myRoster(account, first = viewedDiv()) {
   }
   return null;
 }
-// Your player page there, or Predict's Fantasy tab when no roster has you.
+// Your player page: in the division whose roster has you, else the one being viewed (your scout
+// report).
 async function myPage(account) {
   const r = await myRoster(account);
-  return r ? playerHref(SOURCES[r.div], String(account)) : `${SOURCES[viewedDiv() ?? Object.keys(DIVISIONS)[0]].root}/predict?tab=fantasy`;
+  return playerHref(SOURCES[r?.div ?? viewedDiv() ?? Object.keys(DIVISIONS)[0]], String(account));
 }
 // My team follows your roster unless you've picked one (or None) by hand under the cog. The
 // division searched first is the one My team already points at, so a player on two rosters
@@ -76,6 +79,9 @@ export async function mountMe() {
   }
   autoMyTeam(account).catch((e) => console.warn("my team from sign-in", e));
   const p = await profileOf(account);
+  // On no roster: save their scout and Steam name (re-scouted at most every few hours), so their
+  // profile, the Gallery, Feed and search show them.
+  myRoster(account).then((r) => r || saveMyScout(account, p)).catch((e) => console.warn("scout", e));
   const label = p.name ?? `Account ${account}`;
   el.innerHTML = `<a class="me-av" href="#" title="${esc(label)}: your page" aria-label="Your page (${esc(label)})">${p.avatar
     ? `<img src="${esc(p.avatar)}" alt="" width="30" height="30" referrerpolicy="no-referrer">`

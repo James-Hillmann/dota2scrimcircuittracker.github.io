@@ -12,8 +12,8 @@ export const TEAM_TABS = [
 ];
 // Games is the list; game analysis sits under Stats (a row's ANALYZE opens it on that game).
 export const PLAYER_TABS = [
-  ["stats", "Stats"], ["compare", "Compare"], ["heroes", "Heroes"], ["combat", "Combat"], ["lanes", "Laning", { ad2l: true }],
-  ["items", "Items"], ["map", "Map"], ["games", "Games"],
+  ["feed", "Feed"], ["stats", "Stats"], ["compare", "Compare"], ["heroes", "Heroes"], ["combat", "Combat"],
+  ["lanes", "Laning", { ad2l: true }], ["items", "Items"], ["map", "Map"], ["games", "Games"],
 ];
 export const HERO_TABS = [
   ["stats", "Stats"], ["players", "Players"], ["draft", "Draft"], ["matchups", "Matchups"], ["combat", "Combat"],
