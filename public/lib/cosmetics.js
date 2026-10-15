@@ -58,8 +58,8 @@ export async function galleryCards() {
   const r=await fetch(`${COLLECTION_API}/gallery`);if(!r.ok)throw new Error('Cards unavailable.');return (await r.json()).cards;
 }
 // The Feed (lib/feed.js): a page of posts older than before (ms), or the single post.
-export async function feedPosts({before=null,post=null,account=null,type='all',sort='new',offset=0}={}) {
-  const params=new URLSearchParams({...(before?{before}:{}),...(account!=null?{account}:{}),...(type!=='all'?{type}:{}),...(sort!=='new'?{sort}:{}),...(offset?{offset}:{})}).toString();
+export async function feedPosts({before=null,post=null,account=null,type='all',sort='new',range='all',offset=0}={}) {
+  const params=new URLSearchParams({...(before?{before}:{}),...(account!=null?{account}:{}),...(type!=='all'?{type}:{}),...(sort!=='new'?{sort}:{}),...(sort==='top'&&range!=='all'?{range}:{}),...(offset?{offset}:{})}).toString();
   const q=post?`?post=${encodeURIComponent(post)}`:params?`?${params}`:'';
   const r=await fetch(`${COLLECTION_API}/feed${q}`);if(!r.ok)throw new Error('Feed unavailable.');return r.json();
 }

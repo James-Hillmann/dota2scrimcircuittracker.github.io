@@ -3,7 +3,7 @@ import { designKey, castVote, tally } from '../../../public/lib/card-ratings.js'
 import { DEFAULT_EQUIPMENT, itemByKey } from '../../../public/lib/cosmetics-catalog.js';
 import { isAdmin, giftPacks, clearGifts } from '../../../public/lib/pack-gifts.js';
 import { checkImages } from './image-check.js';
-import { isPostId, postOwner, toggleReaction, reactionTally, addComment, deleteComment, reactToComment, pushNotice, markNoticesSeen, cardPostId, FEED_PAGE, COMMENT_GAP, POST_GAP, MAX_IMAGES, MAX_IMAGE_BYTES, userPostId, buildUserPost, canRemovePost, feedAutoOf, setFeedAuto, pullPost, setFollow, setBan, isBanned, feedTypeOf, feedSortOf, FEED_TYPES, postScore, sortFeed, castPollVote, pollTally } from '../../../public/lib/feed.js';
+import { isPostId, postOwner, toggleReaction, reactionTally, addComment, deleteComment, reactToComment, pushNotice, markNoticesSeen, cardPostId, FEED_PAGE, COMMENT_GAP, POST_GAP, MAX_IMAGES, MAX_IMAGE_BYTES, userPostId, buildUserPost, canRemovePost, feedAutoOf, setFeedAuto, pullPost, setFollow, setBan, isBanned, feedTypeOf, feedSortOf, feedRangeOf, FEED_RANGES, FEED_TYPES, postScore, sortFeed, castPollVote, pollTally } from '../../../public/lib/feed.js';
 import { pingTargets, plainMentions } from '../../../public/lib/mentions.js';
 
 const json=(value,status=200)=>Response.json(value,{status});
@@ -120,7 +120,8 @@ export class CosmeticsVault {
       const one=url.searchParams.get('post'),before=Number(url.searchParams.get('before'))||Infinity,who=url.searchParams.get('account');
       const type=feedTypeOf(url.searchParams.get('type')),sort=feedSortOf(url.searchParams.get('sort')),offset=Math.max(0,Math.floor(Number(url.searchParams.get('offset'))||0));
       if(who!=null&&!/^\d{1,10}$/.test(who))return json({error:'Invalid account.'},400);
-      let posts;
+      const range=feedRangeOf(url.searchParams.get('range')),pinId=await this.ctx.storage.get('feed-pin');
+      let posts,pinned=null;
       if(one) {
         if(!isPostId(one))return json({error:'Choose a post.'},400);
         const p=await this.postById(one);posts=p?[p]:[];
@@ -129,6 +130,12 @@ export class CosmeticsVault {
         const cards=rows.map(([k,v])=>({id:k.slice(5),...v}));
         const pulls=[...(await this.ctx.storage.list({prefix:'pull:'}))].map(([k,v])=>({id:`p:${k.slice(5)}`,kind:'pull',...v})).filter(p=>who==null||String(p.account)===who);
         posts=[...cards,...pulls].filter(FEED_TYPES[type].match);
+        // Fav's pinned post leads the first page of the whole Feed and is left out of the rest.
+        if(pinId){
+          if(who==null&&before===Infinity&&!offset){const p=await this.postById(pinId);if(p&&FEED_TYPES[type].match(p))pinned={...p,pinned:true};}
+          posts=posts.filter(p=>p.id!==pinId);
+        }
+        if(sort==='top'&&range!=='all')posts=posts.filter(p=>p.at>=Date.now()-FEED_RANGES[range].ms);
         if(sort==='new')posts=posts.filter(p=>p.at<before).sort((a,b)=>b.at-a.at);
         else {
           const reacts=await this.ctx.storage.list({prefix:'react:'}),comments=await this.ctx.storage.list({prefix:'comments:'}),polls=await this.ctx.storage.list({prefix:'poll:'});
@@ -137,6 +144,7 @@ export class CosmeticsVault {
         }
       }
       const more=posts.length>FEED_PAGE;posts=posts.slice(0,FEED_PAGE);
+      if(pinned)posts.unshift(pinned);
       const nicknames={};
       for(const p of posts) {
         p.reactions=reactionTally(await this.ctx.storage.get(`react:${p.id}`));
@@ -310,7 +318,17 @@ export class CosmeticsVault {
           if(!stored)throw new Error('That post is gone.');
           for(let i=0;i<(stored.images?.length??0);i++)await txn.delete(`media:${post}:${i}`);
           for(const k of [row,`react:${post}`,`comments:${post}`,`poll:${post}`])await txn.delete(k);
+          if(await txn.get('feed-pin')===post)await txn.delete('feed-pin');
           result={state:saved,removed:post};
+        }
+        // Fav pins one post to the top of the Feed, or unpins it (body.pinned false).
+        else if(body.action==='post-pin') {
+          if(!isAdmin(account))throw new Error('Only Fav can pin posts.');
+          const post=String(body.post??'');
+          if(!isPostId(post))throw new Error('Choose a post.');
+          if(body.pinned===false){if(await txn.get('feed-pin')===post)await txn.delete('feed-pin');}
+          else{if(!await this.postById(post,txn))throw new Error('That post is gone.');await txn.put('feed-pin',post);}
+          result={state:saved,post};
         }
         // Fav bans a player from posting, commenting or reacting (body.scope, all three when left
         // out), for some days or until lifted.

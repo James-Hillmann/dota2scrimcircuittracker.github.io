@@ -9,7 +9,7 @@ import { designKey } from '../lib/card-ratings.js';
 import { mountRating } from './card-rating.js';
 import { shownNickname } from '../lib/cosmetics-engine.js';
 import { itemByKey } from '../lib/cosmetics-catalog.js';
-import { REACTIONS, REACTION_ART, topReaction, rankedReactions, reactionTally, commentThreads, MAX_COMMENT, clipEmbed, clipLink, canRemovePost, feedAutoOf, PULL_RARITIES, BAN_SCOPES, BAN_LABELS, banScope, FEED_TYPES, FEED_SORTS, pollOpen, pollTimeLeft } from '../lib/feed.js';
+import { REACTIONS, REACTION_ART, topReaction, rankedReactions, reactionTally, commentThreads, MAX_COMMENT, clipEmbed, clipLink, canRemovePost, feedAutoOf, PULL_RARITIES, BAN_SCOPES, BAN_LABELS, banScope, FEED_TYPES, FEED_SORTS, FEED_RANGES, pollOpen, pollTimeLeft } from '../lib/feed.js';
 import { screenArt } from '../lib/card-art.js';
 import { playerLine, gameAchievements } from '../lib/highlights.js';
 import { heroImg } from '../lib/hero-meta.js';
@@ -32,10 +32,11 @@ const autoFormHtml = (auto) => `<form class="feed-auto"><fieldset><legend>Auto-p
   <small class="feed-auto-note" role="status" aria-live="polite">Changes apply to new posts. Old posts stay until you delete them.</small></fieldset></form>`;
 
 // The kind of post and the order the Feed shows; kept while you browse, so a redraw keeps them.
-const view = { type: 'all', sort: 'new' };
+const view = { type: 'all', sort: 'trending', range: 'all' };
 const viewBarHtml = () => `<div class="feed-view" role="group" aria-label="Filter and sort the feed">
   <label class="feed-view-type">Show <select name="type">${Object.entries(FEED_TYPES).map(([k, t]) => `<option value="${k}"${view.type === k ? ' selected' : ''}>${t.label}</option>`).join('')}</select></label>
   <div class="feed-view-sort" role="radiogroup" aria-label="Sort">${Object.entries(FEED_SORTS).map(([k, label]) => `<button type="button" role="radio" data-feed-sort="${k}" aria-checked="${view.sort === k}">${label}</button>`).join('')}</div>
+  <label class="feed-view-type feed-view-range"${view.sort === 'top' ? '' : ' hidden'}>Top of <select name="range">${Object.entries(FEED_RANGES).map(([k, r]) => `<option value="${k}"${view.range === k ? ' selected' : ''}>${r.label}</option>`).join('')}</select></label>
 </div>`;
 
 // account: one player's Feed (their profile's Feed tab, collection.js mountProfileFeed): only their
@@ -71,6 +72,7 @@ export async function drawFeed(body, { viewer, signIn, action, swatch, colors, t
   const toolsHtml = (p) => {
     if (me == null) return '';
     const other = String(p.account) !== me, out = [];
+    if (admin && account == null) out.push(`<button type="button" class="link-btn" data-pin-post="${p.pinned ? 'off' : 'on'}">${p.pinned ? 'Unpin' : 'Pin'}</button>`);
     if (canRemovePost(p.id, me, admin)) out.push('<button type="button" class="link-btn" data-remove-post>Delete</button>');
     if (other && account == null) out.push(`<button type="button" class="link-btn" data-unfollow="${esc(p.account)}" title="Hide ${esc(nameOf(p.account))}'s posts from your Feed">Unfollow</button>`);
     if (other && admin) out.push(`<button type="button" class="link-btn feed-ban" data-ban="${esc(p.account)}" data-ban-from="post">Ban</button>`);
@@ -202,8 +204,8 @@ export async function drawFeed(body, { viewer, signIn, action, swatch, colors, t
   function postHtml(p, pinned = false) {
     let media, what, rarity = '#c4b9cf';
     if (p.kind === 'user') {
-      return `<article class="feed-post feed-user${pinned ? ' feed-pinned' : ''}" data-post="${esc(p.id)}" data-account="${esc(p.account)}" style="--rarity:#6f6280">
-      ${pinned ? '<p class="feed-pin-note">From your notifications</p>' : ''}
+      return `<article class="feed-post feed-user${pinned ? ' feed-pinned' : ''}${p.pinned ? ' feed-pin-top' : ''}" data-post="${esc(p.id)}" data-account="${esc(p.account)}" style="--rarity:#6f6280">
+      ${pinned ? '<p class="feed-pin-note">From your notifications</p>' : ''}${p.pinned ? '<p class="feed-pin-badge">Pinned by Fav</p>' : ''}
       <header>${who(p.account)} <span>${p.poll ? 'started a poll' : p.game ? 'highlighted a game' : p.clip ? 'shared a clip' : p.images?.length ? 'posted' : 'wrote'}</span> ${when(p.at)}${toolsHtml(p)}</header>
       <div class="feed-user-body">${userPostHtml(p)}</div>
       <div class="feed-user-foot"><div class="feed-reacts" role="group" aria-label="Reactions">${reactsHtml(p)}</div>${reactionControlHtml(p)}</div>
@@ -225,8 +227,8 @@ export async function drawFeed(body, { viewer, signIn, action, swatch, colors, t
         screens.length ? `${screens.length === 1 ? 'a' : screens.length} loading screen${screens.length === 1 ? '' : 's'}` : ''].filter(Boolean);
       what = `pulled ${got.join(' and ') || 'something'} from a pack`;
     }
-    return `<article class="feed-post${pinned ? ' feed-pinned' : ''}" data-post="${esc(p.id)}" data-account="${esc(p.account)}" style="--rarity:${rarity}">
-      ${pinned ? '<p class="feed-pin-note">From your notifications</p>' : ''}
+    return `<article class="feed-post${pinned ? ' feed-pinned' : ''}${p.pinned ? ' feed-pin-top' : ''}" data-post="${esc(p.id)}" data-account="${esc(p.account)}" style="--rarity:${rarity}">
+      ${pinned ? '<p class="feed-pin-note">From your notifications</p>' : ''}${p.pinned ? '<p class="feed-pin-badge">Pinned by Fav</p>' : ''}
       <header>${who(p.account)} <span>${what}</span> ${when(p.at)}${toolsHtml(p)}</header>
       <div class="feed-media-wrap${p.kind === 'card' ? ' feed-card-wrap' : ''}"><div class="feed-media${p.kind === 'card' ? ' feed-card' : ''}">${media}</div>${reactionControlHtml(p)}</div>
       ${p.kind === 'card' ? `<div class="feed-card-rating" data-rate-post="${esc(p.id)}"></div>` : ''}
@@ -341,14 +343,14 @@ export async function drawFeed(body, { viewer, signIn, action, swatch, colors, t
   };
   drawBans();
   function add(batch, pinned = false) {
-    if (!pinned) served += batch.length;
+    // Fav's pinned post leads the first page but isn't part of the paging.
+    if (!pinned) served += batch.filter((p) => !p.pinned).length;
     for (const p of batch) {
-      if (!pinned) oldest = Math.min(oldest, p.at);
-      if (!pinned && unfollowed.has(String(p.account))) continue;
+      if (!pinned && !p.pinned) oldest = Math.min(oldest, p.at);
+      if (!pinned && !p.pinned && unfollowed.has(String(p.account))) continue;
       if (posts.has(p.id) && !pinned) continue;
       posts.set(p.id, p);
       list.insertAdjacentHTML(pinned ? 'afterbegin' : 'beforeend', postHtml(p, pinned));
-      if (!pinned) oldest = Math.min(oldest, p.at);
     }
     wirePlayerCards(list, { openOnCard: true });
     mountCardRatings();
@@ -360,7 +362,7 @@ export async function drawFeed(body, { viewer, signIn, action, swatch, colors, t
     loading = true; moreBox.innerHTML = '<p>Loading…</p>';
     const mark = viewToken;
     try {
-      const page = await feedPosts({ account, ...view, ...(view.sort === 'new' ? { before: oldest } : { offset: served }) });
+      const page = await feedPosts({ account, ...view, ...(view.sort === 'new' ? { before: Number.isFinite(oldest) ? oldest : null } : { offset: served }) });
       if (mark !== viewToken) return;
       Object.assign(nicknames, page.nicknames); more = page.more; add(page.posts);
     }
@@ -371,6 +373,7 @@ export async function drawFeed(body, { viewer, signIn, action, swatch, colors, t
   async function changeView() {
     const mark = ++viewToken;
     body.querySelectorAll('[data-feed-sort]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.feedSort === view.sort)));
+    body.querySelector('.feed-view-range').hidden = view.sort !== 'top';
     list.innerHTML = ''; posts.clear(); oldest = Infinity; served = 0; more = false; loading = true;
     moreBox.innerHTML = '<p>Loading…</p>';
     try {
@@ -380,7 +383,8 @@ export async function drawFeed(body, { viewer, signIn, action, swatch, colors, t
     } catch (e) { if (mark === viewToken) { moreBox.innerHTML = `<p>${esc(e.message)}</p>`; loading = false; } return; }
     loading = false; drawMore();
   }
-  body.querySelector('.feed-view select').onchange = (e) => { view.type = e.target.value; changeView(); };
+  body.querySelector('.feed-view select[name=type]').onchange = (e) => { view.type = e.target.value; changeView(); };
+  body.querySelector('.feed-view select[name=range]').onchange = (e) => { view.range = e.target.value; changeView(); };
   if (focused?.posts?.[0]) add(focused.posts, true);
   more = first.more; add(first.posts); drawMore();
   // Scrolling near the end loads the next page; the button is there for when it doesn't.
@@ -575,6 +579,12 @@ export async function drawFeed(body, { viewer, signIn, action, swatch, colors, t
     const article = e.target.closest('[data-post]'); if (!article) return;
     const id = article.dataset.post, p = posts.get(id);
     fail(article, '');
+    const pin = e.target.closest('[data-pin-post]');
+    if (pin) {
+      pin.disabled = true;
+      try { await action('post-pin', { post: id, pinned: pin.dataset.pinPost === 'on' }); } catch (err) { pin.disabled = false; fail(article, err.message); return; }
+      return changeView();
+    }
     if (e.target.closest('[data-remove-post]')) {
       if (!confirm('Delete this post? Its images, reactions and comments go too.')) return;
       try { await action('post-delete', { post: id }); posts.delete(id); article.remove(); } catch (err) { fail(article, err.message); }

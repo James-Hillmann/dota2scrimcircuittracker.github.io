@@ -100,6 +100,9 @@ export const FEED_TYPES = Object.freeze({
 });
 // Newest first; Top by score; Trending by score that fades with age (half after about a day).
 export const FEED_SORTS = Object.freeze({ new: 'Newest', trending: 'Trending', top: 'Top' });
+// How far back Top looks: the longest age of a post it ranks (ms), or none for all time.
+export const FEED_RANGES = Object.freeze({ all: { label: 'All time', ms: Infinity }, day: { label: 'Today', ms: 86400000 }, week: { label: 'This week', ms: 7 * 86400000 }, month: { label: 'This month', ms: 30 * 86400000 } });
+export const feedRangeOf = (r) => Object.hasOwn(FEED_RANGES, r) ? r : 'all';
 export const feedTypeOf = (t) => Object.hasOwn(FEED_TYPES, t) ? t : 'all';
 export const feedSortOf = (s) => Object.hasOwn(FEED_SORTS, s) ? s : 'new';
 // A post's score: one point per player who reacted, however many emojis they picked, one per poll

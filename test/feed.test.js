@@ -287,6 +287,8 @@ test('feed sorts: score counts reactors and comments; trending fades with age',a
   assert.deepEqual(sortFeed(posts,'trending',now).map(p=>p.id),['new','old','quiet']);
   assert.deepEqual(sortFeed(posts,'new',now).map(p=>p.id),['quiet','new','old']);
   assert.ok(trendScore(4,0,0)>trendScore(4,0,24*h));
+  const {feedRangeOf,FEED_RANGES}=await import('../public/lib/feed.js');
+  assert.equal(feedRangeOf('week'),'week');assert.equal(feedRangeOf('x'),'all');assert.equal(feedRangeOf('constructor'),'all');assert.equal(FEED_RANGES.all.ms,Infinity);
   assert.equal(feedTypeOf('clips'),'clips');assert.equal(feedTypeOf('constructor'),'all');assert.equal(feedSortOf('x'),'new');
   assert.equal(FEED_TYPES.clips.match({kind:'user',clip:{}}),true);assert.equal(FEED_TYPES.clips.match({kind:'user'}),false);
   assert.equal(FEED_TYPES.pulls.match({kind:'pull'}),true);
@@ -307,6 +309,34 @@ test('vault: the feed filters by kind and pages Top by score',async()=>{
   assert.deepEqual((await feed('?type=clips')).posts.map(p=>p.text),['clip']);
   assert.equal((await feed('?type=cards')).posts.length,0);
   assert.equal((await feed('?type=bogus')).posts.length,3);
+});
+
+test('vault: only Fav pins a post; it leads page one once; Top takes a timeline',async()=>{
+  const rows=new Map(),storage={get:async k=>structuredClone(rows.get(k)),put:async(k,v)=>rows.set(k,structuredClone(v)),delete:async k=>rows.delete(k),list:async({prefix})=>new Map([...rows].filter(([k])=>k.startsWith(prefix)))};storage.transaction=fn=>fn(storage);
+  const vault=new CosmeticsVault({storage});
+  let n=0;const act=(account,body)=>vault.fetch(new Request(`https://vault/action?account=${account}`,{method:'POST',body:JSON.stringify({requestId:`pin-test-request-${String(++n).padStart(4,'0')}`,...body})})).then(async r=>({status:r.status,...await r.json()}));
+  const feed=async(q='')=>(await vault.fetch(new Request(`https://vault/feed${q}`))).json();
+  const FAV='173365627';
+  for(const a of ['101','202','303',FAV])await act(a,{action:'session'});
+  const first=(await act('101',{action:'post',text:'first'})).post.id;
+  await act('202',{action:'post',text:'second'});await act('303',{action:'post',text:'third'});
+  assert.equal((await act('101',{action:'post-pin',post:first})).status,400);
+  assert.equal((await act(FAV,{action:'post-pin',post:first})).status,200);
+  const page=await feed();
+  assert.equal(page.posts[0].text,'first');assert.deepEqual(page.posts.map(p=>p.text).sort(),['first','second','third']);assert.equal(page.posts[0].pinned,true);
+  assert.equal((await feed('?sort=top')).posts[0].id,first);
+  assert.equal((await feed('?sort=top&offset=1')).posts.some(p=>p.id===first),false);
+  assert.equal((await feed(`?before=${Date.now()+1}`)).posts.some(p=>p.id===first),false);
+  assert.equal((await feed('?before=1')).posts.length,0);
+  assert.equal((await feed('?account=101')).posts.some(p=>p.pinned),false);
+  assert.equal((await feed('?sort=top&range=day')).posts.length,3);
+  const old=[...rows].find(([k,v])=>k.startsWith('post:')&&v.text==='second');rows.set(old[0],{...old[1],at:Date.now()-3*86400000});
+  assert.equal((await feed('?sort=top&range=day')).posts.some(p=>p.text==='second'),false);
+  assert.equal((await feed('?sort=top&range=week')).posts.some(p=>p.text==='second'),true);
+  await act(FAV,{action:'post-pin',post:first,pinned:false});
+  assert.equal((await feed()).posts.some(p=>p.pinned),false);
+  await act(FAV,{action:'post-pin',post:first});await act('101',{action:'post-delete',post:first});
+  assert.equal(rows.has('feed-pin'),false);
 });
 
 test('auto-post settings: defaults, checking, and what a pack posts',async()=>{
