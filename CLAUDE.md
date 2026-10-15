@@ -14,6 +14,12 @@ Vanilla ES modules under `public/`. Tests in `test/` (`npm test`). Dev server: `
   `public/data/*.json` (synced data), `package-lock.json`. Denied in `.claude/settings.json`: logs, `_site`, `.wrangler`, `_dev`, screenshots.
 - Don't re-explore. Use the map below to go straight to the file.
 - Small edits: no subagents. Use one only for a sweep across many files.
+- Every turn re-sends the whole conversation, so keep threads short. When a request is unrelated to the
+  current thread, say so in one line and suggest a new session instead of continuing here.
+- Small edits (a text change, a CSS tweak, a one-line fix) don't need high effort or a large model.
+  Say so if the session is set higher than the task needs.
+- Skip the preview, screenshot and browser loop when a change isn't visual (logic, data, workers, docs, tests).
+  Run `npm test` or the relevant script instead.
 
 ## Site map
 
