@@ -438,6 +438,10 @@ function renderHub() {
 
 // Scrim pages before they moved under #/scrims/ (#/week, #/teams/x, #/match/id…): forwarded.
 const OLD_SCRIM = /^#\/(?=(?:week|teams|players|player|heroes|hero|predict|upload|match|matches|edit|search|tiers)(?:[/?]|$))/;
+// A link with a broken %-escape (e.g. #/scrims/player/%) would make decodeURIComponent throw
+// and stop the router; fall back to the raw text instead.
+const safeDecode = (s) => { try { return decodeURIComponent(s); } catch { return s; } };
+
 export function route() {
   setMenu(false);
   let h = here();
@@ -498,13 +502,13 @@ export function route() {
     else if (h.startsWith(`${r}/games`)) { section = "week"; page = () => renderWeek(src, 0); } // old Games tab: Weekly lists every game
     else if (h.startsWith(`${r}/teams`)) {
       // Standings doubles as the team list; a team's own page still lives under <root>/teams/<id>.
-      const slug = decodeURIComponent(h.slice(r.length).split("/")[2] ?? "");
+      const slug = safeDecode(h.slice(r.length).split("/")[2] ?? "");
       section = "standings"; tm = true; page = slug ? () => renderTeams(t, slug) : () => renderStandings(t);
     }
     // Content lives at /content; /week (its old address) still opens it.
     else if (h.startsWith(`${r}/content`) || h.startsWith(`${r}/week`)) { section = "week"; page = () => renderWeek(src, Number(h.slice(r.length).split("/")[2] ?? 0) || 0); }
     else if (h.startsWith(`${r}/tiers`)) { section = "players"; tm = true; page = () => renderPlayers(t); }
-    else if (h.startsWith(`${r}/player/`)) { section = "players"; tm = true; page = () => renderPlayer(t, decodeURIComponent(h.slice(`${r}/player/`.length))); }
+    else if (h.startsWith(`${r}/player/`)) { section = "players"; tm = true; page = () => renderPlayer(t, safeDecode(h.slice(`${r}/player/`.length))); }
     else if (h.startsWith(`${r}/players`)) { section = "players"; tm = true; page = () => renderPlayers(t); }
     else if (h.startsWith(`${r}/hero/`)) { section = "heroes"; tm = true; page = () => renderHero(t, h.slice(`${r}/hero/`.length)); }
     else if (h.startsWith(`${r}/heroes`)) { section = "heroes"; tm = true; page = () => renderHeroes(t); }
@@ -536,10 +540,10 @@ export function route() {
       };
     }
     else if (p.startsWith("/predict")) { section = "predict"; page = async () => (await predictPage()).renderScrimPredict(); }
-    else if (/^\/teams\/[^/?]/.test(p)) { section = "standings"; tm = true; page = () => renderTeams(t, decodeURIComponent(p.split("/")[2])); }
+    else if (/^\/teams\/[^/?]/.test(p)) { section = "standings"; tm = true; page = () => renderTeams(t, safeDecode(p.split("/")[2])); }
     else if (p.startsWith("/content") || p.startsWith("/week")) { section = "week"; page = () => renderWeek(src, Number(p.split("/")[2] ?? 0) || 0); }
     else if (p.startsWith("/tiers")) { section = "players"; tm = true; page = () => renderPlayers(t); }
-    else if (p.startsWith("/player/")) { section = "players"; tm = true; page = () => renderPlayer(t, decodeURIComponent(p.slice("/player/".length))); }
+    else if (p.startsWith("/player/")) { section = "players"; tm = true; page = () => renderPlayer(t, safeDecode(p.slice("/player/".length))); }
     else if (p.startsWith("/players")) { section = "players"; tm = true; page = () => renderPlayers(t); }
     else if (p.startsWith("/hero/")) { section = "heroes"; tm = true; page = () => renderHero(t, p.slice("/hero/".length)); }
     else if (p.startsWith("/heroes")) { section = "heroes"; tm = true; page = () => renderHeroes(t); }
